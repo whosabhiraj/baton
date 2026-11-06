@@ -1,0 +1,64 @@
+{
+  "description": "After done is stored the run is ended: later agent messages get RUN_ENDED (A10).",
+  "run": {
+    "run_id": "r_TEST",
+    "agent_id": "a1",
+    "plan": [
+      {
+        "id": "s1",
+        "title": "Parse input",
+        "acceptance": "tests pass"
+      },
+      {
+        "id": "s2",
+        "title": "Write output",
+        "acceptance": "file exists"
+      }
+    ]
+  },
+  "incoming": [
+    {
+      "v": 1,
+      "run_id": "r_TEST",
+      "agent_id": "a1",
+      "type": "done",
+      "payload": {
+        "status": "success",
+        "summary": "ok"
+      },
+      "msg_id": "e1"
+    },
+    {
+      "v": 1,
+      "run_id": "r_TEST",
+      "agent_id": "a1",
+      "type": "heartbeat",
+      "msg_id": "e2"
+    }
+  ],
+  "expect": [
+    {
+      "ok": true,
+      "seq": 1,
+      "duplicate": false,
+      "stored": {
+        "v": 1,
+        "run_id": "r_TEST",
+        "agent_id": "a1",
+        "ts": "<any>",
+        "src": "cli",
+        "seq": 1,
+        "type": "done",
+        "payload": {
+          "status": "success",
+          "summary": "ok"
+        },
+        "msg_id": "e1"
+      }
+    },
+    {
+      "ok": false,
+      "code": "RUN_ENDED"
+    }
+  ]
+}

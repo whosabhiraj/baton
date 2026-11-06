@@ -1,0 +1,36 @@
+{
+  "$id": "baton/1/hub.exit",
+  "title": "hub.exit",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "code": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "signal": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "diff_stat": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "duration_s": {
+      "type": "number"
+    }
+  },
+  "required": [
+    "code",
+    "signal",
+    "diff_stat",
+    "duration_s"
+  ],
+  "additionalProperties": {}
+}

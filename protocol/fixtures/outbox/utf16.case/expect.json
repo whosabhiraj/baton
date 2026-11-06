@@ -1,0 +1,12 @@
+{
+  "description": "UTF-16 content (PowerShell 5.1 redirection) is skipped with SPOOL_UTF16.",
+  "run": {
+    "run_id": "r_TEST",
+    "agent_id": "a1"
+  },
+  "stored": [],
+  "warnings": [
+    "SPOOL_UTF16"
+  ],
+  "final_offset": 154
+}

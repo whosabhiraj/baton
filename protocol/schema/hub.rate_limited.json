@@ -1,0 +1,15 @@
+{
+  "$id": "baton/1/hub.rate_limited",
+  "title": "hub.rate_limited",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "detail": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "detail"
+  ],
+  "additionalProperties": {}
+}

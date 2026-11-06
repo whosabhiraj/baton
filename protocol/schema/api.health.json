@@ -1,0 +1,15 @@
+{
+  "$id": "baton/1/api.health",
+  "title": "api.health",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "GET /api/health response (A11, A12).",
+  "type": "object",
+  "properties": {
+    "ok": { "type": "boolean", "const": true },
+    "name": { "type": "string", "const": "baton" },
+    "v": { "type": "integer", "const": 1 },
+    "instance": { "type": "string", "minLength": 1, "description": "Random id of this hub process (A12)." }
+  },
+  "required": ["ok", "name", "v", "instance"],
+  "additionalProperties": {}
+}

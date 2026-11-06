@@ -1,0 +1,11 @@
+{
+  "input": {
+    "qid": "q_1",
+    "text": "x",
+    "options": [
+      1
+    ],
+    "blocking": true
+  },
+  "code": "INVALID_PAYLOAD"
+}

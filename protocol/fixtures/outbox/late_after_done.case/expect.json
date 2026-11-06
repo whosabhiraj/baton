@@ -1,0 +1,27 @@
+{
+  "description": "Lines after done are skipped with RUN_ENDED.",
+  "run": {
+    "run_id": "r_TEST",
+    "agent_id": "a1"
+  },
+  "stored": [
+    {
+      "v": 1,
+      "run_id": "r_TEST",
+      "agent_id": "a1",
+      "ts": "<any>",
+      "src": "spool",
+      "seq": 1,
+      "type": "done",
+      "payload": {
+        "status": "success",
+        "summary": "ok"
+      },
+      "msg_id": "o1"
+    }
+  ],
+  "warnings": [
+    "RUN_ENDED"
+  ],
+  "final_offset": 191
+}

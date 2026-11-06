@@ -1,0 +1,22 @@
+{
+  "$id": "baton/1/agent.hello",
+  "title": "agent.hello",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "model": {
+      "type": "string"
+    },
+    "cwd": {
+      "type": "string"
+    },
+    "brief_ack": {
+      "type": "boolean",
+      "const": true
+    }
+  },
+  "required": [
+    "brief_ack"
+  ],
+  "additionalProperties": {}
+}

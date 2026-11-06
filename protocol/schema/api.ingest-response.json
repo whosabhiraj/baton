@@ -1,0 +1,14 @@
+{
+  "$id": "baton/1/api.ingest-response",
+  "title": "api.ingest-response",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "POST /api/ingest success response (A11).",
+  "type": "object",
+  "properties": {
+    "ok": { "type": "boolean", "const": true },
+    "seq": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+    "duplicate": { "type": "boolean" }
+  },
+  "required": ["ok", "seq", "duplicate"],
+  "additionalProperties": {}
+}

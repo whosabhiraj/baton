@@ -1,0 +1,27 @@
+{
+  "$id": "baton/1/api.inbox",
+  "title": "api.inbox",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "GET /api/runs/{id}/inbox response (A11): all messages with n > after.",
+  "type": "object",
+  "properties": {
+    "ok": { "type": "boolean", "const": true },
+    "messages": { "type": "array", "items": { "$ref": "#/$defs/inbox_message" } }
+  },
+  "required": ["ok", "messages"],
+  "additionalProperties": {},
+  "$defs": {
+    "inbox_message": {
+      "type": "object",
+      "properties": {
+        "v": { "type": "number", "const": 1 },
+        "n": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+        "ts": { "type": "string" },
+        "type": { "type": "string" },
+        "payload": { "type": "object", "propertyNames": { "type": "string" }, "additionalProperties": {} }
+      },
+      "required": ["v", "n", "ts", "type", "payload"],
+      "additionalProperties": {}
+    }
+  }
+}

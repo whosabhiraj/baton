@@ -1,0 +1,11 @@
+{
+  "input": {
+    "steps": [
+      {
+        "id": "s1",
+        "title": "t"
+      }
+    ]
+  },
+  "code": "INVALID_PAYLOAD"
+}

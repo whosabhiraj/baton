@@ -1,0 +1,14 @@
+{
+  "$id": "baton/1/api.error",
+  "title": "api.error",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Error body of every failing API call (A11). Codes include INVALID_ENVELOPE, INVALID_PAYLOAD, HUB_ONLY_TYPE, UNKNOWN_INBOX_TYPE, UNAUTHORIZED, RUN_MISMATCH, AGENT_MISMATCH, RUN_ENDED, NOT_FOUND, METHOD_NOT_ALLOWED, INTERNAL.",
+  "type": "object",
+  "properties": {
+    "ok": { "type": "boolean", "const": false },
+    "code": { "type": "string", "minLength": 1 },
+    "error": { "type": "string" }
+  },
+  "required": ["ok", "code", "error"],
+  "additionalProperties": {}
+}

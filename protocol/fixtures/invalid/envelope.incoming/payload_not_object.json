@@ -1,0 +1,10 @@
+{
+  "input": {
+    "v": 1,
+    "run_id": "r_TEST",
+    "agent_id": "a1",
+    "type": "heartbeat",
+    "payload": "x"
+  },
+  "code": "INVALID_ENVELOPE"
+}

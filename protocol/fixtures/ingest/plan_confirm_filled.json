@@ -1,0 +1,105 @@
+{
+  "description": "plan {confirm:true} is stored with the run record's plan steps filled in (A5).",
+  "run": {
+    "run_id": "r_TEST",
+    "agent_id": "a1",
+    "plan": [
+      {
+        "id": "s1",
+        "title": "Parse input",
+        "acceptance": "tests pass"
+      },
+      {
+        "id": "s2",
+        "title": "Write output",
+        "acceptance": "file exists"
+      }
+    ]
+  },
+  "incoming": [
+    {
+      "v": 1,
+      "run_id": "r_TEST",
+      "agent_id": "a1",
+      "type": "plan",
+      "payload": {
+        "confirm": true
+      },
+      "msg_id": "p1"
+    },
+    {
+      "v": 1,
+      "run_id": "r_TEST",
+      "agent_id": "a1",
+      "type": "plan",
+      "payload": {
+        "steps": [
+          {
+            "id": "s1",
+            "title": "Parse input",
+            "acceptance": "tests pass"
+          }
+        ],
+        "reason": "revised"
+      },
+      "msg_id": "p2"
+    }
+  ],
+  "expect": [
+    {
+      "ok": true,
+      "seq": 1,
+      "duplicate": false,
+      "stored": {
+        "v": 1,
+        "run_id": "r_TEST",
+        "agent_id": "a1",
+        "ts": "<any>",
+        "src": "cli",
+        "seq": 1,
+        "type": "plan",
+        "payload": {
+          "confirm": true,
+          "steps": [
+            {
+              "id": "s1",
+              "title": "Parse input",
+              "acceptance": "tests pass"
+            },
+            {
+              "id": "s2",
+              "title": "Write output",
+              "acceptance": "file exists"
+            }
+          ]
+        },
+        "msg_id": "p1"
+      }
+    },
+    {
+      "ok": true,
+      "seq": 2,
+      "duplicate": false,
+      "stored": {
+        "v": 1,
+        "run_id": "r_TEST",
+        "agent_id": "a1",
+        "ts": "<any>",
+        "src": "cli",
+        "seq": 2,
+        "type": "plan",
+        "payload": {
+          "steps": [
+            {
+              "id": "s1",
+              "title": "Parse input",
+              "acceptance": "tests pass"
+            }
+          ],
+          "reason": "revised"
+        },
+        "msg_id": "p2"
+      }
+    }
+  ]
+}

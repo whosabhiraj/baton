@@ -1,0 +1,38 @@
+{
+  "description": "Wrong run_id/agent_id, hub-only types and invalid payloads are skipped with warnings.",
+  "run": {
+    "run_id": "r_TEST",
+    "agent_id": "a1"
+  },
+  "stored": [
+    {
+      "v": 1,
+      "run_id": "r_TEST",
+      "agent_id": "a1",
+      "ts": "<any>",
+      "src": "spool",
+      "seq": 1,
+      "type": "heartbeat",
+      "payload": {},
+      "msg_id": "o1"
+    },
+    {
+      "v": 1,
+      "run_id": "r_TEST",
+      "agent_id": "a1",
+      "ts": "<any>",
+      "src": "spool",
+      "seq": 2,
+      "type": "heartbeat",
+      "payload": {},
+      "msg_id": "o6"
+    }
+  ],
+  "warnings": [
+    "RUN_MISMATCH",
+    "AGENT_MISMATCH",
+    "HUB_ONLY_TYPE",
+    "INVALID_PAYLOAD"
+  ],
+  "final_offset": 486
+}

@@ -1,0 +1,13 @@
+{
+  "v": 1,
+  "run_id": "r_TEST",
+  "agent_id": "a1",
+  "seq": 5,
+  "ts": "2026-11-06T14:12:09.123Z",
+  "type": "heartbeat",
+  "payload": {},
+  "msg_id": "spool@120",
+  "src": "spool",
+  "client_seq": 99,
+  "extra": true
+}

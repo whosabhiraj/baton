@@ -1,0 +1,233 @@
+# BATON/1 protocol
+
+> Sections 3.x below are copied verbatim from the original spec (`docs/BATON_BUILD_PROMPT.md` §3).
+> Where they conflict with the **Amendments** at the end of this file, the Amendments win.
+
+## 3. The protocol: BATON/1
+
+One protocol for every agent. It has three layers, so an agent with any capability level can take part:
+
+- **Layer A, the `baton` CLI** (preferred). Any agent that can run a shell command can report and receive messages.
+- **Layer B, file spool** (fallback). If the CLI can't reach the hub, it appends to `$BATON_RUN_DIR/events.jsonl`. The hub tails that file. An agent with only file access can write the same JSON lines by hand.
+- **Layer C, passive telemetry** (automatic). Adapters translate native output into `activity` events. Agents don't need to do anything for this.
+
+### 3.1 Envelope
+
+Every message is one JSON object per line:
+
+```json
+{
+  "v": 1,
+  "run_id": "r_01J...",
+  "agent_id": "cc-b-0007",
+  "seq": 42,
+  "ts": "2026-11-06T14:12:09.123Z",
+  "type": "step_done",
+  "payload": { }
+}
+```
+
+`seq` is per-run, strictly increasing; the hub assigns it if the sender omits it. Unknown `type` values must be stored and forwarded, never rejected (forward compatibility).
+
+### 3.2 Environment given to every agent
+
+| Var | Meaning |
+|---|---|
+| `BATON_URL` | hub base URL (e.g. `http://127.0.0.1:7777`) |
+| `BATON_TOKEN` | per-run bearer token; can only post/read for this run |
+| `BATON_RUN_ID` | run id |
+| `BATON_AGENT_ID` | e.g. `cc-b-0007` |
+| `BATON_RUN_DIR` | `runs/<run_id>/` (spool + inbox) |
+| `BATON_BRIEF` | path to `BATON_BRIEF.md` |
+
+`BATON_TOKEN` is a Baton credential for this one run. It is not, and must never be derived from, any Anthropic/OpenAI credential. Revoke it when the run ends.
+
+### 3.3 Message types
+
+Agent → hub:
+
+| type | payload | when |
+|---|---|---|
+| `hello` | `{ model, cwd, brief_ack: true }` | first thing, after reading the brief |
+| `plan` | `{ steps: [{ id, title, acceptance }] }` | after reading the brief; may revise the conductor's plan, with a `reason` |
+| `step_start` | `{ step_id, note? }` | beginning a step |
+| `step_done` | `{ step_id, summary, evidence? }` | acceptance met; `evidence` = test output, file, commit |
+| `step_blocked` | `{ step_id, reason }` | cannot continue, no question to ask |
+| `progress` | `{ percent: 0-100, note }` | at least every ~5 minutes of real work |
+| `artifact` | `{ kind: "file"\|"diff"\|"commit"\|"url"\|"log", ref, note? }` | something the conductor should look at |
+| `question` | `{ qid, text, options?, blocking: bool }` | needs a decision from the conductor |
+| `heartbeat` | `{}` | automatic from the CLI every 30s while a command runs; hand-send if idle >60s |
+| `done` | `{ status: "success"\|"partial"\|"failed", summary, followups? }` | last message from the agent |
+| `error` | `{ message, fatal: bool }` | something broke |
+
+Hub-generated (agents never send these): `activity` (tool call, file edit, shell command, from adapters), `exit` (`{ code, signal, diff_stat, duration_s }`), `rate_limited` (`{ detail }`), `killed`, `paused`, `resumed`.
+
+Hub → agent (delivered to `$BATON_RUN_DIR/inbox/<n>.json`, shown by `baton inbox`):
+
+| type | payload |
+|---|---|
+| `message` | `{ from: "conductor"\|"human", text }` |
+| `answer` | `{ qid, text }` |
+| `plan_update` | `{ steps }`, a revised plan from the conductor |
+| `pause` / `resume` / `stop` | `{ reason? }`; `stop` means finish the current edit, commit, send `done`, exit |
+
+### 3.4 The `baton` CLI (what agents call)
+
+```
+baton hello
+baton plan < plan.json                    # or: baton plan --file plan.json
+baton plan --confirm                      # accept the conductor's plan unchanged
+baton step <id> start [--note ".."]
+baton step <id> done  --summary ".." [--evidence <ref>]
+baton step <id> blocked --reason ".."
+baton progress <0-100> "note"
+baton artifact <file|diff|commit|url|log> <ref> [--note ".."]
+baton ask "question" [--options a,b,c] [--blocking]   # blocking: waits, prints the answer to stdout
+baton inbox                               # prints unread hub→agent messages, marks them read
+baton heartbeat
+baton done --status success|partial|failed --summary ".." [--followups ".."]
+baton error "message" [--fatal]
+```
+
+Rules for the CLI:
+- Exit 0 even when the hub is unreachable (spool to `events.jsonl` instead); an agent must never fail its real work because reporting failed.
+- `baton ask --blocking` polls the inbox every 2s, times out after 15 minutes, then prints `NO_ANSWER` and exits 0. The agent then proceeds with its best-judgement default and says so in the next `progress`.
+- Output is terse (one line) so it doesn't waste agent context.
+
+### 3.5 Agent behaviour rules (copied into every brief)
+
+1. Read the brief. Run `baton hello`.
+2. Send `plan` (confirm or revise the conductor's plan). Revise only with a reason.
+3. For each step: `step start` → work → verify against the acceptance criterion → `step done` with evidence.
+4. Run `baton inbox` at every step boundary and before any destructive action.
+5. If a decision is needed and it isn't covered by the brief, `baton ask`. Don't guess on anything marked `ask_before` in the brief.
+6. Stay inside the worktree and the allowed paths. Commit to your branch with small, descriptive commits.
+7. Finish with `baton done`. If you stop for any reason, say so with `done --status partial` or `error --fatal`.
+8. Never print, store or transmit credentials. Never read other agents' run dirs or worktrees.
+
+### 3.6 Identity
+
+- `agent_id`: `{kind}-{account}-{nnnn}`, e.g. `cc-b-0007` (Claude Code, account b), `cx-1-0003` (Codex, account 1), `oc-k-0001` (OpenCode, key k).
+- `callsign`: a short readable name from a word list (Vesper, Ratchet, Lumen, …), unique among live agents. Shown on the dashboard and used by the conductor in conversation.
+- Each agent also has `account_id`, `role`, `model`, `color` (inherited from the account), `branch`, `worktree`.
+- The hub is the only source of identity. Agents state their `agent_id` in messages but the hub checks it against the run token.
+
+
+---
+
+## Amendments (approved 2026-11-06; these override §3 above)
+
+Machine-readable schemas: the JSON Schema files `protocol/schema/*.json` are the master copy
+(they were generated once from `protocol/types.ts`, which is now reference only). Shared test
+fixtures live in `protocol/fixtures/` (`valid/`, `invalid/`, `ingest/`, `outbox/`, `redact/`);
+the Go conformance tests validate every fixture against the schemas. A protocol change means:
+edit the schema file, add fixtures, update this document.
+
+### A1. `msg_id` and deduplication
+
+Every agent message carries `msg_id`, a client-generated UUID (the `baton` CLI always sets it).
+The hub stores a message **once per `msg_id`** per run: a message that was spooled *and* posted
+is stored once. A repeated `msg_id` is acknowledged (`duplicate: true`) and not stored again.
+
+### A2. `seq` is assigned by the hub
+
+The hub is the only writer of `events.jsonl` and always assigns `seq` (per run, strictly
+increasing, starting at 1). A sender-supplied `seq` is kept as `client_seq` for reference.
+Stored events also carry `msg_id` and `src` (`cli | spool | hub | adapter`).
+
+### A3. Separate spool file (replaces Layer B's use of `events.jsonl`)
+
+When the hub is unreachable, the CLI appends the envelope (one JSON line, with `msg_id` and
+`ts`) to **`$BATON_RUN_DIR/outbox.jsonl`**. Agents writing by hand append to the same file.
+Agents never write `events.jsonl`.
+
+The hub ingests `outbox.jsonl` on startup (before it starts listening) and then by tailing it.
+It tracks how far it has read as a byte offset in `$BATON_RUN_DIR/outbox.offset`, and only
+consumes complete lines (ending in `\n`). A line without `msg_id` gets
+`msg_id = "spool@<byteOffset>"`, so re-reading the same bytes never duplicates it. Lines that are
+not valid JSON, or whose `run_id`/`agent_id` don't match the run, are skipped and reported as a
+hub warning (not stored as events).
+
+"Unreachable" for the CLI means: connection refused/reset, DNS failure, timeout (3 s), or HTTP 5xx.
+
+### A4. `stalled` (hub-generated)
+
+If no event arrives from a run for `heartbeat_timeout_s` while its process is still alive, the
+hub emits `stalled { last_seen, timeout_s }` and sets the status to `stalled`; the next agent
+event clears it. **A run never ends on heartbeat timeout alone** — only on `done`, process exit
+or kill.
+
+### A5. `plan --confirm`
+
+`baton plan --confirm` sends `plan { confirm: true }`. The hub stores it with the conductor's
+steps filled in: `{ confirm: true, steps: [...] }`.
+
+### A6. Hub-only types are rejected
+
+Agent messages with type `activity`, `exit`, `rate_limited`, `killed`, `paused`, `resumed`,
+`stalled` or `to_agent` are rejected (`HUB_ONLY_TYPE`). Other unknown types are stored and
+forwarded unchanged. Known types have their payload validated (`INVALID_PAYLOAD` on failure).
+
+### A7. Inbox files and read state
+
+Hub → agent messages are files `$BATON_RUN_DIR/inbox/<n>.json`, `n` = 1, 2, 3 … zero-padded to
+6 digits (`000001.json`), body = `{ v: 1, n, ts, type, payload }`. The hub writes each file
+atomically (temp file + rename) and also records the delivery in the run's event log as a
+hub-generated `to_agent { n, type, payload }` event, so the dashboard sees both directions.
+
+Read state is kept by the agent side only: the CLI appends each consumed `n` (one per line) to
+`$BATON_RUN_DIR/inbox/.read`. `baton inbox` prints and marks all unread messages.
+`baton ask --blocking` consumes **only** the `answer` whose `qid` matches; other messages stay
+unread for the next `baton inbox`.
+
+### A8. Timeouts and polling
+
+`baton ask --blocking` defaults: poll every 2 s, give up after 900 s (prints `NO_ANSWER`, exit 0).
+Overridable per call (`--timeout <s>`) or by the hub via env `BATON_ASK_TIMEOUT_S` and
+`BATON_POLL_INTERVAL_S`. While blocked it sends a `heartbeat` every 30 s
+(`BATON_HEARTBEAT_INTERVAL_S`).
+
+### A9. CLI exit codes and output
+
+- `0`: success, **or** the hub was unreachable and the message was spooled, **or** the hub
+  rejected the message for a non-usage reason (e.g. revoked token). The agent's real work must
+  never fail because reporting failed.
+- `2`: invalid usage (bad/missing arguments, invalid JSON for `plan`, not inside a Baton run).
+- Output is one terse line, e.g. `ok #12`, `spooled (hub unreachable)`, `qid q_ab12cd`.
+
+### A10. Per-run tokens
+
+Tokens look like `bt_run_<base64url>`; the hub stores only their sha256 in `run.json`. A token
+can only post to `/api/ingest` for its own run and read its own run's inbox and events. It is
+revoked when the run ends (in Phase 1: when `done` is ingested).
+
+### A11. Hub HTTP API (BATON/1, local)
+
+All routes are under the hub base URL (`BATON_URL`, default `http://127.0.0.1:7777`).
+Auth is `Authorization: Bearer <token>`. **Admin token** = the hub's dashboard/API token.
+**Run token** = a per-run token (A10). Errors are JSON `{ ok: false, code, error }`.
+
+| Route | Auth | Body / query | Response |
+|---|---|---|---|
+| `GET /api/health` | none | — | `{ ok: true, name: "baton", v: 1 }` |
+| `POST /api/ingest` | run | envelope (A1–A6) | `200 { ok: true, seq, duplicate }`; `400 INVALID_ENVELOPE / INVALID_PAYLOAD / HUB_ONLY_TYPE`; `401 UNAUTHORIZED`; `403 RUN_MISMATCH / AGENT_MISMATCH`; `410 RUN_ENDED` |
+| `GET /api/runs/:id/inbox?after=<n>` | run (own) or admin | — | `{ ok: true, messages: InboxMessage[] }` (all with `n > after`; stateless) |
+| `GET /api/runs/:id/events?since=<seq>` | run (own) or admin | — | `{ ok: true, events: StoredEvent[] }` (`seq > since`) |
+| `GET /api/state` | admin | — | `{ ok: true, runs: RunSummary[] }` (run record minus token hash, plus `last_seq`, `last_event_ts`, `open_questions`, `step_states`) |
+| `GET /api/stream` | admin (header, or `?token=` for EventSource) | `Last-Event-ID` | SSE; each event `id: <global n>`, `event: baton`, `data: StoredEvent`. If the id is older than the in-memory buffer, the hub sends `event: reset` and the client re-fetches `/api/state`. |
+| `POST /api/runs/:id/message` | admin | `{ text, from? }` (`from` default `human`) | `{ ok: true, n }` |
+| `POST /api/runs/:id/answer` | admin | `{ qid, text }` | `{ ok: true, n }` |
+| `POST /api/runs/:id/plan_update` | admin | `{ steps }` | `{ ok: true, n }` |
+| `POST /api/runs/:id/pause` · `resume` · `stop` | admin | `{ reason? }` | `{ ok: true, n }` |
+| `POST /api/dev/runs` | admin, dev mode only | `{ agent_id?, callsign?, role?, kind?, model?, account_id?, plan? }` | `{ ok: true, run_id, agent_id, token, run_dir, env }` — `env` is the full `BATON_*` set for the agent |
+
+`run_id` format: `r_` + 26-char ULID-like id (time-sortable). The hub never logs tokens.
+
+### A12. Instance id, SSE hello, hub shutdown (approved 2026-11-06)
+
+- Every SSE stream (`GET /api/stream` and any later stream) starts with
+  `event: hello` / `data: {"instance":"<id>"}`, sent before any `baton` event. `instance` is a
+  random id of the running hub process; clients compare it across reconnects to notice a hub restart.
+- `GET /api/health` additionally returns `instance`: `{ ok: true, name: "baton", v: 1, instance }`.
+- `POST /api/hub/shutdown` (admin) answers `{ ok: true }` and then shuts the hub down gracefully.
+- Phase 6 will add `GET /api/wait` and `/api/conductor/*`.

@@ -1,0 +1,104 @@
+{
+  "description": "A repeated msg_id is acknowledged as duplicate with the original seq and stored once (A1).",
+  "run": {
+    "run_id": "r_TEST",
+    "agent_id": "a1",
+    "plan": [
+      {
+        "id": "s1",
+        "title": "Parse input",
+        "acceptance": "tests pass"
+      },
+      {
+        "id": "s2",
+        "title": "Write output",
+        "acceptance": "file exists"
+      }
+    ]
+  },
+  "incoming": [
+    {
+      "v": 1,
+      "run_id": "r_TEST",
+      "agent_id": "a1",
+      "type": "heartbeat",
+      "msg_id": "d1"
+    },
+    {
+      "v": 1,
+      "run_id": "r_TEST",
+      "agent_id": "a1",
+      "type": "progress",
+      "payload": {
+        "percent": 5,
+        "note": "a"
+      },
+      "msg_id": "d2"
+    },
+    {
+      "v": 1,
+      "run_id": "r_TEST",
+      "agent_id": "a1",
+      "type": "heartbeat",
+      "msg_id": "d1"
+    },
+    {
+      "v": 1,
+      "run_id": "r_TEST",
+      "agent_id": "a1",
+      "type": "progress",
+      "payload": {
+        "percent": 9,
+        "note": "b"
+      },
+      "msg_id": "d2"
+    }
+  ],
+  "expect": [
+    {
+      "ok": true,
+      "seq": 1,
+      "duplicate": false,
+      "stored": {
+        "v": 1,
+        "run_id": "r_TEST",
+        "agent_id": "a1",
+        "ts": "<any>",
+        "src": "cli",
+        "seq": 1,
+        "type": "heartbeat",
+        "payload": {},
+        "msg_id": "d1"
+      }
+    },
+    {
+      "ok": true,
+      "seq": 2,
+      "duplicate": false,
+      "stored": {
+        "v": 1,
+        "run_id": "r_TEST",
+        "agent_id": "a1",
+        "ts": "<any>",
+        "src": "cli",
+        "seq": 2,
+        "type": "progress",
+        "payload": {
+          "percent": 5,
+          "note": "a"
+        },
+        "msg_id": "d2"
+      }
+    },
+    {
+      "ok": true,
+      "seq": 1,
+      "duplicate": true
+    },
+    {
+      "ok": true,
+      "seq": 2,
+      "duplicate": true
+    }
+  ]
+}

@@ -1,0 +1,107 @@
+{
+  "description": "Invalid payloads and run/agent mismatches are rejected; later valid messages still get seq 1.",
+  "run": {
+    "run_id": "r_TEST",
+    "agent_id": "a1",
+    "plan": [
+      {
+        "id": "s1",
+        "title": "Parse input",
+        "acceptance": "tests pass"
+      },
+      {
+        "id": "s2",
+        "title": "Write output",
+        "acceptance": "file exists"
+      }
+    ]
+  },
+  "incoming": [
+    {
+      "v": 1,
+      "run_id": "r_TEST",
+      "agent_id": "a1",
+      "type": "step_done",
+      "payload": {
+        "step_id": "s1"
+      },
+      "msg_id": "v1"
+    },
+    {
+      "v": 1,
+      "run_id": "r_TEST",
+      "agent_id": "a1",
+      "type": "progress",
+      "payload": {
+        "percent": 500,
+        "note": "x"
+      },
+      "msg_id": "v2"
+    },
+    {
+      "v": 1,
+      "agent_id": "a1",
+      "type": "heartbeat",
+      "msg_id": "v3"
+    },
+    {
+      "v": 1,
+      "run_id": "r_OTHER",
+      "agent_id": "a1",
+      "type": "heartbeat",
+      "msg_id": "v4"
+    },
+    {
+      "v": 1,
+      "run_id": "r_TEST",
+      "agent_id": "a2",
+      "type": "heartbeat",
+      "msg_id": "v5"
+    },
+    {
+      "v": 1,
+      "run_id": "r_TEST",
+      "agent_id": "a1",
+      "type": "heartbeat",
+      "msg_id": "v6"
+    }
+  ],
+  "expect": [
+    {
+      "ok": false,
+      "code": "INVALID_PAYLOAD"
+    },
+    {
+      "ok": false,
+      "code": "INVALID_PAYLOAD"
+    },
+    {
+      "ok": false,
+      "code": "INVALID_ENVELOPE"
+    },
+    {
+      "ok": false,
+      "code": "RUN_MISMATCH"
+    },
+    {
+      "ok": false,
+      "code": "AGENT_MISMATCH"
+    },
+    {
+      "ok": true,
+      "seq": 1,
+      "duplicate": false,
+      "stored": {
+        "v": 1,
+        "run_id": "r_TEST",
+        "agent_id": "a1",
+        "ts": "<any>",
+        "src": "cli",
+        "seq": 1,
+        "type": "heartbeat",
+        "payload": {},
+        "msg_id": "v6"
+      }
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "n": 1,
+  "type": "message",
+  "payload": {
+    "from": "human",
+    "text": "hi"
+  }
+}

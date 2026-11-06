@@ -1,0 +1,55 @@
+{
+  "description": "Secrets in payloads are redacted before storing.",
+  "run": {
+    "run_id": "r_TEST",
+    "agent_id": "a1",
+    "plan": [
+      {
+        "id": "s1",
+        "title": "Parse input",
+        "acceptance": "tests pass"
+      },
+      {
+        "id": "s2",
+        "title": "Write output",
+        "acceptance": "file exists"
+      }
+    ]
+  },
+  "incoming": [
+    {
+      "v": 1,
+      "run_id": "r_TEST",
+      "agent_id": "a1",
+      "type": "progress",
+      "payload": {
+        "percent": 1,
+        "note": "used sk-ant-abcdefghijkl and token=abc123",
+        "password": "hunter2"
+      },
+      "msg_id": "x1"
+    }
+  ],
+  "expect": [
+    {
+      "ok": true,
+      "seq": 1,
+      "duplicate": false,
+      "stored": {
+        "v": 1,
+        "run_id": "r_TEST",
+        "agent_id": "a1",
+        "ts": "<any>",
+        "src": "cli",
+        "seq": 1,
+        "type": "progress",
+        "payload": {
+          "percent": 1,
+          "note": "used sk-ant-[REDACTED] and token=[REDACTED]",
+          "password": "[REDACTED]"
+        },
+        "msg_id": "x1"
+      }
+    }
+  ]
+}

@@ -1,0 +1,67 @@
+{
+  "description": "Unknown non-hub types and unknown top-level/payload fields are stored unchanged (A6).",
+  "run": {
+    "run_id": "r_TEST",
+    "agent_id": "a1",
+    "plan": [
+      {
+        "id": "s1",
+        "title": "Parse input",
+        "acceptance": "tests pass"
+      },
+      {
+        "id": "s2",
+        "title": "Write output",
+        "acceptance": "file exists"
+      }
+    ]
+  },
+  "incoming": [
+    {
+      "v": 1,
+      "run_id": "r_TEST",
+      "agent_id": "a1",
+      "type": "future_thing",
+      "payload": {
+        "a": 1,
+        "nested": {
+          "b": [
+            1,
+            2
+          ]
+        },
+        "big": 12345678901234567000
+      },
+      "msg_id": "u1",
+      "trace": "abc"
+    }
+  ],
+  "expect": [
+    {
+      "ok": true,
+      "seq": 1,
+      "duplicate": false,
+      "stored": {
+        "v": 1,
+        "run_id": "r_TEST",
+        "agent_id": "a1",
+        "ts": "<any>",
+        "src": "cli",
+        "seq": 1,
+        "type": "future_thing",
+        "payload": {
+          "a": 1,
+          "nested": {
+            "b": [
+              1,
+              2
+            ]
+          },
+          "big": 12345678901234567000
+        },
+        "msg_id": "u1",
+        "trace": "abc"
+      }
+    }
+  ]
+}

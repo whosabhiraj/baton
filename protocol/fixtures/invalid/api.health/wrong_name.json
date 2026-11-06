@@ -1,0 +1,9 @@
+{
+  "input": {
+    "ok": true,
+    "name": "other",
+    "v": 1,
+    "instance": "x"
+  },
+  "code": "INVALID_PAYLOAD"
+}

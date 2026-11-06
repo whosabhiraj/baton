@@ -1,0 +1,6 @@
+{
+  "brief_ack": true,
+  "model": "claude-x",
+  "cwd": "/work",
+  "extra_field": 1
+}

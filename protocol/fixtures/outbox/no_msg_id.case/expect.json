@@ -1,0 +1,36 @@
+{
+  "description": "A line without msg_id gets spool@<byte offset of the line start> (A3).",
+  "run": {
+    "run_id": "r_TEST",
+    "agent_id": "a1"
+  },
+  "stored": [
+    {
+      "v": 1,
+      "run_id": "r_TEST",
+      "agent_id": "a1",
+      "ts": "<any>",
+      "src": "spool",
+      "seq": 1,
+      "type": "heartbeat",
+      "payload": {},
+      "msg_id": "spool@0"
+    },
+    {
+      "v": 1,
+      "run_id": "r_TEST",
+      "agent_id": "a1",
+      "ts": "<any>",
+      "src": "spool",
+      "seq": 2,
+      "type": "progress",
+      "payload": {
+        "percent": 1,
+        "note": "x"
+      },
+      "msg_id": "spool@61"
+    }
+  ],
+  "warnings": [],
+  "final_offset": 156
+}

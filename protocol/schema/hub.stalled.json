@@ -1,0 +1,19 @@
+{
+  "$id": "baton/1/hub.stalled",
+  "title": "hub.stalled",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "last_seen": {
+      "type": "string"
+    },
+    "timeout_s": {
+      "type": "number"
+    }
+  },
+  "required": [
+    "last_seen",
+    "timeout_s"
+  ],
+  "additionalProperties": {}
+}

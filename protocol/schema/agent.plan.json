@@ -1,0 +1,83 @@
+{
+  "$id": "baton/1/agent.plan",
+  "title": "agent.plan",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "anyOf": [
+    {
+      "type": "object",
+      "properties": {
+        "steps": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1
+              },
+              "acceptance": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "id",
+              "title",
+              "acceptance"
+            ]
+          }
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "steps"
+      ],
+      "additionalProperties": {}
+    },
+    {
+      "type": "object",
+      "properties": {
+        "confirm": {
+          "type": "boolean",
+          "const": true
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1
+              },
+              "acceptance": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "id",
+              "title",
+              "acceptance"
+            ]
+          }
+        }
+      },
+      "required": [
+        "confirm"
+      ],
+      "additionalProperties": {}
+    }
+  ]
+}

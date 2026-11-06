@@ -1,0 +1,13 @@
+{
+  "input": {
+    "v": 1,
+    "n": 0,
+    "ts": "2026-11-06T14:12:09.123Z",
+    "type": "message",
+    "payload": {
+      "from": "human",
+      "text": "hi"
+    }
+  },
+  "code": "INVALID_PAYLOAD"
+}

@@ -1,0 +1,30 @@
+{
+  "$id": "baton/1/agent.artifact",
+  "title": "agent.artifact",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "kind": {
+      "type": "string",
+      "enum": [
+        "file",
+        "diff",
+        "commit",
+        "url",
+        "log"
+      ]
+    },
+    "ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "note": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "kind",
+    "ref"
+  ],
+  "additionalProperties": {}
+}

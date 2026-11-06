@@ -1,0 +1,7 @@
+{
+  "input": {
+    "from": "bot",
+    "text": "x"
+  },
+  "code": "INVALID_PAYLOAD"
+}

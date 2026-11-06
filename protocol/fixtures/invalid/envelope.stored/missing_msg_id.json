@@ -1,0 +1,13 @@
+{
+  "input": {
+    "v": 1,
+    "run_id": "r_TEST",
+    "agent_id": "a1",
+    "seq": 1,
+    "ts": "2026-11-06T14:12:09.123Z",
+    "type": "heartbeat",
+    "payload": {},
+    "src": "cli"
+  },
+  "code": "INVALID_ENVELOPE"
+}

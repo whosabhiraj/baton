@@ -1,0 +1,10 @@
+{
+  "v": 1,
+  "run_id": "r_TEST",
+  "agent_id": "a1",
+  "type": "future_thing",
+  "payload": {
+    "x": 1
+  },
+  "trace": "abc"
+}

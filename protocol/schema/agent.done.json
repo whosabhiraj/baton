@@ -1,0 +1,28 @@
+{
+  "$id": "baton/1/agent.done",
+  "title": "agent.done",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": [
+        "success",
+        "partial",
+        "failed"
+      ]
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "followups": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "status",
+    "summary"
+  ],
+  "additionalProperties": {}
+}

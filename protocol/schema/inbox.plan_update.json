@@ -1,0 +1,38 @@
+{
+  "$id": "baton/1/inbox.plan_update",
+  "title": "inbox.plan_update",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "steps": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "acceptance": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "acceptance"
+        ]
+      }
+    }
+  },
+  "required": [
+    "steps"
+  ],
+  "additionalProperties": {}
+}

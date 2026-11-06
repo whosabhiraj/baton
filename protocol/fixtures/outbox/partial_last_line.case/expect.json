@@ -1,0 +1,22 @@
+{
+  "description": "An unterminated last line is not consumed; the offset stays at the end of the last complete line.",
+  "run": {
+    "run_id": "r_TEST",
+    "agent_id": "a1"
+  },
+  "stored": [
+    {
+      "v": 1,
+      "run_id": "r_TEST",
+      "agent_id": "a1",
+      "ts": "<any>",
+      "src": "spool",
+      "seq": 1,
+      "type": "heartbeat",
+      "payload": {},
+      "msg_id": "o1"
+    }
+  ],
+  "warnings": [],
+  "final_offset": 75
+}

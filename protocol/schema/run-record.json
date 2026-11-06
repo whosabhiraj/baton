@@ -1,0 +1,92 @@
+{
+  "$id": "baton/1/run-record",
+  "title": "run-record",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "run_id": {
+      "type": "string"
+    },
+    "agent_id": {
+      "type": "string"
+    },
+    "callsign": {
+      "type": "string"
+    },
+    "account_id": {
+      "type": "string"
+    },
+    "role": {
+      "type": "string"
+    },
+    "kind": {
+      "type": "string"
+    },
+    "model": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "starting",
+        "running",
+        "waiting",
+        "blocked",
+        "paused",
+        "stalled",
+        "rate_limited",
+        "done",
+        "failed",
+        "killed",
+        "exited"
+      ]
+    },
+    "created_at": {
+      "type": "string"
+    },
+    "ended_at": {
+      "type": "string"
+    },
+    "token_sha256": {
+      "type": "string"
+    },
+    "token_revoked": {
+      "type": "boolean"
+    },
+    "plan": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "acceptance": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "acceptance"
+        ]
+      }
+    }
+  },
+  "required": [
+    "run_id",
+    "agent_id",
+    "status",
+    "created_at",
+    "token_sha256",
+    "token_revoked"
+  ],
+  "additionalProperties": {}
+}

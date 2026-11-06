@@ -1,0 +1,2 @@
+{"v":1,"run_id":"r_TEST","agent_id":"a1","type":"done","payload":{"status":"success","summary":"ok"},"msg_id":"o1"}
+{"v":1,"run_id":"r_TEST","agent_id":"a1","type":"heartbeat","msg_id":"o2"}

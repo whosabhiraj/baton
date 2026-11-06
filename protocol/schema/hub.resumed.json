@@ -1,0 +1,12 @@
+{
+  "$id": "baton/1/hub.resumed",
+  "title": "hub.resumed",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "reason": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": {}
+}

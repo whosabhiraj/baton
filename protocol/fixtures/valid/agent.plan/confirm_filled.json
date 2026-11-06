@@ -1,0 +1,10 @@
+{
+  "confirm": true,
+  "steps": [
+    {
+      "id": "s1",
+      "title": "Parse input",
+      "acceptance": "tests pass"
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "input": {
+    "code": "0",
+    "signal": null,
+    "diff_stat": null,
+    "duration_s": 1
+  },
+  "code": "INVALID_PAYLOAD"
+}

@@ -1,0 +1,87 @@
+{
+  "description": "Hub-only types are rejected with HUB_ONLY_TYPE and nothing is stored (A6).",
+  "run": {
+    "run_id": "r_TEST",
+    "agent_id": "a1",
+    "plan": [
+      {
+        "id": "s1",
+        "title": "Parse input",
+        "acceptance": "tests pass"
+      },
+      {
+        "id": "s2",
+        "title": "Write output",
+        "acceptance": "file exists"
+      }
+    ]
+  },
+  "incoming": [
+    {
+      "v": 1,
+      "run_id": "r_TEST",
+      "agent_id": "a1",
+      "type": "exit",
+      "payload": {
+        "code": 0,
+        "signal": null,
+        "diff_stat": null,
+        "duration_s": 1
+      },
+      "msg_id": "h1"
+    },
+    {
+      "v": 1,
+      "run_id": "r_TEST",
+      "agent_id": "a1",
+      "type": "stalled",
+      "payload": {},
+      "msg_id": "h2"
+    },
+    {
+      "v": 1,
+      "run_id": "r_TEST",
+      "agent_id": "a1",
+      "type": "to_agent",
+      "payload": {},
+      "msg_id": "h3"
+    },
+    {
+      "v": 1,
+      "run_id": "r_TEST",
+      "agent_id": "a1",
+      "type": "heartbeat",
+      "msg_id": "h4"
+    }
+  ],
+  "expect": [
+    {
+      "ok": false,
+      "code": "HUB_ONLY_TYPE"
+    },
+    {
+      "ok": false,
+      "code": "HUB_ONLY_TYPE"
+    },
+    {
+      "ok": false,
+      "code": "HUB_ONLY_TYPE"
+    },
+    {
+      "ok": true,
+      "seq": 1,
+      "duplicate": false,
+      "stored": {
+        "v": 1,
+        "run_id": "r_TEST",
+        "agent_id": "a1",
+        "ts": "<any>",
+        "src": "cli",
+        "seq": 1,
+        "type": "heartbeat",
+        "payload": {},
+        "msg_id": "h4"
+      }
+    }
+  ]
+}

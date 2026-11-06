@@ -1,0 +1,35 @@
+{
+  "description": "Invalid JSON is skipped with a warning; blank lines are skipped silently; later lines still ingested.",
+  "run": {
+    "run_id": "r_TEST",
+    "agent_id": "a1"
+  },
+  "stored": [
+    {
+      "v": 1,
+      "run_id": "r_TEST",
+      "agent_id": "a1",
+      "ts": "<any>",
+      "src": "spool",
+      "seq": 1,
+      "type": "heartbeat",
+      "payload": {},
+      "msg_id": "o1"
+    },
+    {
+      "v": 1,
+      "run_id": "r_TEST",
+      "agent_id": "a1",
+      "ts": "<any>",
+      "src": "spool",
+      "seq": 2,
+      "type": "heartbeat",
+      "payload": {},
+      "msg_id": "o3"
+    }
+  ],
+  "warnings": [
+    "INVALID_ENVELOPE"
+  ],
+  "final_offset": 172
+}

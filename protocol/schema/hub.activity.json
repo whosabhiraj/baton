@@ -1,0 +1,31 @@
+{
+  "$id": "baton/1/hub.activity",
+  "title": "hub.activity",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "tool": {
+      "type": "string",
+      "enum": [
+        "edit",
+        "shell",
+        "read",
+        "test",
+        "search",
+        "web",
+        "other"
+      ]
+    },
+    "detail": {
+      "type": "string"
+    },
+    "raw_kind": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "tool",
+    "detail"
+  ],
+  "additionalProperties": {}
+}

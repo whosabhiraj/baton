@@ -1,0 +1,2 @@
+﻿{"v":1,"run_id":"r_TEST","agent_id":"a1","type":"heartbeat","msg_id":"o1","ts":"2026-11-06T14:00:00.000Z"}
+{"v":1,"run_id":"r_TEST","agent_id":"a1","type":"progress","payload":{"percent":10,"note":"n"},"msg_id":"o2"}

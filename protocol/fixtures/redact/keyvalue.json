@@ -1,0 +1,94 @@
+[
+  {
+    "in": "api_key=abcdef123456",
+    "out": "api_key=[REDACTED]"
+  },
+  {
+    "in": "API_KEY: \"supersecretvalue\"",
+    "out": "API_KEY: \"[REDACTED]\""
+  },
+  {
+    "in": "{\"password\": \"hunter2hunter2\"}",
+    "out": "{\"password\": \"[REDACTED]\"}"
+  },
+  {
+    "in": "{'token': 'abc123xyz'}",
+    "out": "{'token': '[REDACTED]'}"
+  },
+  {
+    "in": "DATABASE_PASSWORD=p4ssw0rd!",
+    "out": "DATABASE_PASSWORD=[REDACTED]"
+  },
+  {
+    "in": "my-secret = topsecret value",
+    "out": "my-secret = [REDACTED] value"
+  },
+  {
+    "in": "client.secret=abc123 other=1",
+    "out": "client.secret=[REDACTED] other=1"
+  },
+  {
+    "in": "apikey=zzzzzzzz",
+    "out": "apikey=[REDACTED]"
+  },
+  {
+    "in": "passwd: abcdef",
+    "out": "passwd: [REDACTED]"
+  },
+  {
+    "in": "pwd=abc",
+    "out": "pwd=[REDACTED]"
+  },
+  {
+    "in": "pwd=ab",
+    "out": "pwd=ab"
+  },
+  {
+    "in": "key=value1",
+    "out": "key=[REDACTED]"
+  },
+  {
+    "in": "token=[REDACTED]",
+    "out": "token=[REDACTED]"
+  },
+  {
+    "in": "password: \"[REDACTED]\"",
+    "out": "password: \"[REDACTED]\""
+  },
+  {
+    "in": "token=[REDACTEDX] tail",
+    "out": "token=[REDACTED] tail"
+  },
+  {
+    "in": "api_key=abc123; password=def456, token=ghi789}",
+    "out": "api_key=[REDACTED]; password=[REDACTED], token=[REDACTED]}"
+  },
+  {
+    "in": "monkey=banana",
+    "out": "monkey=banana"
+  },
+  {
+    "in": "keyboard=qwerty",
+    "out": "keyboard=qwerty"
+  },
+  {
+    "in": "x_token_y=abc123",
+    "out": "x_token_y=[REDACTED]"
+  },
+  {
+    "in": "GITHUB_TOKEN=ghp_abcdefghijklmnopqrstuvwxyz0123456789",
+    "out": "GITHUB_TOKEN=[REDACTED]"
+  },
+  {
+    "in": "Authorization=abcdefghi",
+    "out": "Authorization=abcdefghi"
+  },
+  {
+    "in": "a token: abc",
+    "out": "a token: [REDACTED]"
+  },
+  {
+    "in": "line1\nsecret=abc123\nline3",
+    "out": "line1\nsecret=[REDACTED]\nline3"
+  }
+]

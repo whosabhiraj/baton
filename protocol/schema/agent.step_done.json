@@ -1,0 +1,24 @@
+{
+  "$id": "baton/1/agent.step_done",
+  "title": "agent.step_done",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "step_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "step_id",
+    "summary"
+  ],
+  "additionalProperties": {}
+}

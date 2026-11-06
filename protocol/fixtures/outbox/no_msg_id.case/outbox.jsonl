@@ -1,0 +1,2 @@
+{"v":1,"run_id":"r_TEST","agent_id":"a1","type":"heartbeat"}
+{"v":1,"run_id":"r_TEST","agent_id":"a1","type":"progress","payload":{"percent":1,"note":"x"}}

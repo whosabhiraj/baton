@@ -1,0 +1,5 @@
+{
+  "tool": "shell",
+  "detail": "go test",
+  "raw_kind": "tool_use"
+}

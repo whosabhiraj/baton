@@ -1,0 +1,18 @@
+[
+  {
+    "in": "-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA\nabcdef\n-----END RSA PRIVATE KEY----- after",
+    "out": "-----PRIVATE KEY [REDACTED]----- after"
+  },
+  {
+    "in": "-----BEGIN PRIVATE KEY-----\nMIIE truncated without end",
+    "out": "-----PRIVATE KEY [REDACTED]-----"
+  },
+  {
+    "in": "before -----BEGIN OPENSSH PRIVATE KEY-----\nxyz\n-----END OPENSSH PRIVATE KEY-----",
+    "out": "before -----PRIVATE KEY [REDACTED]-----"
+  },
+  {
+    "in": "-----BEGIN PUBLIC KEY-----\nabc\n-----END PUBLIC KEY-----",
+    "out": "-----BEGIN PUBLIC KEY-----\nabc\n-----END PUBLIC KEY-----"
+  }
+]

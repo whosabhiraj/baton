@@ -1,0 +1,12 @@
+{
+  "input": {
+    "v": 1,
+    "n": 1,
+    "type": "message",
+    "payload": {
+      "from": "human",
+      "text": "hi"
+    }
+  },
+  "code": "INVALID_PAYLOAD"
+}

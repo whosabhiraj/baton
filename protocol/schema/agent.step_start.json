@@ -1,0 +1,19 @@
+{
+  "$id": "baton/1/agent.step_start",
+  "title": "agent.step_start",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "step_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "note": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "step_id"
+  ],
+  "additionalProperties": {}
+}

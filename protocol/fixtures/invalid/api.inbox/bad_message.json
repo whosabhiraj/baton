@@ -1,0 +1,11 @@
+{
+  "input": {
+    "ok": true,
+    "messages": [
+      {
+        "n": 1
+      }
+    ]
+  },
+  "code": "INVALID_PAYLOAD"
+}

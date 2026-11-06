@@ -1,0 +1,67 @@
+{
+  "$id": "baton/1/api.state",
+  "title": "api.state",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "GET /api/state response (A11). RunSummary = run record without token_sha256, plus derived fields.",
+  "type": "object",
+  "properties": {
+    "ok": { "type": "boolean", "const": true },
+    "runs": { "type": "array", "items": { "$ref": "#/$defs/run_summary" } }
+  },
+  "required": ["ok", "runs"],
+  "additionalProperties": {},
+  "$defs": {
+    "plan_step": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "title": { "type": "string", "minLength": 1 },
+        "acceptance": { "type": "string", "minLength": 1 }
+      },
+      "required": ["id", "title", "acceptance"]
+    },
+    "open_question": {
+      "type": "object",
+      "properties": {
+        "qid": { "type": "string", "minLength": 1 },
+        "text": { "type": "string", "minLength": 1 },
+        "options": { "type": "array", "items": { "type": "string" } },
+        "blocking": { "type": "boolean" },
+        "ts": { "type": "string" },
+        "seq": { "type": "integer", "exclusiveMinimum": 0 }
+      },
+      "required": ["qid", "text", "blocking"],
+      "additionalProperties": {}
+    },
+    "run_summary": {
+      "type": "object",
+      "properties": {
+        "run_id": { "type": "string" },
+        "agent_id": { "type": "string" },
+        "callsign": { "type": "string" },
+        "account_id": { "type": "string" },
+        "role": { "type": "string" },
+        "kind": { "type": "string" },
+        "model": { "type": "string" },
+        "status": {
+          "type": "string",
+          "enum": ["starting", "running", "waiting", "blocked", "paused", "stalled", "rate_limited", "done", "failed", "killed", "exited"]
+        },
+        "created_at": { "type": "string" },
+        "ended_at": { "type": "string" },
+        "token_revoked": { "type": "boolean" },
+        "plan": { "type": "array", "items": { "$ref": "#/$defs/plan_step" } },
+        "last_seq": { "type": "integer", "minimum": 0 },
+        "last_event_ts": { "type": "string" },
+        "open_questions": { "type": "array", "items": { "$ref": "#/$defs/open_question" } },
+        "step_states": {
+          "type": "object",
+          "description": "step id -> state",
+          "additionalProperties": { "type": "string", "enum": ["pending", "active", "done", "blocked"] }
+        }
+      },
+      "required": ["run_id", "agent_id", "status", "created_at", "token_revoked", "last_seq", "open_questions", "step_states"],
+      "additionalProperties": {}
+    }
+  }
+}

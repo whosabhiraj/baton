@@ -1,0 +1,6 @@
+{"v":1,"run_id":"r_TEST","agent_id":"a1","type":"heartbeat","msg_id":"o1"}
+{"v":1,"run_id":"r_OTHER","agent_id":"a1","type":"heartbeat","msg_id":"o2"}
+{"v":1,"run_id":"r_TEST","agent_id":"a9","type":"heartbeat","msg_id":"o3"}
+{"v":1,"run_id":"r_TEST","agent_id":"a1","type":"exit","payload":{},"msg_id":"o4"}
+{"v":1,"run_id":"r_TEST","agent_id":"a1","type":"step_done","payload":{"step_id":"s1"},"msg_id":"o5"}
+{"v":1,"run_id":"r_TEST","agent_id":"a1","type":"heartbeat","msg_id":"o6"}

@@ -1,0 +1,7 @@
+{
+  "input": {
+    "kind": "blob",
+    "ref": "x"
+  },
+  "code": "INVALID_PAYLOAD"
+}

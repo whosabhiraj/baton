@@ -1,0 +1,105 @@
+{
+  "description": "Hub assigns seq 1..n; a sender seq is kept as client_seq; missing ts is filled; missing payload becomes {}.",
+  "run": {
+    "run_id": "r_TEST",
+    "agent_id": "a1",
+    "plan": [
+      {
+        "id": "s1",
+        "title": "Parse input",
+        "acceptance": "tests pass"
+      },
+      {
+        "id": "s2",
+        "title": "Write output",
+        "acceptance": "file exists"
+      }
+    ]
+  },
+  "incoming": [
+    {
+      "v": 1,
+      "run_id": "r_TEST",
+      "agent_id": "a1",
+      "type": "hello",
+      "payload": {
+        "brief_ack": true
+      },
+      "msg_id": "m1",
+      "ts": "2026-11-06T14:00:00.000Z"
+    },
+    {
+      "v": 1,
+      "run_id": "r_TEST",
+      "agent_id": "a1",
+      "type": "step_start",
+      "payload": {
+        "step_id": "s1"
+      },
+      "msg_id": "m2",
+      "seq": 40
+    },
+    {
+      "v": 1,
+      "run_id": "r_TEST",
+      "agent_id": "a1",
+      "type": "heartbeat",
+      "msg_id": "m3"
+    }
+  ],
+  "expect": [
+    {
+      "ok": true,
+      "seq": 1,
+      "duplicate": false,
+      "stored": {
+        "v": 1,
+        "run_id": "r_TEST",
+        "agent_id": "a1",
+        "ts": "2026-11-06T14:00:00.000Z",
+        "src": "cli",
+        "seq": 1,
+        "type": "hello",
+        "payload": {
+          "brief_ack": true
+        },
+        "msg_id": "m1"
+      }
+    },
+    {
+      "ok": true,
+      "seq": 2,
+      "duplicate": false,
+      "stored": {
+        "v": 1,
+        "run_id": "r_TEST",
+        "agent_id": "a1",
+        "ts": "<any>",
+        "src": "cli",
+        "seq": 2,
+        "type": "step_start",
+        "payload": {
+          "step_id": "s1"
+        },
+        "msg_id": "m2",
+        "client_seq": 40
+      }
+    },
+    {
+      "ok": true,
+      "seq": 3,
+      "duplicate": false,
+      "stored": {
+        "v": 1,
+        "run_id": "r_TEST",
+        "agent_id": "a1",
+        "ts": "<any>",
+        "src": "cli",
+        "seq": 3,
+        "type": "heartbeat",
+        "payload": {},
+        "msg_id": "m3"
+      }
+    }
+  ]
+}

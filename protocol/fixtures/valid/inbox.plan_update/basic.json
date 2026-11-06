@@ -1,0 +1,14 @@
+{
+  "steps": [
+    {
+      "id": "s1",
+      "title": "Parse input",
+      "acceptance": "tests pass"
+    },
+    {
+      "id": "s2",
+      "title": "Write output",
+      "acceptance": "file exists"
+    }
+  ]
+}

@@ -1,0 +1,65 @@
+{
+  "$id": "baton/1/envelope.stored",
+  "title": "envelope.stored",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "v": {
+      "type": "number",
+      "const": 1
+    },
+    "run_id": {
+      "type": "string"
+    },
+    "agent_id": {
+      "type": "string"
+    },
+    "seq": {
+      "type": "integer",
+      "exclusiveMinimum": 0,
+      "maximum": 9007199254740991
+    },
+    "ts": {
+      "type": "string"
+    },
+    "type": {
+      "type": "string"
+    },
+    "payload": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {}
+    },
+    "msg_id": {
+      "type": "string"
+    },
+    "src": {
+      "type": "string",
+      "enum": [
+        "cli",
+        "spool",
+        "hub",
+        "adapter"
+      ]
+    },
+    "client_seq": {
+      "type": "integer",
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991
+    }
+  },
+  "required": [
+    "v",
+    "run_id",
+    "agent_id",
+    "seq",
+    "ts",
+    "type",
+    "payload",
+    "msg_id",
+    "src"
+  ],
+  "additionalProperties": {}
+}

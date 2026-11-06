@@ -1,0 +1,20 @@
+{
+  "$id": "baton/1/agent.error",
+  "title": "agent.error",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "message": {
+      "type": "string",
+      "minLength": 1
+    },
+    "fatal": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "message",
+    "fatal"
+  ],
+  "additionalProperties": {}
+}

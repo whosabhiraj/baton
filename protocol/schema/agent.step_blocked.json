@@ -1,0 +1,21 @@
+{
+  "$id": "baton/1/agent.step_blocked",
+  "title": "agent.step_blocked",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "step_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "required": [
+    "step_id",
+    "reason"
+  ],
+  "additionalProperties": {}
+}

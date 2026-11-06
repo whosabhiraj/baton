@@ -1,0 +1,36 @@
+{
+  "description": "UTF-8 BOM at file start and CRLF line endings are tolerated.",
+  "run": {
+    "run_id": "r_TEST",
+    "agent_id": "a1"
+  },
+  "stored": [
+    {
+      "v": 1,
+      "run_id": "r_TEST",
+      "agent_id": "a1",
+      "ts": "2026-11-06T14:00:00.000Z",
+      "src": "spool",
+      "seq": 1,
+      "type": "heartbeat",
+      "payload": {},
+      "msg_id": "o1"
+    },
+    {
+      "v": 1,
+      "run_id": "r_TEST",
+      "agent_id": "a1",
+      "ts": "<any>",
+      "src": "spool",
+      "seq": 2,
+      "type": "progress",
+      "payload": {
+        "percent": 10,
+        "note": "n"
+      },
+      "msg_id": "o2"
+    }
+  ],
+  "warnings": [],
+  "final_offset": 222
+}
