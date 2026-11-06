@@ -1,7 +1,7 @@
 # HANDOFF — read this first
 
-Last updated: **2026-11-06**, **Phase 2 in progress** (session ended mid-phase; see §E).
-Next up: finish Phase 2 wiring (§E), run all tests, show the user, get approval.
+Last updated: **2026-11-06**, **Phase 2 built**, all tests green, waiting for the user's check and approval (§E).
+Next up: user checks Phase 2; then Phase 3 (`baton mock`).
 
 Big change since Phase 0: the hub **and** the `baton` CLI are written in **Go** (one binary).
 `docs/GO_HUB_DESIGN.md` is approved and overrides `docs/PLAN.md` §3, §4.7, §5 and §6.
@@ -58,7 +58,7 @@ Things only you can do:
 |---|---|---|
 | 0 Plan + repo init | ✅ done | `2a5a98d` |
 | 1 Protocol + CLI + spool + minimal hub (Go) | ✅ done | up to the "Phase 1 done" commit |
-| 2 Hub core | 🟡 in progress: config, audit, runs/worktrees/briefs, daemon + human commands done; hub/API wiring in flight | `d014636` … `35d8fba` |
+| 2 Hub core | 🟡 built, all tests green, **awaiting user approval** | `d014636` … `9159f09` |
 | 3 `baton mock` | pending | — |
 | 4 Dashboard | pending | — |
 | 5 Adapters | pending | — |
@@ -92,26 +92,21 @@ Runtime data: `~/.baton/projects/<repo-name>-<hash8>/` (override with `BATON_HOM
 `admin.token`, `hub.lock`, `hub.port`, `runs/<run_id>/{run.json, events.jsonl, outbox.jsonl,
 outbox.offset, inbox/}`.
 
-## E. Resume here (Phase 2)
+## E. Resume here (Phase 2 sign-off)
 
-Done and committed: `internal/config` (+ `baton.config.example.yaml`, `protocol/schema/config.json`),
-`internal/audit`, `internal/runs` + `internal/briefing`, `internal/gitx`, `internal/daemon`,
-`internal/logx`, human commands in `internal/cli` (`baton`, `up`, `attach`, `hub serve|status|stop|rotate-token`).
+Phase 2 is fully built and committed (`9159f09`): config + hot-reload + write-back, audit log,
+runs/worktrees/briefs with account selection rules, background hub daemon + human commands,
+hub/API wiring (spawn, accounts, config, audit routes; SSE hub notices; idle stop). PROTOCOL.md
+A13–A14. `go vet ./...` and `go test ./...` (incl. e2e: lifecycle, crash, daemon, phase2) green.
 
-Remaining ("P2-D wiring"; may be partly in the working tree: check `git status`, review, finish, test):
-1. `hub.Options`: `Repo`, `GlobalConfig`, `ProjectConfig`, `ConfigPoll`, `IdleStop`; Start runs the
-   config watcher, audit log and runs manager; heartbeat timeout read live from config.
-2. Bus carries hub notices → SSE `event: hub` (`config_reloaded`, `spool_warning`, `idle_stop`).
-3. API (admin; actor via `X-Baton-Actor`): `POST /api/spawn`, `GET /api/accounts`,
-   `PATCH /api/accounts/{id}`, `GET|PATCH /api/config`, `GET /api/audit`; `/api/state` gains
-   accounts, mode, config_ok, config_issues, instance; audit entry for every control action.
-4. Idle stop: no live runs + no SSE clients + no admin requests for `hub.idle_stop_min` (30).
-5. `store.Run.SetExtra`; PROTOCOL.md A14 for the new routes/events; `e2e/phase2_test.go`.
-6. Then `hub serve` passes `Repo` to `hub.Options` (internal/cli/up.go); optional `Hub.Instance`.
-7. Phase 2 acceptance: kill hub mid-run → recover (crash test), live config edit applies, broken
-   config reported while the hub keeps running, one hub per project (daemon test). Then `npm run check`.
-
-Other follow-up: CI file stays untracked until the git token has `workflow` scope.
+Next steps:
+1. Give the user a short "how to check Phase 2" (e.g. `baton up` in a test repo, `baton hub status`,
+   copy `baton.config.example.yaml` to `~/.baton/config.yaml`, POST /api/spawn dry run and real,
+   edit config live and watch GET /api/config, `baton hub stop`). Get approval.
+2. Known small items: multi-field PATCH /api/accounts is not atomic; stalled detector ticks every
+   0.5 s; optional `Hub.Instance` field (hub serve reads it via /api/health).
+3. CI file stays untracked until the git token has `workflow` scope.
+4. Then Phase 3 (`baton mock`) — ask its open questions first.
 
 ## F. Decisions log (details in PLAN.md §4 and GO_HUB_DESIGN.md §0)
 
