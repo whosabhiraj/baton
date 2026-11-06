@@ -23,22 +23,44 @@ function start(): void {
   const bar = h('header', { id: 'topbar' });
   const rail = h('aside', { id: 'rail', 'aria-label': 'Accounts' });
   const list = h('section', { id: 'list', 'aria-label': 'Agents' });
-  // Phase 4b mounts the three.js scene here; it reads the same store.
-  const scene = h('section', { id: 'scene', 'aria-label': 'Scene', hidden: true }, h('p', { class: 'muted' }, 'The 3D scene arrives in the next phase. Press L to go back to the list.'));
+  // The three.js scene is loaded on first show; it reads the same store as the list.
+  const scene = h('section', { id: 'scene', 'aria-label': 'Scene (press L for the list)', hidden: true });
+  let sceneCtl: import('./scene').SceneCtl | null | undefined; // undefined = not loaded yet
+  let sceneLoading = false;
+  const syncScene = () => {
+    const want = state.view === 'scene';
+    if (want && sceneCtl === undefined && !sceneLoading) {
+      sceneLoading = true;
+      void import('./scene').then((m) => {
+        sceneCtl = m.mountScene(scene);
+        if (!sceneCtl) {
+          state.view = 'list';
+          state.notices.push('3D scene unavailable (no WebGL); showing the list.');
+        }
+        emit();
+      });
+    }
+    sceneCtl?.setVisible(want);
+    sceneCtl?.update();
+  };
   const detail = h('aside', { id: 'detail', 'aria-label': 'Selected agent', hidden: true });
   const overlay = h('div', { id: 'overlay', hidden: true });
   app.append(bar, h('div', { id: 'layout' }, rail, h('main', { id: 'main' }, list, scene), detail), overlay);
 
   const toggleView = () => {
     state.view = state.view === 'list' ? 'scene' : 'list';
+    localStorage.setItem('baton.view', state.view);
     emit();
   };
+  state.view = localStorage.getItem('baton.view') === 'list' ? 'list' : 'scene';
   const parts = [topbar(bar, toggleView), accountsRail(rail), runsList(list), detailPanel(detail), overlayHost(overlay)];
   const paint = () => {
     if (state.conn === 'auth') return needLogin('The hub rejected the token. Paste a valid admin token.');
     list.hidden = state.view !== 'list';
     scene.hidden = state.view !== 'scene';
+    document.body.classList.toggle('view-scene', state.view === 'scene');
     parts.forEach((p) => p());
+    syncScene();
   };
   const unsub = subscribe(paint);
   const tick = window.setInterval(emit, 3000); // ages and events/min

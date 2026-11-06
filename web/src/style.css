@@ -226,3 +226,30 @@ legend { padding: 0 6px; color: var(--mute); font-size: 12px; }
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
+
+/* 3D scene */
+body.view-scene #main { padding: 0; overflow: hidden; position: relative; }
+#scene { position: relative; height: 100%; min-height: 420px; border: 0; border-radius: 0; padding: 0; overflow: hidden; }
+#scene canvas { display: block; }
+.scene-labels { position: absolute; inset: 0; pointer-events: none; }
+.lbl { pointer-events: none; white-space: nowrap; text-align: center; text-shadow: 0 1px 6px rgba(6, 9, 18, .9); transition: opacity .2s; }
+.lbl span { display: block; }
+.lbl .cs { font: italic 400 17px/1.1 var(--serif); color: var(--paper); }
+.lbl .st { font: 10.5px/1.3 var(--mono); color: var(--mute); text-transform: uppercase; letter-spacing: .08em; }
+.lbl .more { display: none; font: 11px/1.4 var(--sans); color: #cfc9ba; margin-top: 2px; }
+.lbl.hover .more, .lbl.sel .more { display: block; }
+.lbl.sel .cs { font-size: 21px; color: #fff; }
+.lbl-agent .q { display: inline-grid !important; place-items: center; width: 18px; height: 18px; margin: 2px auto; border-radius: 99px; background: var(--brass); color: var(--brass-ink); font: 700 11px/1 var(--mono); animation: call 2.4s ease-in-out infinite; }
+.lbl-agent.st-waiting .st { color: var(--brass); }
+.lbl-agent.st-blocked .st, .lbl-agent.st-rate_limited .st, .lbl-agent.st-stalled .st { color: var(--hot); }
+.lbl-agent.st-failed .st, .lbl-agent.st-killed .st { color: var(--bad); }
+.lbl-agent.st-running .st { color: var(--ok); }
+.lbl-acct { display: flex; gap: 8px; align-items: baseline; padding: 2px 8px; border-left: 2px solid var(--c); background: rgba(13, 18, 32, .55); }
+.lbl-acct span { display: inline; }
+.lbl-acct .name { font: 600 12px/1.4 var(--sans); color: var(--c); }
+.lbl-acct .use { font: 11px/1.4 var(--mono); color: var(--paper); }
+.lbl-acct .flag { color: var(--bad); }
+.lbl-acct.off { opacity: .35; }
+.lbl-cond .cs { font-size: 20px; color: var(--brass); }
+.scene-hint { position: absolute; left: 16px; bottom: 12px; font-size: 12px; color: var(--mute); pointer-events: none; }
+@media (max-width: 900px) { #scene { height: 70vh; } body.view-scene #main { overflow: visible; } }
