@@ -1,0 +1,12 @@
+{"type":"step_start","timestamp":1760000000000,"sessionID":"ses_test","part":{"type":"step-start","id":"prt_1"}}
+{"type":"tool_use","timestamp":1760000001000,"sessionID":"ses_test","part":{"type":"tool","tool":"bash","state":{"status":"completed","input":{"command":"ls -la","description":"list files"},"output":"a.txt"}}}
+{"type":"tool_use","timestamp":1760000002000,"sessionID":"ses_test","part":{"type":"tool","tool":"read","state":{"status":"completed","input":{"filePath":"/work/a.txt"}}}}
+{"type":"tool_use","timestamp":1760000003000,"sessionID":"ses_test","part":{"type":"tool","tool":"edit","state":{"status":"completed","input":{"filePath":"/work/a.txt","oldString":"a","newString":"b"}}}}
+{"type":"tool_use","timestamp":1760000003500,"sessionID":"ses_test","part":{"type":"tool","tool":"grep","state":{"status":"completed","input":{"pattern":"TODO","path":"/work"}}}}
+{"type":"tool_use","timestamp":1760000003600,"sessionID":"ses_test","part":{"type":"tool","tool":"webfetch","state":{"status":"completed","input":{"url":"https://example.com"}}}}
+{"type":"tool_use","timestamp":1760000003700,"sessionID":"ses_test","part":{"type":"tool","tool":"task","state":{"status":"error","input":{"description":"explore"}}}}
+{"type":"step_finish","timestamp":1760000004000,"sessionID":"ses_test","part":{"type":"step-finish","reason":"tool-calls","cost":0.01,"tokens":{"input":100,"output":20,"reasoning":5,"cache":{"read":50,"write":10}}}}
+{"type":"text","timestamp":1760000005000,"sessionID":"ses_test","part":{"type":"text","text":"done","time":{"end":1760000005000}}}
+{"type":"step_finish","timestamp":1760000006000,"sessionID":"ses_test","part":{"type":"step-finish","reason":"stop","cost":0.02,"tokens":{"input":30,"output":10,"reasoning":0,"cache":{"read":80,"write":0}}}}
+{"type":"error","timestamp":1760000007000,"sessionID":"ses_test","error":{"name":"UnknownError","data":{"message":"x"}}}
+not json

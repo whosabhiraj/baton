@@ -32,7 +32,7 @@ var loginKinds = map[string]struct {
 }{
 	"claude":   {"CLAUDE_CONFIG_DIR", []string{"claude", "auth", "login"}, []string{"claude", "auth", "status"}},
 	"codex":    {"CODEX_HOME", []string{"codex", "login"}, []string{"codex", "login", "status"}},
-	"opencode": {"OPENCODE_CONFIG_DIR", []string{"opencode", "auth", "login"}, []string{"opencode", "auth", "list"}},
+	"opencode": {"XDG_DATA_HOME", []string{"opencode", "auth", "login"}, []string{"opencode", "auth", "list"}},
 }
 
 // cmdLogin: baton login <account-id> | baton login --status [<account-id>].

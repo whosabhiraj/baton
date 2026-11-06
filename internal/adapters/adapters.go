@@ -42,7 +42,7 @@ func For(kind string, cfg config.Config) (Adapter, error) {
 	case "codex":
 		return codex{}, nil
 	case "opencode":
-		return nil, fmt.Errorf("opencode adapter is not implemented yet (Phase 5c)")
+		return opencode{}, nil
 	}
 	ck, ok := cfg.Kinds[kind]
 	if !ok {

@@ -71,12 +71,13 @@ accounts:
     enabled: true
 
   # Optional: API-key providers only. Never use a Claude subscription here; Baton forces
-  # forbid_claude_subscription to true for opencode accounts.
+  # forbid_claude_subscription to true for opencode accounts. XDG_DATA_HOME is required: Baton
+  # refuses to start the run without it, or if the stored login is an Anthropic subscription.
   - id: opencode-k
     label: "OpenCode (API key)"
     kind: opencode
     color: "#b5e48c"
-    env: { OPENCODE_CONFIG_DIR: ~/.baton/accounts/opencode-k }
+    env: { XDG_DATA_HOME: ~/.baton/accounts/opencode-k }  # OpenCode keeps logins in $XDG_DATA_HOME/opencode/auth.json
     forbid_claude_subscription: true
     roles: [implementer]
     max_concurrent: 2

@@ -1,0 +1,70 @@
+[
+  {
+    "type": "activity",
+    "payload": {
+      "detail": "ls -la",
+      "raw_kind": "bash",
+      "tool": "shell"
+    }
+  },
+  {
+    "type": "activity",
+    "payload": {
+      "detail": "/work/a.txt",
+      "raw_kind": "read",
+      "tool": "read"
+    }
+  },
+  {
+    "type": "activity",
+    "payload": {
+      "detail": "/work/a.txt",
+      "raw_kind": "edit",
+      "tool": "edit"
+    }
+  },
+  {
+    "type": "activity",
+    "payload": {
+      "detail": "TODO",
+      "raw_kind": "grep",
+      "tool": "search"
+    }
+  },
+  {
+    "type": "activity",
+    "payload": {
+      "detail": "https://example.com",
+      "raw_kind": "webfetch",
+      "tool": "web"
+    }
+  },
+  {
+    "type": "activity",
+    "payload": {
+      "detail": "explore",
+      "raw_kind": "task",
+      "tool": "other"
+    }
+  },
+  {
+    "type": "usage",
+    "payload": {
+      "cache_read_tokens": 50,
+      "cache_write_tokens": 10,
+      "cost_usd": 0.01,
+      "input_tokens": 100,
+      "output_tokens": 25
+    }
+  },
+  {
+    "type": "usage",
+    "payload": {
+      "cache_read_tokens": 130,
+      "cache_write_tokens": 10,
+      "cost_usd": 0.03,
+      "input_tokens": 130,
+      "output_tokens": 35
+    }
+  }
+]

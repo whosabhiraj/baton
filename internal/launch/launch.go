@@ -95,10 +95,6 @@ func (l *Launcher) store() *store.Store {
 	return l.o.Store
 }
 
-// preflight is the hook for refusing a launch before anything is spawned.
-// TODO(5c): OpenCode refusal check (non-negotiable #2).
-func preflight(_ *config.Account, _ runs.SpawnResult) error { return nil }
-
 // Start launches the agent of a fresh run.
 func (l *Launcher) Start(res runs.SpawnResult) error {
 	st := l.store()
