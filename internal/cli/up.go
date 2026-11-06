@@ -41,7 +41,7 @@ func project(o opts) (repo, dataDir string, err error) {
 	if o.has("project") {
 		repo = o.get("project")
 	} else if cwd, e := os.Getwd(); e == nil {
-		if top, e := gitx.TopLevel(cwd); e == nil {
+		if top, e := gitx.ProjectTopLevel(cwd); e == nil {
 			repo = top
 		} else if !o.has("data-dir") {
 			repo = cwd

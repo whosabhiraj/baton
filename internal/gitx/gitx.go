@@ -82,6 +82,9 @@ func IsRepo(dir string) bool {
 // Init runs `git init` in dir and creates an initial (possibly empty) commit, so worktrees
 // can branch from it. Only call after the user agreed.
 func Init(dir string) error {
+	if IsUnsafeRoot(dir) {
+		return ErrUnsafeRoot
+	}
 	ctx := context.Background()
 	if _, err := Run(ctx, dir, "init"); err != nil {
 		return err
@@ -102,4 +105,44 @@ func CurrentBranch(dir string) (string, error) {
 		return b, nil
 	}
 	return Run(ctx, dir, "rev-parse", "HEAD")
+}
+
+// ErrUnsafeRoot means a git repository was found at (or a command targeted) the user's home
+// folder or a filesystem/drive root. Baton never treats those as a project: a stray repo there
+// would make every folder under home look like part of one project.
+var ErrUnsafeRoot = errors.New("refusing to use the home folder or a filesystem root as a project")
+
+// IsUnsafeRoot reports whether dir is the user's home folder or a filesystem/drive root.
+func IsUnsafeRoot(dir string) bool {
+	clean := func(p string) string {
+		if r, err := filepath.EvalSymlinks(p); err == nil {
+			p = r
+		}
+		p = filepath.Clean(p)
+		if runtime.GOOS == "windows" || runtime.GOOS == "darwin" {
+			p = strings.ToLower(p)
+		}
+		return p
+	}
+	d := clean(dir)
+	if d == clean(filepath.Dir(d)) { // "/" or "C:\"
+		return true
+	}
+	if home, err := os.UserHomeDir(); err == nil && home != "" && d == clean(home) {
+		return true
+	}
+	return false
+}
+
+// ProjectTopLevel is TopLevel, but returns ErrUnsafeRoot when the repository root is the home
+// folder or a filesystem root.
+func ProjectTopLevel(dir string) (string, error) {
+	top, err := TopLevel(dir)
+	if err != nil {
+		return "", err
+	}
+	if IsUnsafeRoot(top) {
+		return "", ErrUnsafeRoot
+	}
+	return top, nil
 }

@@ -64,8 +64,16 @@ func (c *ctx) ensureRepo(o opts) (ok bool, err error) {
 	if err != nil {
 		return false, err
 	}
-	if _, err := gitx.TopLevel(cwd); err == nil {
+	if gitx.IsUnsafeRoot(cwd) {
+		fmt.Fprintln(c.stderr, "baton: refusing to use your home folder or a drive root as a project; cd into a project folder first")
+		return false, nil
+	}
+	_, err = gitx.ProjectTopLevel(cwd)
+	if err == nil {
 		return true, nil
+	}
+	if errors.Is(err, gitx.ErrUnsafeRoot) {
+		fmt.Fprintln(c.stderr, "baton: warning: ignoring a git repository at your home folder or a drive root")
 	}
 	if !c.ask(fmt.Sprintf("%s is not a git repository. Initialise one here? [y/N] ", cwd)) {
 		fmt.Fprintln(c.stderr, "baton: not a git repository; nothing started")
