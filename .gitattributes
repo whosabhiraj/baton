@@ -1,0 +1,5 @@
+# LF everywhere so Windows/macOS/Linux checkouts are byte-identical.
+* text=auto eol=lf
+# Byte-exact protocol fixtures (CRLF/BOM/UTF-16 outbox cases, byte offsets): never convert.
+protocol/fixtures/** -text
+*.exe binary
