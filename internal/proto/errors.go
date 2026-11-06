@@ -15,6 +15,18 @@ const (
 	CodeNotFound         = "NOT_FOUND"
 	CodeInternal         = "INTERNAL"
 	CodeUnknownQID       = "UNKNOWN_QID" // answer for a qid that is not an open question of the run
+
+	// Spawn / account selection (spec §4.2; checked in this order).
+	CodeAccountRequired = "ACCOUNT_REQUIRED"  // no explicit account and no routing[role]
+	CodeUnknownAccount  = "UNKNOWN_ACCOUNT"   // account id not in config
+	CodeAccountDisabled = "ACCOUNT_DISABLED"  // account.enabled = false
+	CodeRoleNotAllowed  = "ROLE_NOT_ALLOWED"  // role not in account.roles
+	CodeModelNotAllowed = "MODEL_NOT_ALLOWED" // model not in account.models
+	CodeAccountBusy     = "ACCOUNT_BUSY"      // account at max_concurrent
+	CodeMaxAgents       = "MAX_AGENTS"        // global cap (auto mode only)
+	CodeNotARepo        = "NOT_A_REPO"        // target folder is not a git repository
+	CodeGit             = "GIT_ERROR"         // a git command failed
+	CodeConfigInvalid   = "CONFIG_INVALID"    // config write rejected by validation
 )
 
 // Error is a protocol error carrying the HTTP status the API should answer with.
@@ -45,8 +57,11 @@ func statusFor(code string) int {
 		return http.StatusNotFound
 	case CodeRunEnded:
 		return http.StatusGone
-	case CodeUnknownQID:
+	case CodeUnknownQID, CodeAccountDisabled, CodeRoleNotAllowed, CodeModelNotAllowed,
+		CodeAccountBusy, CodeMaxAgents, CodeNotARepo:
 		return http.StatusConflict
+	case CodeAccountRequired, CodeUnknownAccount, CodeConfigInvalid:
+		return http.StatusBadRequest
 	default:
 		return http.StatusInternalServerError
 	}

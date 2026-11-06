@@ -45,6 +45,13 @@ type CreateOpts struct {
 	Role      string
 	Kind      string
 	Model     string
+	Effort    string
+	Task      string
+	Repo      string
+	Branch    string
+	Base      string // base branch / commit
+	Worktree  string
+	Actor     string
 	Plan      []proto.PlanStep
 	Token     string // "" = generated
 }
@@ -172,7 +179,8 @@ func (s *Store) Create(c CreateOpts) (*Run, string, error) {
 	}
 	rec := proto.RunRecord{
 		RunID: c.RunID, AgentID: c.AgentID, Callsign: c.Callsign, AccountID: c.AccountID,
-		Role: c.Role, Kind: c.Kind, Model: c.Model, Status: proto.StatusStarting,
+		Role: c.Role, Kind: c.Kind, Model: c.Model, Effort: c.Effort, Task: c.Task, Repo: c.Repo,
+		Branch: c.Branch, BaseBranch: c.Base, Worktree: c.Worktree, Actor: c.Actor, Status: proto.StatusStarting,
 		CreatedAt: nowTS(time.Now()), TokenSHA256: ids.HashToken(c.Token), Plan: c.Plan,
 	}
 	b, err := json.MarshalIndent(rec, "", "  ")

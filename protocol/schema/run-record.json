@@ -25,6 +25,32 @@
     "model": {
       "type": "string"
     },
+    "effort": {
+      "type": "string"
+    },
+    "task": {
+      "type": "string"
+    },
+    "repo": {
+      "type": "string"
+    },
+    "branch": {
+      "type": "string"
+    },
+    "base_branch": {
+      "type": "string"
+    },
+    "worktree": {
+      "type": "string"
+    },
+    "actor": {
+      "type": "string",
+      "enum": [
+        "human",
+        "conductor",
+        "dev"
+      ]
+    },
     "status": {
       "type": "string",
       "enum": [

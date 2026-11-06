@@ -98,6 +98,13 @@ type RunRecord struct {
 	Role         string                     `json:"role,omitempty"`
 	Kind         string                     `json:"kind,omitempty"`
 	Model        string                     `json:"model,omitempty"`
+	Effort       string                     `json:"effort,omitempty"`
+	Task         string                     `json:"task,omitempty"`
+	Repo         string                     `json:"repo,omitempty"`        // target repo (git top-level)
+	Branch       string                     `json:"branch,omitempty"`      // baton/<agent_id>
+	BaseBranch   string                     `json:"base_branch,omitempty"` // branch/commit the worktree started from
+	Worktree     string                     `json:"worktree,omitempty"`    // absolute path
+	Actor        string                     `json:"actor,omitempty"`       // who spawned it: human | conductor | dev
 	Status       RunStatus                  `json:"status"`
 	CreatedAt    string                     `json:"created_at"`
 	EndedAt      string                     `json:"ended_at,omitempty"`
