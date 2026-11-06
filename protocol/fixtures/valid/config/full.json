@@ -1,0 +1,1 @@
+{"hub":{"port":7777,"mode":"auto","worktrees":{"cleanup":"remove_after_days","days":7}},"accounts":[{"id":"claude-a","kind":"claude","color":"#ff8a3d","max_concurrent":2,"enabled":false}]}

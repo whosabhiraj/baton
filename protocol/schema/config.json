@@ -1,0 +1,92 @@
+{
+  "$id": "baton/1/config",
+  "title": "config",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Shape of baton.config.yaml (global or project file), as JSON. Unknown keys are tolerated by the hub (warning only), so additionalProperties is left open. Cross-field rules (unique ids, routing targets, loopback checks beyond the pattern) are enforced by the hub, not here.",
+  "type": "object",
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,30}$" },
+    "stringList": { "type": "array", "items": { "type": "string" } },
+    "stringMap": { "type": "object", "additionalProperties": { "type": "string" } },
+    "account": {
+      "type": "object",
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "label": { "type": "string" },
+        "kind": { "type": "string", "minLength": 1 },
+        "color": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+        "env": { "$ref": "#/$defs/stringMap" },
+        "models": { "$ref": "#/$defs/stringList" },
+        "roles": { "$ref": "#/$defs/stringList" },
+        "max_concurrent": { "type": "integer", "minimum": 1, "default": 1 },
+        "enabled": { "type": "boolean", "default": true },
+        "forbid_claude_subscription": { "type": "boolean" },
+        "permissions": {
+          "type": "object",
+          "properties": {
+            "mode": { "enum": ["default", "acceptEdits", "permissive"], "default": "default" },
+            "allowed_tools": { "$ref": "#/$defs/stringList" },
+            "denied_tools": { "$ref": "#/$defs/stringList" },
+            "extra_args": { "$ref": "#/$defs/stringList" }
+          }
+        },
+        "heartbeat_timeout_s": { "type": "integer", "minimum": 0 },
+        "ask_timeout_s": { "type": "integer", "minimum": 0 },
+        "poll_interval_s": { "type": "number", "minimum": 0 }
+      },
+      "required": ["id"]
+    },
+    "kind": {
+      "type": "object",
+      "properties": {
+        "command": { "type": "string", "minLength": 1 },
+        "args": { "$ref": "#/$defs/stringList" },
+        "env": { "$ref": "#/$defs/stringMap" },
+        "parser": { "enum": ["none", "stream-json", "jsonl"], "default": "none" },
+        "notes": { "type": "string" }
+      },
+      "required": ["command"]
+    }
+  },
+  "properties": {
+    "hub": {
+      "type": "object",
+      "properties": {
+        "port": { "type": "integer", "minimum": 0, "maximum": 65535, "default": 7777 },
+        "bind": { "type": "string", "pattern": "^(127(\\.[0-9]{1,3}){3}|localhost|::1|\\[::1\\])$", "default": "127.0.0.1" },
+        "heartbeat_timeout_s": { "type": "integer", "minimum": 1, "default": 120 },
+        "ask_timeout_s": { "type": "integer", "minimum": 1, "default": 900 },
+        "poll_interval_s": { "type": "number", "exclusiveMinimum": 0, "default": 2 },
+        "idle_stop_min": { "type": "integer", "minimum": 0, "default": 30 },
+        "open_browser": { "type": "boolean", "default": true },
+        "mode": { "enum": ["user", "propose", "auto"], "default": "propose" },
+        "max_agents_auto": { "type": "integer", "minimum": 0, "default": 6 },
+        "worktrees": {
+          "type": "object",
+          "properties": {
+            "cleanup": { "enum": ["keep", "remove_on_merge", "remove_after_days"], "default": "keep" },
+            "days": { "type": "integer", "minimum": 1, "default": 14 }
+          }
+        },
+        "approvals": {
+          "type": "object",
+          "properties": {
+            "merge": { "type": "boolean", "default": true },
+            "spawn": { "type": "boolean", "default": false }
+          }
+        }
+      }
+    },
+    "conductor": {
+      "type": "object",
+      "properties": {
+        "account": { "type": "string" },
+        "model": { "type": "string" },
+        "effort": { "type": "string" }
+      }
+    },
+    "accounts": { "type": "array", "items": { "$ref": "#/$defs/account" } },
+    "routing": { "$ref": "#/$defs/stringMap" },
+    "kinds": { "type": "object", "additionalProperties": { "$ref": "#/$defs/kind" } }
+  }
+}

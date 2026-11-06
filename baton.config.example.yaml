@@ -1,0 +1,98 @@
+# Baton configuration example.
+#
+# Put account definitions in the global file (~/.baton/config.yaml) and per-project
+# overrides in <repo>/baton.config.yaml. The project file wins: hub/conductor keys are
+# merged key by key, accounts are merged by `id` field by field (a project may also add
+# accounts), routing and kinds are merged by key.
+#
+# Every key below is shown with its default unless noted. Omit what you do not need.
+# Changes are picked up live; a broken file keeps the last good configuration and the
+# errors are shown on the dashboard and in the CLI.
+
+hub:
+  port: 7777                 # preferred port; falls back to the next free one
+  bind: 127.0.0.1            # loopback only (127.0.0.1, ::1 or localhost)
+  heartbeat_timeout_s: 120   # no heartbeat for this long while alive -> stalled
+  ask_timeout_s: 900         # `baton ask --blocking` gives up after this long
+  poll_interval_s: 2         # `baton ask` inbox polling interval
+  idle_stop_min: 30          # stop the hub after this many idle minutes (0 = never)
+  open_browser: true         # `baton` opens the dashboard
+  mode: propose              # user | propose | auto
+  max_agents_auto: 6         # global agent cap, auto mode only
+  worktrees:
+    cleanup: keep            # keep | remove_on_merge | remove_after_days
+    days: 14                 # used by remove_after_days
+  approvals:
+    merge: true              # merges need a human click
+    spawn: false             # spawns need a human click (propose mode asks anyway)
+
+# Which account runs the conductor, and with what model/effort. Optional.
+conductor:
+  account: claude-a
+  model: opus                # whatever the account's CLI accepts
+  effort: ""                 # CLI-specific effort level, "" = CLI default
+
+accounts:
+  - id: claude-a             # unique, lower-case: ^[a-z0-9][a-z0-9-]{0,30}$
+    label: "Claude A (conductor account)"
+    kind: claude             # claude | codex | opencode | generic | a key under `kinds`
+    color: "#ff8a3d"         # #rrggbb, used in the dashboard
+    env:                     # per-account isolation; a leading ~ is expanded
+      CLAUDE_CONFIG_DIR: ~/.baton/accounts/claude-a
+    models: [opus, sonnet]
+    roles: [conductor, planner, reviewer]
+    max_concurrent: 2        # default 1
+    enabled: true            # default true
+    permissions:             # opt-in; default = the CLI's normal mode
+      mode: default          # default | acceptEdits | permissive
+      allowed_tools: []
+      denied_tools: []
+      extra_args: []
+
+  - id: claude-b
+    label: "Claude B"
+    kind: claude
+    color: "#ffd166"
+    env: { CLAUDE_CONFIG_DIR: ~/.baton/accounts/claude-b }
+    models: [sonnet, opus]
+    roles: [implementer, tester]
+    max_concurrent: 3
+    enabled: true
+    heartbeat_timeout_s: 180 # optional per-account override of the hub value (0 = hub value)
+
+  - id: codex-1
+    label: "ChatGPT / Codex"
+    kind: codex
+    color: "#4cc9f0"
+    env: { CODEX_HOME: ~/.baton/accounts/codex-1 }
+    models: [default]
+    roles: [implementer, refactorer]
+    max_concurrent: 3
+    enabled: true
+
+  # Optional: API-key providers only. Never use a Claude subscription here; Baton forces
+  # forbid_claude_subscription to true for opencode accounts.
+  - id: opencode-k
+    label: "OpenCode (API key)"
+    kind: opencode
+    color: "#b5e48c"
+    env: { OPENCODE_CONFIG_DIR: ~/.baton/accounts/opencode-k }
+    forbid_claude_subscription: true
+    roles: [implementer]
+    max_concurrent: 2
+    enabled: false           # disabled until you add an API key
+
+# Static role -> account routing (optional). Without it, a spawn must name an account.
+routing:
+  reviewer: claude-a
+  refactorer: codex-1
+
+# Custom adapter kinds defined in config, no code change (optional). Use them as an
+# account `kind`.
+# kinds:
+#   my-cli:
+#     command: my-cli
+#     args: ["--print"]
+#     env: {}
+#     parser: jsonl          # none | stream-json | jsonl
+#     notes: "Kind-specific hints shown in the agent brief."

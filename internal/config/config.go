@@ -3,14 +3,11 @@
 // failing hard (errors are reported, the last good config stays in effect), reloads on change
 // by polling, and writes edits back to the right file preserving comments.
 //
-// STUB: types and signatures are fixed (Phase 2 contract); bodies are filled in by the config
-// task. Field names = YAML keys (snake_case).
+// Types and signatures are the Phase 2 contract; the implementation lives in load.go,
+// watch.go and write.go. Field names = YAML keys (snake_case).
 package config
 
-import (
-	"context"
-	"time"
-)
+import "time"
 
 // Modes for how agent lineups are decided.
 const (
@@ -132,46 +129,4 @@ func (c *Config) Account(id string) (*Account, bool) {
 		}
 	}
 	return nil, false
-}
-
-// Defaults returns the built-in configuration (no accounts).
-func Defaults() Config { panic("config: not implemented") }
-
-// GlobalPath is <BATON_HOME>/config.yaml.
-func GlobalPath() string { panic("config: not implemented") }
-
-// ProjectPath is <repo>/baton.config.yaml.
-func ProjectPath(repoRoot string) string { panic("config: not implemented") }
-
-// Load reads, merges (project overrides global; accounts merged by id, field by field) and
-// validates both files. Missing files are fine (defaults). Never returns a nil Snapshot.
-func Load(globalPath, projectPath string) *Snapshot { panic("config: not implemented") }
-
-// Watcher polls both files and reloads on change.
-type Watcher struct{}
-
-// Watch loads once, then polls every interval (default 2 s). onChange is called after each
-// reload attempt that changed the files (including failed ones: check Issues).
-func Watch(ctx context.Context, globalPath, projectPath string, interval time.Duration, onChange func(*Snapshot)) *Watcher {
-	panic("config: not implemented")
-}
-
-// Current returns the latest snapshot.
-func (w *Watcher) Current() *Snapshot { panic("config: not implemented") }
-
-// Stop ends polling.
-func (w *Watcher) Stop() {}
-
-// SetAccountField changes one field of one account (YAML key, e.g. "enabled",
-// "max_concurrent", "models") and writes it back to the file that defines that account
-// (the project file if it overrides the account, else the global file), keeping comments
-// and formatting. The result is validated before writing; invalid edits are refused.
-func SetAccountField(snap *Snapshot, accountID, field string, value any) error {
-	panic("config: not implemented")
-}
-
-// SetHubField does the same for a hub-level key (e.g. "mode", "open_browser"); it writes to
-// the project file when it exists and sets the key, else the global file.
-func SetHubField(snap *Snapshot, field string, value any) error {
-	panic("config: not implemented")
 }
