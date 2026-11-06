@@ -1,6 +1,6 @@
 # HANDOFF — read this first
 
-Last updated: **2026-11-07**, **Phase 4a built** (`777337d`), awaiting the user's visual check. Phase 4 questions answered — see §E.
+Last updated: **2026-11-07**, **Phase 4a/4b/4c built** and redesigned (`ade3a1b`), awaiting the user's check. Phase 4 questions answered — see §E.
 
 Big change since Phase 0: the hub **and** the `baton` CLI are written in **Go** (one binary).
 `docs/GO_HUB_DESIGN.md` is approved and overrides `docs/PLAN.md` §3, §4.7, §5 and §6.
@@ -61,7 +61,7 @@ Things only you can do:
 | 1 Protocol + CLI + spool + minimal hub (Go) | ✅ done | up to the "Phase 1 done" commit |
 | 2 Hub core | ✅ done (verified end to end; PowerShell piped-`y` fix `b4e6c60`) | `d014636` … `b4e6c60` |
 | 3 `baton mock` | ✅ done (controls, approvals, kill checked by hand) | `a5f9baf` … this commit |
-| 4 Dashboard | 4a built, awaiting check; 4b/4c pending | `24bf6c7` … `777337d` |
+| 4 Dashboard | 4a list/panels, 4b 3D map, 4c timeline + replay, redesign; awaiting check | `24bf6c7` … `ade3a1b` |
 | 5 Adapters | pending | — |
 | 6 Conductor | pending | — |
 | 7 Hardening | pending | — |
@@ -95,7 +95,7 @@ Runtime data: `~/.baton/projects/<repo-name>-<hash8>/` (override with `BATON_HOM
 `admin.token`, `hub.lock`, `hub.port`, `runs/<run_id>/{run.json, events.jsonl, outbox.jsonl,
 outbox.offset, inbox/}`.
 
-## E. Resume here (Phase 4a built, awaiting check)
+## E. Resume here (Phase 4 built, awaiting check)
 
 Phase 4 answers (2026-11-07, all the recommended options):
 1. Split: **4a** working dashboard without 3D (list view, agent panel with plan, events, question +
@@ -107,10 +107,11 @@ Phase 4 answers (2026-11-07, all the recommended options):
    localStorage and strips it from the address bar; paste box as fallback. (Done in `24bf6c7`.)
 4. Approval gates: keep the current defaults — merges need a human click, spawns don't.
 
-State: 4a done in `777337d` (vanilla TS in `web/src`: auth, api, store, stream, ui/*). Verified:
-`npm run check` green, endpoints exercised against the mock, `/` serves the build. Not verified by
-execution: DOM behaviour (no browser in the build session) — the user checks visually. Not built
-(not requested): audit view, plan_update control. Next: user feedback on 4a, then ask before 4b.
+State: Phase 4 built. 4a list/panels, 4b lean 3D map (`web/src/scene.ts`, lazy-loaded three.js),
+4c timeline with replay scrub (`web/src/ui/timeline.ts`), then a full redesign (`ade3a1b`). Checked
+in headless Edge against the mock (no console errors). The design contract lives in a local,
+uncommitted file (`web/DESIGN.local.md`). Dev loop: `baton mock` + `npm run dev:web` (Vite proxies
+`/api` with a rewritten Host; never serves `*.local.*`). Next: user feedback, then ask before Phase 5.
 
 API surface for the dashboard (PROTOCOL.md A11–A15):
 - `GET /api/state` (runs with status, plan, step_states, open_questions, usage; accounts with
