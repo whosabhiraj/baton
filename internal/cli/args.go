@@ -7,8 +7,8 @@ import (
 	"strings"
 )
 
-// optDefs mirrors OPTION_DEFS in the reference cli/baton.ts (true = boolean flag), plus the
-// Go-only `up` flags.
+// optDefs lists every flag (true = boolean flag). Parsing follows Node's util.parseArgs
+// strict mode, which the original reference CLI used, so agent invocations behave the same.
 var optDefs = map[string]bool{
 	"note": false, "summary": false, "evidence": false, "reason": false, "options": false,
 	"blocking": true, "timeout": false, "status": false, "followups": false, "fatal": true,

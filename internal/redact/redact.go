@@ -1,6 +1,6 @@
 // Package redact removes secrets from strings and JSON-like values before they are stored,
-// fanned out or logged. It is a port of hub/redact.ts; Go's RE2 has no lookahead, so the
-// key=value rule checks for an already-redacted value in code.
+// fanned out or logged. Go's RE2 has no lookahead, so the key=value
+// rule checks for an already-redacted value in code.
 package redact
 
 import (

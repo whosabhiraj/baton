@@ -1,7 +1,7 @@
 # HANDOFF — read this first
 
-Last updated: **2026-11-06**, end of **Phase 1 build** (waiting for the user's approval).
-Next up: Phase 1 sign-off items (§E), then **Phase 2** (hub core: daemon, runs, worktrees, config).
+Last updated: **2026-11-06**, end of **Phase 1** (approved).
+Next up: **Phase 2** (hub core: daemon, runs, worktrees, config). Ask its open questions first.
 
 Big change since Phase 0: the hub **and** the `baton` CLI are written in **Go** (one binary).
 `docs/GO_HUB_DESIGN.md` is approved and overrides `docs/PLAN.md` §3, §4.7, §5 and §6.
@@ -19,7 +19,7 @@ Commands that work today (need Go and Node 24+):
 
 | Command | What it does |
 |---|---|
-| `npm run check` | formatting, vet, every Go test (unit + end-to-end + crash recovery), and the original TypeScript CLI tests run against the Go binary |
+| `npm run check` | formatting, vet, every Go test (unit, protocol conformance, end-to-end lifecycle, CLI behaviour, crash recovery), then a build |
 | `npm run build` | builds `dist/baton` (`dist/baton.exe` on Windows), version-stamped |
 | `npm run install:baton` | `go install` → `baton` on PATH (Go's bin folder; open a new terminal) |
 | `baton up --dev` | runs a hub in the foreground (prints URL + admin token; Ctrl+C stops). Phase 2 makes it a background daemon |
@@ -57,7 +57,7 @@ Things only you can do:
 | Phase | Status | Commits |
 |---|---|---|
 | 0 Plan + repo init | ✅ done | `2a5a98d` |
-| 1 Protocol + CLI + spool + minimal hub (Go) | 🟡 built, all tests green, **awaiting user approval** | `5cf0ceb` … `61b9a1f` |
+| 1 Protocol + CLI + spool + minimal hub (Go) | ✅ done | up to the "Phase 1 done" commit |
 | 2 Hub core | next | — |
 | 3 `baton mock` | pending | — |
 | 4 Dashboard | pending | — |
@@ -86,23 +86,18 @@ e2e/                    lifecycle, CLI parity (38 cases), crash recovery (hard-k
 scripts/*.mjs           build / install / test / check (cross-platform)
 web/embed.go            embeds web/dist (dashboard comes in Phase 4)
 docs/                   PLAN.md, GO_HUB_DESIGN.md
-cli/, bin/, hub/*.ts, protocol/types.ts, scripts/gen-schemas.ts, test/, tsconfig.json
-                        TypeScript reference implementation (test oracle) — delete after approval
 ```
 
 Runtime data: `~/.baton/projects/<repo-name>-<hash8>/` (override with `BATON_HOME`), with
 `admin.token`, `hub.lock`, `hub.port`, `runs/<run_id>/{run.json, events.jsonl, outbox.jsonl,
 outbox.offset, inbox/}`.
 
-## E. Phase 1 sign-off checklist
+## E. Open follow-ups
 
-1. User reviews and approves Phase 1.
-2. Delete the TS reference (cli/, bin/, hub/*.ts, protocol/types.ts, scripts/gen-schemas.ts,
-   test/, root tsconfig.json; package.json `bin` + deps hono/@hono/node-server/zod/yaml) and
-   make `npm test` Go-only. Port remaining cases first if any.
-3. CI file pushed once the token has `workflow` scope; watch the first run on all 3 OSes.
-4. Small follow-ups noted: spool warnings are only logged (not on the bus); install script's
-   PATH check only looks at the current process PATH (false warning in old shells).
+1. CI: `.github/workflows/ci.yml` is untracked; push it once the git token has `workflow`
+   scope (or add it via the GitHub web UI), then watch the first run on all 3 OSes.
+2. Spool warnings are only logged, not published to the dashboard (design §5.2) — Phase 2.
+3. Phase 1 additions after review: `UNKNOWN_QID` (PROTOCOL.md A13).
 
 ## F. Decisions log (details in PLAN.md §4 and GO_HUB_DESIGN.md §0)
 
@@ -116,6 +111,7 @@ outbox.offset, inbox/}`.
 - 2026-11-06: runtime data in the user's home (`~/.baton/projects/...`), not in the project.
 - 2026-11-06: `max_agents` 6 in auto mode; no global cap when the user picks/approves
   (per-account `max_concurrent` still applies — confirm wording in Phase 2); worktrees `keep`.
+- 2026-11-06: Phase 1 approved; TypeScript reference removed; answers must match an open question (A13).
 - 2026-11-06: **hub + CLI in Go, one binary**; JSON Schema is the protocol master; CI on 3 OSes;
   port 7777 preferred with fallback (2222 rejected: common alt-SSH port); `hub stop` asks,
   `--keep-agents`; module `github.com/whosabhiraj/baton`; A12 approved; persistent admin token.

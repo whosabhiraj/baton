@@ -1,5 +1,5 @@
-// Package paths computes where Baton keeps its data. It is a port of hub/paths.ts and must
-// produce identical directory names.
+// Package paths computes where Baton keeps its data. Directory names are stable: changing
+// the naming would orphan existing project data (see the golden tests).
 package paths
 
 import (

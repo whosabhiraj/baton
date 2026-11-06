@@ -16,7 +16,7 @@ import (
 	"time"
 )
 
-// Port of test/cli.test.ts (38 cases) against the Go binary.
+// CLI behaviour against the real binary (38 cases ported from the original TS test suite).
 
 type runFx struct {
 	dir string

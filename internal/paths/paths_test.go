@@ -8,8 +8,7 @@ import (
 	"testing"
 )
 
-// Golden values computed with the TypeScript reference (hub/paths.ts projectDataDir) on
-// Windows, using paths that do not exist (so no realpath is involved).
+// Golden values computed with the original TypeScript implementation on Windows, using paths that do not exist (so no realpath is involved).
 func TestProjectDataDirGoldenWindows(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		t.Skip("golden paths are Windows paths")

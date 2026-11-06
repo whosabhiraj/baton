@@ -21,14 +21,13 @@ it only runs the official clis and never touches your login tokens. everything s
 
 ## status
 
-phase 1 of 8: protocol, the agent cli and the hub basics. plan and design are in `docs/`.
+phase 1 of 8 done (protocol, agent cli, hub basics). working on phase 2: background hub, runs, worktrees, config. plan and design are in `docs/`.
 
 ## building
 
-needs go (see `go.mod`), node 24+ and git.
+needs go (see `go.mod`), node 24+ (only for the helper scripts) and git.
 
 ```
-npm install
 npm run check    # fmt, vet, all tests
 npm run build    # -> dist/baton
 ```

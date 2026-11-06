@@ -1,4 +1,4 @@
-// npm run check: gofmt (must be clean), go vet, go test, then the TS-oracle CLI test vs the Go binary.
+// npm run check: gofmt (must be clean), go vet, then npm test.
 import { capture, die, requireGo, run } from './_lib.mjs';
 
 requireGo();

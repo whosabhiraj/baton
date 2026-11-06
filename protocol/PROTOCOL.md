@@ -118,7 +118,7 @@ Rules for the CLI:
 ## Amendments (approved 2026-11-06; these override §3 above)
 
 Machine-readable schemas: the JSON Schema files `protocol/schema/*.json` are the master copy
-(they were generated once from `protocol/types.ts`, which is now reference only). Shared test
+(edit them directly; dashboard types are generated from them). Shared test
 fixtures live in `protocol/fixtures/` (`valid/`, `invalid/`, `ingest/`, `outbox/`, `redact/`);
 the Go conformance tests validate every fixture against the schemas. A protocol change means:
 edit the schema file, add fixtures, update this document.

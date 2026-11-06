@@ -1,6 +1,6 @@
 // Package cli implements the `baton` command: what agents call to report to, and hear from,
 // the hub (PROTOCOL.md §3.4, A1-A12), plus the few human commands of Phase 1.
-// The reference implementation is cli/baton.ts; behaviour and output must match it.
+// Output lines and exit codes are part of the protocol (A9); e2e/cli_test.go pins them.
 package cli
 
 import (
