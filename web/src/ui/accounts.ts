@@ -2,6 +2,19 @@ import { api, errText } from '../api';
 import { emit, refresh, state } from '../store';
 import { bullet, h, renderIf, setKids, usageText } from '../util';
 
+/** Capacity as a mini line: one station per slot, the first `used` filled. */
+function slots(a: { used: number; max_concurrent: number; color?: string }): HTMLElement {
+  const max = Math.max(0, Math.min(a.max_concurrent, 12));
+  const el = h(
+    'span',
+    { class: 'slots-row', role: 'img', 'aria-label': `${a.used} of ${a.max_concurrent} slots in use` },
+    h('span', { class: 'route slots' }, ...Array.from({ length: max }, (_, i) => h('i', { class: 'stn' + (i < a.used ? ' stn-done' : '') }))),
+    `${a.used}/${a.max_concurrent}`,
+  );
+  (el.firstChild as HTMLElement).style.setProperty('--c', a.color || '#a9adb9');
+  return el;
+}
+
 export function accountsRail(host: HTMLElement): () => void {
   const err = h('div', { class: 'err', role: 'alert', hidden: true });
   const list = h('div', { class: 'acct-list' });
@@ -40,7 +53,7 @@ export function accountsRail(host: HTMLElement): () => void {
             h(
               'span',
               { class: 'row sub' },
-              `${a.used} of ${a.max_concurrent} slots`,
+              slots(a),
               a.rate_limited && h('span', { class: 'flag' }, 'rate limited'),
               !a.enabled && h('span', { class: 'flag off' }, 'disabled'),
             ),
