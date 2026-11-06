@@ -14,7 +14,10 @@
   "scripts": {
     "typecheck": "tsc -p .",
     "schemas": "node scripts/gen-schemas.ts",
-    "test": "node --test \"test/**/*.test.ts\""
+    "build": "node scripts/build.mjs",
+    "install:baton": "node scripts/install.mjs",
+    "test": "node scripts/test.mjs",
+    "check": "node scripts/check.mjs"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.6",
