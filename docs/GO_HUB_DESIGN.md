@@ -9,7 +9,7 @@ protocol amendments A1–A11) still applies unchanged.
 
 ## 0. Decisions (2026-11-06)
 
-| §11 Q | Decision |
+| Question | Decision |
 |---|---|
 | 1 Go CLI too | **Yes, one binary.** TS CLI = reference oracle during Phase 1, then deleted. |
 | 2 Rulebook | **JSON Schema files are master**; zod + generator removed after final regeneration. |
@@ -21,30 +21,6 @@ protocol amendments A1–A11) still applies unchanged.
 | 8 Admin token | **Persistent per project**, `baton hub rotate-token`. |
 
 Toolchain installed for development: Go 1.27 (doc text saying 1.26 means "current stable").
-
-## Summary (plain language)
-
-- **What changes:** the hub (the background program that receives agent reports, stores them,
-  runs agents and serves the dashboard) will be written in **Go** instead of TypeScript. I also
-  recommend that the `baton` command itself be Go, so Baton ships as **one program file**
-  (`baton.exe` on Windows, `baton` elsewhere) that works the same in PowerShell, cmd, Git Bash,
-  macOS and Linux terminals, starts in a few milliseconds (agents call it constantly), and needs
-  no Node.js to run.
-- **What stays:** the protocol (`protocol/PROTOCOL.md`, amendments A1–A11) is unchanged; the
-  run-folder layout under `~/.baton/projects/...` is unchanged; the dashboard stays TypeScript +
-  Vite + three.js and is baked into the Go program at build time. All non-negotiables stay.
-- **How the two languages stay in agreement:** the JSON Schema files in `protocol/schema/`
-  become the single rulebook. Go checks messages against those exact files, the dashboard gets
-  its TypeScript types generated from them, and a shared folder of example messages
-  (`protocol/fixtures/`) is tested on both sides. A test fails the moment they drift.
-- **What becomes obsolete:** the TypeScript hub pieces (`hub/*.ts`), the zod file
-  (`protocol/types.ts`), the schema generator, the npm-link install, and — if you agree — the
-  TypeScript CLI now being written (it is used as a reference to check the Go one, then removed).
-- **What you need to decide:** see §11 — chiefly (1) Go CLI too, yes/no; (2) JSON Schema as the
-  rulebook; (3) automated tests on all three OSes via GitHub Actions; (4) port policy;
-  (5) what `baton hub stop` does to running agents; (6) the Go module name.
-
----
 
 ## 1. Scope of Go
 
@@ -354,7 +330,7 @@ A generic line tailer, reused in Phase 5 for adapter stdout files.
   10 s) so a stuck client cannot pin a goroutine.
 - Proposed additive amendment **A12**: every stream starts with
   `event: hello` / `data: {"instance":"<hub instance id>"}`, and `/api/health` returns
-  `instance` too, so a client can detect a hub restart unambiguously. (Needs your OK; §11 Q7.)
+  `instance` too, so a client can detect a hub restart unambiguously. (Approved as A12.)
 
 ### 5.4 Auth middleware
 
@@ -642,231 +618,8 @@ a fresh clone (the dashboard shows the "not built" page).
 | §5 repo layout | §3 of this document |
 | Kept unchanged | CLI exit codes (A9), per-run token hashing (A10), Vite dashboard, run-dir layout, data in `~/.baton/projects/<name>-<h8>/` |
 
-### 9.3 Files in the repo
+## 10. History
 
-| File | Fate |
-|---|---|
-| `protocol/PROTOCOL.md` | stays; T1 updates the "Machine-readable schemas" line under Amendments and adds A12 if approved |
-| `protocol/schema/*.json` | stays, becomes master (regenerate once from zod first) |
-| `protocol/types.ts`, `scripts/gen-schemas.ts` | delete after the final regeneration |
-| `hub/paths.ts` | port to `internal/paths`, then delete |
-| `hub/redact.ts` | port to `internal/redact` (+ fixtures), then delete |
-| `cli/baton.ts`, `bin/baton.js` | reference oracle during Phase 1, then delete (Q1) |
-| `test/cli.test.ts` | used once against the Go binary (configurable BIN), ported to `e2e/cli_test.go`, then delete |
-| `test/lifecycle.test.ts` | ported to `e2e/lifecycle_test.go`, then delete |
-| `package.json` | keep as task runner + dashboard deps; drop `bin`, `hono`, `@hono/node-server`, `zod`, `yaml`; `engines.node` stays (dashboard build) |
-| `tsconfig.json` | moves to `web/tsconfig.json` (scope = dashboard only); root one deleted |
-| `.gitignore` | `dist/` → `web/dist/*` + `!web/dist/.gitkeep`, add `/dist/` (build output) |
-| `package-lock.json` | regenerate after dependency changes |
-
----
-
-## 10. Phase 1 work breakdown (for implementation agents)
-
-Four tasks with disjoint file ownership. **T1 lands first** (it is small): its first commit is
-the exported API below as compiling stubs, so T2–T4 can build against it immediately.
-T2, T3, T4 then run in parallel. Nobody edits files outside their ownership; if a change is
-needed in another task's package, ask that task's owner (or the architect).
-
-Shared rules for all tasks: Go 1.26, `gofmt`, no cgo, no dependency beyond those listed;
-cross-platform (no shell scripts, `filepath` everywhere); every exported func documented;
-tests must pass on Windows locally.
-
-### T1 — Protocol + foundations
-
-**Owns:** `go.mod`, `go.sum`, `protocol/embed.go`, `protocol/schema/api.*.json` (new),
-`protocol/fixtures/**`, `internal/proto/**`, `internal/ids/**`, `internal/paths/**`,
-`internal/redact/**`. (Also: run `npm run schemas` once before starting and commit the output
-unchanged as the master copy.)
-
-**API (exact):**
-```go
-// package protocol
-var Schemas embed.FS // schema/*.json
-
-// package proto
-const Version = 1
-type Source string            // "cli" | "spool" | "hub" | "adapter"
-const (SrcCLI Source = "cli"; SrcSpool = "spool"; SrcHub = "hub"; SrcAdapter = "adapter")
-type RunStatus string         // starting running waiting blocked paused stalled rate_limited done failed killed exited
-type PlanStep struct { ID string `json:"id"`; Title string `json:"title"`; Acceptance string `json:"acceptance"` }
-type Envelope struct {        // incoming
-    V int; RunID, AgentID string; Seq *int64; TS string; Type string
-    Payload map[string]any; MsgID string
-    Extra map[string]json.RawMessage // unknown top-level fields, preserved
-} // with MarshalJSON/UnmarshalJSON handling Extra; json names per schema
-type StoredEvent struct {
-    V int; RunID, AgentID string; Seq int64; TS, Type string; Payload map[string]any
-    MsgID string; Src Source; ClientSeq *int64; Extra map[string]json.RawMessage
-}
-type InboxMessage struct { V int; N int; TS, Type string; Payload map[string]any }
-type RunRecord struct { /* fields of run-record.json */ }
-type Error struct { Status int; Code, Msg string }   // implements error
-// codes: INVALID_ENVELOPE INVALID_PAYLOAD HUB_ONLY_TYPE UNKNOWN_INBOX_TYPE UNAUTHORIZED
-//        RUN_MISMATCH AGENT_MISMATCH RUN_ENDED NOT_FOUND INTERNAL
-var AgentTypes, HubOnlyTypes, InboxTypes []string
-func IsHubOnly(t string) bool
-func ParseIncoming(b []byte) (Envelope, *Error)           // UseNumber; payload default {}; schema envelope.incoming
-func ValidateAgentPayload(typ string, p map[string]any) (map[string]any, *Error)
-func ValidateInboxPayload(typ string, p map[string]any) (map[string]any, *Error)
-func ValidateHubPayload(typ string, p map[string]any) (map[string]any, *Error)
-func MarshalLine(v any) []byte                            // compact, no HTML escaping, '\n'-terminated
-
-// package ids
-func RunID() string           // "r_" + 26-char ULID
-func UUID() string            // v4
-func RunToken() string        // "bt_run_" + base64url(32 bytes)
-func AdminToken() string      // "bt_adm_" + base64url(32 bytes)
-func QID() string             // "q_" + 6 base36
-func HashToken(tok string) string            // sha256 hex
-func TokenMatches(hashHex, tok string) bool  // constant time
-
-// package paths
-func BatonHome() string                       // $BATON_HOME or ~/.baton
-func ProjectDataDir(repoPath, home string) string
-func RunsDir(dataDir string) string; func RunDir(dataDir, runID string) string
-const RunRecordFile="run.json", EventsFile="events.jsonl", OutboxFile="outbox.jsonl",
-      OutboxOffsetFile="outbox.offset", InboxDir="inbox", InboxReadFile=".read"
-func InboxFileName(n int) string; func ParseInboxFileName(name string) (int, bool)
-
-// package redact
-func String(s string) string
-func Value(v any) any        // deep walk; sensitive keys → "[REDACTED]"; depth cap 50
-```
-
-**Acceptance:** fixtures exist for every schema (≥1 valid, ≥1 invalid per agent/inbox type;
-ingest, outbox and redact cases listed in §2.3); conformance + struct-vs-schema tests pass;
-`ids` tests (format, uniqueness, ULID time-sortable); `paths` tests (Windows lower-casing,
-macOS lower-casing, name sanitising); redact fixtures ported from the current TS rules incl. the
-lookahead rewrite (§4.1); `go vet` clean.
-
-### T2 — Hub core (store, spool, bus, API, hub wiring)
-
-**Owns:** `internal/store/**`, `internal/spool/**`, `internal/bus/**`, `internal/api/**`,
-`internal/hub/**` (incl. lock file).
-
-**API (exact, used by T3/T4):**
-```go
-// package hub
-type Options struct {
-    DataDir    string
-    Bind       string        // default "127.0.0.1"; non-loopback refused in Phase 1
-    Port       int           // 0 = OS-assigned
-    Dev        bool          // enables POST /api/dev/runs
-    AdminToken string        // "" = load/create <DataDir>/admin.token
-    SpoolPoll  time.Duration // default 250ms
-    Logger     *slog.Logger  // nil = discard
-}
-type Hub struct { URL, AdminToken, DataDir string /* unexported fields */ }
-func Start(ctx context.Context, o Options) (*Hub, error) // lock → open store → ingest outboxes → listen
-func (h *Hub) Close(ctx context.Context) error           // §5.6; idempotent
-func (h *Hub) Done() <-chan struct{}                     // closed after shutdown completes
-```
-Internals (store `Run.Append/Deliver/Events/Inbox/Summary/CheckToken`, spool tailer, broker
-`Publish/Subscribe`) as designed in §5.1–5.4; their exact shape is T2's choice.
-
-**HTTP behaviour:** exactly A11 (routes, auth classes, status codes, error JSON), plus Host
-guard, body limit, recover middleware, `event: reset` semantics, `GET /api/state` RunSummary
-(`last_seq`, `last_event_ts`, `open_questions`, `step_states`). `POST /api/dev/runs` returns
-`env` with `BATON_URL, BATON_TOKEN, BATON_RUN_ID, BATON_AGENT_ID, BATON_RUN_DIR, BATON_BRIEF`.
-
-**Acceptance (unit tests in T2's packages):** seq 1..n under 50 concurrent ingests; dup msg_id
-→ `duplicate:true`, stored once; truncated last line recovered; inbox file without `to_agent`
-repaired on open; all `ingest/` and `outbox/` fixtures pass; ring replay vs reset (old id,
-future id), slow subscriber dropped without blocking `Append`; auth matrix (no token / wrong /
-other run's token / admin / revoked → expected codes); Host guard; second `hub.Start` on the
-same DataDir fails with a clear "hub already running" error.
-
-### T3 — `baton` CLI
-
-**Owns:** `cmd/baton/**`, `internal/cli/**`.
-
-**API:**
-```go
-// package cli
-func Main(args []string, stdin io.Reader, stdout, stderr io.Writer, getenv func(string) string) int
-```
-**Behaviour:** identical to the reference `cli/baton.ts` and PROTOCOL §3.4 + A1–A9: every
-agent command; same one-line outputs (`ok #12`, `ok #12 (dup)`, `spooled (hub unreachable)`,
-`qid q_xxxxxx`, `inbox empty`, `[n] answer <qid>: <text>`, `[n] message (<from>): <text>`,
-`[n] plan_update: s1 T; s2 T`, `[n] pause: <reason>`, `NO_ANSWER`); same exit codes (0 / 2;
-`400` from hub → 2, `401/403/410` → 0 with `rejected` on stderr, 5xx/unreachable/3 s timeout →
-spool); payload validated locally with `proto.ValidateAgentPayload` before sending; spool line
-written with a single `Write` (`O_APPEND`); `.read` handling as A7; `ask --blocking` polling,
-timeout, heartbeats per A8 env vars; inbox falls back to `GET /api/runs/:id/inbox` when the run
-dir is missing; `plan` from `--file`, piped stdin, bare array, `--confirm` (if stdin is a
-terminal and no `--file` → exit 2; stdin read capped at 10 s so a Git Bash/mintty pipe can't
-hang the agent); HTTP client with `Proxy: nil`. Human commands in Phase 1: `help`, `version`,
-`up [--port N] [--dev] [--data-dir D] [--admin-token-file F]` → `hub.Start`, prints
-`baton hub: <url>` as the **first** stdout line, then admin token + data dir, runs until
-Ctrl+C. Unknown human commands from later phases (`attach`, `mock`, `hub`, `login`, `gc`)
-print "not available yet (Phase N)" and exit 2.
-
-**Acceptance:** in-process unit tests of `Main` (argument parser edge cases, every usage
-error → 2, help without env); cold start of `baton heartbeat` with hub down < 50 ms on Windows
-(measured in a test log, not asserted in CI).
-
-### T4 — E2E tests, build tooling, transition
-
-**Owns:** `e2e/**`, `package.json` (scripts/deps edits), `.gitignore`, `scripts/*.mjs` (new
-helpers only), `web/embed.go`, `web/dist/.gitkeep`, and the transitional edit to
-`test/cli.test.ts` (configurable `BATON_TEST_BIN`). Deletion of obsolete TS files happens only
-after the user approves Phase 1 (§9.3 list).
-
-**Deliverables:** `e2e/main_test.go` (builds the binary once), `e2e/lifecycle_test.go` (§7.2),
-`e2e/cli_test.go` (port of every case in `test/cli.test.ts`, using `httptest` fake hubs),
-`e2e/crash_test.go` (separate `baton up` process, hard kill, restart); npm scripts from §8
-(`build`, `install:baton`, `test`, `check`); a short "how to build/run/test" block for
-`HANDOFF.md` (handed to the main session, which owns HANDOFF.md).
-
-**Acceptance:** `go test ./...` and `npm run check` pass on Windows; `node --test
-test/cli.test.ts` with `BATON_TEST_BIN=<go binary>` passes; manual check script prints
-`baton version` from PowerShell, cmd and Git Bash.
-
-### Interfaces between tasks (summary)
-
-```
-T3 cli  ──uses──▶ T1 proto, ids, paths      T3 cli (up) ──uses──▶ T2 hub.Start/Close
-T2 hub  ──uses──▶ T1 proto, ids, paths, redact
-T4 e2e  ──uses──▶ T2 hub.Start (in-process), the built binary from T3, fixtures from T1
-```
-
----
-
-## 11. Open questions for the user
-
-1. **Go CLI too (one binary)?**
-   (a) Yes — the `baton` agent CLI is rewritten in Go; the TS CLI being written now is used as
-   the reference to check the Go one, then deleted. **← recommended**
-   (b) Yes, but keep the TS CLI in the repo permanently as a reference implementation.
-   (c) No — keep the TS CLI for agents (needs Node + npm link on every machine running agents);
-   only the hub is Go.
-2. **Protocol rulebook:** (a) JSON Schema files are the master; zod is removed **← recommended**;
-   (b) keep zod as the authoring format and generate the schemas (protocol changes need Node);
-   (c) Go structs are the master and the schemas are generated from them.
-3. **Automated tests on Windows + macOS + Linux** (GitHub Actions, free for public repos), from
-   Phase 1? (a) Yes **← recommended** (the project must work on all three and you develop on
-   one); (b) later; (c) no.
-4. **Port policy:** (a) prefer the configured port (default 7777), fall back to the next free one
-   and remember it per project **← recommended**; (b) always fixed — fail if taken;
-   (c) always random.
-5. **(Phase 2/5) `baton hub stop` while agents are running:**
-   (a) ask, then tell agents to `stop` and kill them after a grace period; `--keep-agents`
-   leaves them running, and the next hub start re-attaches to them **← recommended**;
-   (b) never touch agents — they always keep running and are re-attached;
-   (c) always kill them.
-6. **Go module name / GitHub location:** `github.com/<owner>/baton` — which owner and repo
-   name? (Only you can answer; it appears in every import, so it's best fixed now.)
-7. **Small additive protocol amendment A12:** SSE streams start with `event: hello
-   {instance}` and `/api/health` returns `instance`, so the dashboard can tell the hub
-   restarted (§5.3). Also new routes `POST /api/hub/shutdown` (admin) and, in Phase 6,
-   `GET /api/wait` and `/api/conductor/*`. (a) approve **← recommended**; (b) discuss.
-8. **Admin token lifetime:** (a) persistent per project (dashboard stays logged in across hub
-   restarts), `baton hub rotate-token` to change it **← recommended**; (b) new token every hub
-   start.
-
-Verify at build time (not questions, reminders): current versions of `jsonschema/v6`,
-`go.yaml.in/yaml/v3` (and whether v4 is final), MCP `go-sdk`; Windows `CREATE_BREAKAWAY_FROM_JOB`
-behaviour and Job Object kill of grandchildren; `claude` flags for stdin prompt, stream-json
-input + `--resume`, `--mcp-config` stdio form; `codex exec` stdin prompt and `--json` usage
-shape.
+The Phase 1 task breakdown (T1–T4), the TypeScript-to-Go file migration table and the
+original open questions (answered in §0) were removed once Phase 1 shipped; see git history
+(`git log -- docs/GO_HUB_DESIGN.md`).
