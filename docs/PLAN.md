@@ -10,7 +10,7 @@ Status of each phase lives in `HANDOFF.md`, not here.
 
 ## 1. What Baton is (one paragraph)
 
-A local hub that lets one Opus "conductor" run a fleet of coding agents (Claude Code, Codex
+A local hub that lets one "conductor" agent (model configurable) run a fleet of coding agents (Claude Code, Codex
 CLI, OpenCode, or any command) across several accounts, with a live 3D web dashboard. The
 user runs `baton` inside a project folder, adjusts settings if needed, types a prompt, and the
 conductor proposes a team of agents, gets approval, spawns them in isolated git worktrees,
@@ -45,7 +45,7 @@ answers their questions, reviews their diffs and merges.
   1. Target repo = the current folder. If it is not a git repo, **ask** the user, then
      `git init` + initial commit. Never do it silently.
   2. Start the hub as a **background daemon** if one isn't running for this project.
-  3. Start the **headless Opus conductor** (owned by the hub, not the terminal).
+  3. Start the **headless conductor** (owned by the hub, not the terminal).
   4. Open a terminal chat UI attached to the conductor, and open the dashboard in the browser.
 - **Ctrl+C / closing the terminal only detaches.** Agents, conductor and dashboard keep running.
 - `baton attach` re-attaches the terminal chat to the running conductor (history shown).
@@ -55,9 +55,13 @@ answers their questions, reviews their diffs and merges.
 
 ### 4.2 Headless conductor
 
-- The hub runs the conductor as a long-lived official `claude` process on the conductor account
-  (`--model opus`, Baton MCP server attached, conductor system prompt), using stream-json
-  input/output. Exact flags must be verified against `claude --help` at build time.
+- The hub runs the conductor as a long-lived official CLI process on the conductor account
+  (Baton MCP server attached, conductor system prompt), using stream-json input/output. Exact
+  flags must be verified against `claude --help` at build time.
+- **The conductor model is a setting, not fixed to Opus** (decided 2026-11-06): `conductor:
+  { account, model, effort }` in config, switchable from the dashboard. Opus is only the default
+  suggestion. Whether the conductor may also be a non-Claude CLI (e.g. Codex, which also
+  supports MCP) is open question #9 (Phase 6).
 - The conductor keeps working while the user is detached (answers agent questions, reviews,
   *proposes* merges — merges still go through approval gates, §4.6).
 - Conversation history is persisted so `baton attach` can replay it.
@@ -211,3 +215,5 @@ Ask each at the start of the phase that needs it:
    input, MCP config, permission modes; `codex exec --json` event shape, `CODEX_HOME`, effort
    setting (`model_reasoning_effort`); OpenCode config dir variable.
 8. **Before any step that spends quota**, ask first.
+9. **(Phase 6)** Conductor kind: Claude Code only, or any MCP-capable CLI (Codex, OpenCode)? The
+   model is configurable either way.
