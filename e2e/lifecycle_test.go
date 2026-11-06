@@ -19,9 +19,8 @@ const lifeToken = "bt_adm_test_lifecycle"
 
 func startHub(t *testing.T, dataDir string) *hub.Hub {
 	t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
-	defer cancel()
-	h, err := hub.Start(ctx, hub.Options{
+	// ctx is the hub lifetime (cancelling it shuts the hub down), so it must outlive the test.
+	h, err := hub.Start(context.Background(), hub.Options{
 		DataDir:    dataDir,
 		Port:       0,
 		Dev:        true,

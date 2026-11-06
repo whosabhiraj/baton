@@ -56,6 +56,16 @@ func (c *ctx) cmdUp(o opts) (int, error) {
 		}
 		opt.DataDir = paths.ProjectDataDir(repoRoot(cwd), paths.BatonHome())
 	}
+	// --admin-token-file F: if F exists and is non-empty, use its token; otherwise the hub's
+	// token (persistent per project) is written to F after start.
+	tokenFromFile := false
+	if o.has("admin-token-file") {
+		if b, err := os.ReadFile(o.get("admin-token-file")); err == nil {
+			if tok := strings.TrimSpace(string(b)); tok != "" {
+				opt.AdminToken, tokenFromFile = tok, true
+			}
+		}
+	}
 	stop, cancel := upStopCtx()
 	defer cancel()
 	h, err := startHub(stop, opt)
@@ -68,7 +78,7 @@ func (c *ctx) cmdUp(o opts) (int, error) {
 	fmt.Fprintf(c.stdout, "baton hub: %s\n", h.URL)
 	fmt.Fprintf(c.stdout, "admin token: %s\n", h.AdminToken)
 	fmt.Fprintf(c.stdout, "data dir: %s\n", h.DataDir)
-	if f := o.get("admin-token-file"); o.has("admin-token-file") {
+	if f := o.get("admin-token-file"); o.has("admin-token-file") && !tokenFromFile {
 		if err := os.WriteFile(f, []byte(h.AdminToken), 0o600); err != nil {
 			fmt.Fprintf(c.stderr, "baton: warning: could not write admin token file (%s)\n", err.Error())
 		}
