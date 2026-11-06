@@ -37,9 +37,10 @@ Things only you can do:
    `HANDOFF.local.md` if it exists (machine facts, not committed) → `docs/GO_HUB_DESIGN.md`
    (§0 = decisions) → `docs/PLAN.md` → the original spec, if present locally
    (`docs/BATON_BUILD_PROMPT.local.md`; not in the repo).
-2. Check state: `git log --oneline`, `git status`. If the tables here disagree with git, trust
+2. If §E lists unanswered open questions, ask the user those first (before any code).
+3. Check state: `git log --oneline`, `git status`. If the tables here disagree with git, trust
    git and tell the user.
-3. **Working rules:**
+4. **Working rules:**
    - Ask, don't assume (AskUserQuestion). Propose improvements, implement after approval.
    - Phase by phase; ask before starting the next phase.
    - **Commit (and push) progress continuously** — stable, tested pieces; scan for personal
@@ -49,8 +50,8 @@ Things only you can do:
    - Update `PROGRESS.local.md` after every meaningful step; this file at the end of every phase.
    - Never commit personal material (the user's messages, quotes of them, working notes,
      machine details) — keep it in `*.local.md` (gitignored). More working preferences: HANDOFF.local.md.
-4. Go may not be on PATH in old shells: prepend Go's bin dir (see HANDOFF.local.md).
-5. Commit messages end with the Co-Authored-By line from the session's attribution rules.
+5. Go may not be on PATH in old shells: prepend Go's bin dir (see HANDOFF.local.md).
+6. Commit messages end with the Co-Authored-By line from the session's attribution rules.
 
 ## C. Phase status
 
@@ -112,8 +113,10 @@ What Phase 3 left for the dashboard to use (all in PROTOCOL.md A11–A15):
 - Answer body is `{"qid": "...", "text": "..."}`. Admin auth = `Authorization: Bearer <admin token>`
   (SSE: `?token=`). Dev against `baton mock --speed 5` (no quota; data in `<BATON_HOME>/mock`).
 
-**Open questions — ask the user before writing Phase 4 code** (they were not answered yet; the
-recommended option is first):
+**First action for the next agent: ask the user these four questions** (one AskUserQuestion
+call, options as written, recommended option first and marked "(Recommended)"). They were
+prepared in the previous session but never answered. Do not write Phase 4 code until the user
+has answered them:
 1. Scope/split: (a) 4a working dashboard without 3D (list view, agent panel with plan, events,
    question + answer box, controls, approvals, usage, spawn form, account toggles, config editor),
    4b 3D scene, 4c timeline/replay; conductor chat panel moved to Phase 6 (needs the real
