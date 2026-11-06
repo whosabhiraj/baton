@@ -4,7 +4,7 @@ run a bunch of coding agents at once (claude code, codex, opencode, or really an
 run a shell command) across your accounts. one conductor agent splits up the work and keeps
 things moving, you approve the important stuff, and there's a dashboard to watch it all.
 
-still being built: the hub, agent cli and a mock work, the dashboard and real agents don't yet.
+still being built: the hub, agent cli, dashboard and claude code agents work. codex, opencode and the conductor don't yet.
 
 ## the idea
 
@@ -21,31 +21,49 @@ it only runs the official clis and never touches your login tokens. everything s
 
 ## status
 
-phases 1-3 of 8 done:
+phases 1-4 of 8 done, 5 in progress:
 
 - protocol + the agent cli, with a file spool so nothing is lost when the hub is down
 - background hub per project: runs, git worktrees, account rules, live config, audit log, stalled detection
 - `baton mock` (below)
+- the dashboard: agent list with each plan drawn as a little route, a panel per agent (answer
+  questions, message, pause, stop, kill), approvals, spawn form, config, a 3d map and a
+  timeline you can scrub back through. works on a phone too
+- real agents: claude code runs for real now (headless, in its own worktree, reports back,
+  tokens and cost show up). each agent gets a small supervisor process, so it survives a hub
+  restart and kill takes its whole process tree with it
 
-next is phase 4, the dashboard. then real agent adapters, then the conductor. plan and design are in `docs/`.
+next: codex and `baton login`, then opencode, then the conductor. plan and design are in `docs/`.
 
 ## building
 
-needs go (see `go.mod`), node 24+ (only for the helper scripts) and git.
+needs go (see `go.mod`), node 24+ (for the dashboard build and helper scripts) and git.
 
 ```
-npm run check    # fmt, vet, all tests
-npm run build    # -> dist/baton
+npm install
+npm run check    # fmt, vet, all tests, dashboard typecheck
+npm run build    # dashboard + binary -> dist/baton
 npm run install:baton   # puts baton on your PATH (open a new terminal)
 ```
 
-what works today: `baton up` in a repo starts the hub and prints its url and admin token,
-`baton hub status` / `baton hub stop`, and the http api (`protocol/PROTOCOL.md`), e.g. spawning
-an agent run with `POST /api/spawn`. no agent process starts yet, that's phase 5.
+`baton up` in a repo starts the hub, prints its url and admin token and opens the dashboard.
+`baton hub status` / `baton hub stop` do what they say. spawn agents from the dashboard (or
+`POST /api/spawn`, see `protocol/PROTOCOL.md`).
+
+> NOTE: worker agents run with permission checks off by default (they only touch their own
+> worktree, but they can run any command). set `permissions.mode` per account in the config
+> (`default`, `acceptEdits` or `permissive`) if you want them on a shorter leash.
 
 ## try it without agents
 
-`baton mock` starts a hub with a fake conductor and six fake agents on a scratch repo, so the dashboard can be built and tried without spending any quota. until the dashboard exists, poke it through the api (`GET /api/state`, answer questions, pause or kill runs, approve merges). it uses its own data folder (`~/.baton/mock`, never your project or your real config). ctrl+c stops it. `--once` stops after the opening scenario, `--speed 5` runs it faster, `--seed N` repeats a run, `--reset` starts from a clean folder.
+`baton mock` starts a hub with a fake conductor and fake agents on a scratch repo and opens the
+dashboard, so you can click around without spending any quota. it uses its own data folder
+(`~/.baton/mock`, never your project or your real config). ctrl+c stops it. `--once` stops
+after the opening scenario, `--speed 5` runs it faster, `--seed N` repeats a run, `--reset`
+starts from a clean folder.
+
+working on the dashboard: run `baton mock`, then `npm run dev:web` with `BATON_HUB_URL` set to
+the url it printed, and open the vite url with `#token=<admin token>`.
 
 ## docs
 

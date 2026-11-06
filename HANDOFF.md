@@ -51,7 +51,6 @@ Things only you can do:
    - Never commit personal material (the user's messages, quotes of them, working notes,
      machine details) — keep it in `*.local.md` (gitignored). More working preferences: HANDOFF.local.md.
 5. Go may not be on PATH in old shells: prepend Go's bin dir (see HANDOFF.local.md).
-6. Commit messages end with the Co-Authored-By line from the session's attribution rules.
 
 ## C. Phase status
 
