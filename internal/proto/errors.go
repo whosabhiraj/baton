@@ -24,6 +24,7 @@ const (
 	CodeModelNotAllowed = "MODEL_NOT_ALLOWED" // model not in account.models
 	CodeAccountBusy     = "ACCOUNT_BUSY"      // account at max_concurrent
 	CodeMaxAgents       = "MAX_AGENTS"        // global cap (auto mode only)
+	CodeCallsignTaken   = "CALLSIGN_TAKEN"    // custom callsign used by a live agent
 	CodeNotARepo        = "NOT_A_REPO"        // target folder is not a git repository
 	CodeGit             = "GIT_ERROR"         // a git command failed
 	CodeConfigInvalid   = "CONFIG_INVALID"    // config write rejected by validation
@@ -58,7 +59,7 @@ func statusFor(code string) int {
 	case CodeRunEnded:
 		return http.StatusGone
 	case CodeUnknownQID, CodeAccountDisabled, CodeRoleNotAllowed, CodeModelNotAllowed,
-		CodeAccountBusy, CodeMaxAgents, CodeNotARepo:
+		CodeAccountBusy, CodeMaxAgents, CodeNotARepo, CodeCallsignTaken:
 		return http.StatusConflict
 	case CodeAccountRequired, CodeUnknownAccount, CodeConfigInvalid:
 		return http.StatusBadRequest
