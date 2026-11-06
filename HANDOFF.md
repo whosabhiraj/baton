@@ -1,7 +1,7 @@
 # HANDOFF — read this first
 
-Last updated: **2026-11-07**, **Phase 6a done** (conductor REST routes + `baton mcp`). Phase 5's real codex
-run still waits for `baton login codex-1`.
+Last updated: **2026-11-07**, **Phase 6 code done** (6a-6d). Waiting on the user for logins, then three
+small real runs (quota): codex check (Phase 5), first real conductor, Phase 6 acceptance.
 
 Big change since Phase 0: the hub **and** the `baton` CLI are written in **Go** (one binary).
 `docs/GO_HUB_DESIGN.md` is approved and overrides `docs/PLAN.md` §3, §4.7, §5 and §6.
@@ -21,10 +21,12 @@ Commands that work today (need Go, Node 24+ and git; `npm install` once):
 | `npm run check` | gofmt, vet, dashboard types in sync + typecheck, every Go test, then a full build |
 | `npm run build` | dashboard + binary -> `dist/baton` (`.exe` on Windows), version-stamped |
 | `npm run install:baton` | same, installed to Go's bin folder (on PATH in a new terminal) |
-| `baton up` | in a repo: starts (or reuses) the background hub, prints URL + admin token, opens the dashboard |
+| `baton` | in a repo: hub (background) + conductor, opens the dashboard and, in a terminal, the conductor chat (`--no-chat`) |
+| `baton up` | in a repo: starts (or reuses) the background hub, prints URL + admin token, opens the dashboard (no conductor) |
+| `baton attach` | status, then the conductor chat (Bubble Tea; plain line mode when not a terminal). Ctrl+C detaches |
 | `baton hub status` / `baton hub stop` | hub state / stop it (asks; `--keep-agents`) |
 | `baton login <account>` / `baton login --status` | log an account's CLI in, inside its own config dir |
-| `baton mock [--speed N] [--seed N] [--once] [--reset]` | demo hub with a fake conductor and fake agents (`~/.baton/mock`), no quota |
+| `baton mock [--speed N] [--seed N] [--once] [--reset]` | demo hub with a fake conductor and fake agents (`~/.baton/mock`), no quota; the chat echoes, one lineup is proposed |
 | `npm run dev:web` | dashboard dev server with hot reload; set `BATON_HUB_URL` to a running hub (e.g. the mock) and open it with `#token=<admin token>` |
 | `baton mcp` | conductor MCP stdio server (started by the hub in 6b; needs `BATON_CONDUCTOR_TOKEN`) |
 | `baton help` | agent commands (`hello`, `plan`, `step`, `progress`, `ask`, `inbox`, `done`, ...) |
@@ -68,7 +70,7 @@ Things only you can do:
 | 3 `baton mock` | ✅ done (controls, approvals, kill checked by hand) | `7e40608` … |
 | 4 Dashboard | ✅ done: list + panels, 3D rail-yard map, timeline + replay, phone layout; design iterated live with the user | `4b771b3` … `20f9bfe` |
 | 5 Adapters | code done: supervisor, env allowlist, claude (real run ok), codex, opencode + refusal, custom kinds, `baton login`; real codex run pending login | `852719b` … `72e99ec` |
-| 6 Conductor | 6a done: conductor token, run/diff/merge/wait routes, real merges, `baton mcp` (18 tools). Next 6b (headless conductor), 6c (terminal chat in Bubble Tea + dashboard chat), 6d (lineup flow + real e2e) | `12da74f` |
+| 6 Conductor | code done: 6a conductor token, run/diff/merge/wait routes, real merges, `baton mcp`; 6b headless conductor (history, resume, auto-wake); 6c chat (Bubble Tea + dashboard sheet); 6d lineups. Real runs pending login | `12da74f` … `5bfb69e` |
 | 7 Hardening | pending | — |
 | 8 Remote access (future) | not planned yet | — |
 
@@ -91,7 +93,10 @@ internal/adapters       claude, codex, opencode, config-defined kinds (generic);
 internal/launch         real Launcher: start, stdout -> activity/usage, exit + diff stat, kill,
                         adoption after hub restart, preflight (OpenCode/Claude-subscription refusal)
 internal/mock           `baton mock`: fake conductor + agents through the real hub
-internal/mcpserver      `baton mcp`: the conductor's MCP stdio server, tools = thin REST calls (A16)
+internal/mcpserver      `baton mcp`: the conductor's MCP stdio server, 20 tools = thin REST calls (A16, A18)
+internal/conductor      headless conductor process (claude -p stream-json), history, resume, auto-wake,
+                        embedded prompt.md, FakeCLI (BATON_FAKE_CLAUDE=1) for mock and tests (A17)
+internal/chat           terminal chat: Bubble Tea UI + line mode, slash commands
 internal/cli            agent commands, baton up/hub/login/mock, help
 internal/{ids,paths,redact,gitx,logx,bus,briefing}  helpers
 protocol/               PROTOCOL.md (BATON/1 + A1-A15), schema/*.json (source of truth), fixtures/
@@ -107,28 +112,29 @@ Runtime data: `~/.baton/projects/<repo-name>-<hash8>/` (override with `BATON_HOM
 brief.md, stdout.jsonl, stderr.log, supervisor.json, exit.json}`. Global config:
 `~/.baton/config.yaml`; per project: `<repo>/baton.config.yaml`.
 
-## E. Resume here (Phase 6: 6a done, next 6b)
+## E. Resume here (Phase 6 code done; real runs wait for the user)
 
-Phase 6 answers (2026-11-07): conductor = Claude Code only, built so other kinds can be added;
-default conductor `claude-a` / opus / high, configurable; split 6a/6b/6c/6d with a check-in after
-each; terminal chat uses **Bubble Tea** (overrides the "plain REPL first" line in GO_HUB_DESIGN);
-REST + SSE stays (no WebSockets). 6a answers: merges are `--no-ff` merge commits, conflicts are
-refused (the conductor sends the agent back); a dirty checkout of the base refuses the merge and the
-approval stays pending; the conductor token may switch `hub.mode` and `account.enabled` but never
-decide approvals or change other config.
+The user works through `TODO.local.md` (logins, CI file). After the logins, with the user and
+**asking before each (quota)**: (1) one tiny codex run to check the codex adapter against its real
+`--json` output; (2) first real conductor: `baton` in a small test project, one message: verify
+stream-json input, `--resume` after a hub restart, `--append-system-prompt-file`,
+`--permission-prompts none`, that the conductor sees the `mcp__baton__*` tools (the `mcp__baton`
+entry in `--allowedTools` may need the per-tool form), and token/cost lines; (3) Phase 6
+acceptance (split a small task across two accounts: lineup approved, question answered, diff
+reviewed, merge approved). Fix what they show, then Phase 7 (hardening) — ask its open questions.
 
-Done (6a, PROTOCOL.md A16): conductor session token, `GET /api/runs`, `GET /api/runs/:id`,
-`GET /api/runs/:id/diff`, `POST /api/runs/:id/merge`, `GET /api/wait` (long-poll with cursor),
-real merges on approval, `baton mcp` with 18 tools.
+Phase 6 decisions (2026-11-07): conductor = Claude Code only, extensible; default `claude-a` /
+opus / high (config); Bubble Tea chat; REST + SSE (no WebSockets); merges = `--no-ff` merge commits,
+refused on conflict / uncommitted agent work / dirty base checkout (approval stays pending);
+conductor token limited (mode + account enabled only, never approvals); auto-wake nudges an idle
+conductor (`conductor.auto_wake`); conductor tools = Baton MCP + Read/Grep/Glob, everything else
+denied without a prompt; lineups: approval in user/propose mode, spawn now in auto, conductor
+spawns outside auto refused (LINEUP_REQUIRED). Working style from now on: continue sub-phase to
+sub-phase without asking; anything needing the user goes to `TODO.local.md`.
 
-Next (6b): headless conductor owned by the hub — `claude` with stream-json in/out on the conductor
-account, `--mcp-config` pointing at `baton mcp` with a freshly minted token, conductor system prompt
-file, `history.jsonl`, restart with `--resume`, conductor state notices. Verify flags against
-`claude --help` first; any real run uses quota (**ask first**).
-
-Phase 5 leftover: user logs in (`baton login claude-a|claude-b|codex-1`), then one tiny real codex
-run (**quota, ask first**) to capture its `--json` stream and check effort/sandbox flags and cached
-token accounting. OpenCode stays disabled until an API-key provider is chosen.
+Testing without quota: `baton mock` has a working (echo) conductor chat and proposes one lineup.
+Visual checks: headless Chrome over CDP (a plain `--screenshot` hangs on the SSE streams); the
+dashboard opens a sheet from the URL fragment (`#open=chat`, `#open=approvals`).
 
 API surface for the dashboard (PROTOCOL.md A11–A15):
 - `GET /api/state` (runs with status, plan, step_states, open_questions, usage; accounts with
@@ -186,6 +192,9 @@ RUN_ENDED (global mapping 410); mock hub data lives in `<BATON_HOME>/mock/data`.
   (configurable), 6a-6d split, Bubble Tea terminal chat, REST + SSE (no WebSockets); merges are
   no-ff merge commits, refused on conflict or a dirty base checkout (approval stays pending);
   conductor token limited (mode + account enabled only, no approval decisions).
+
+- 2026-11-07: Phase 6b-6d: headless conductor with history/resume/auto-wake, Bubble Tea and
+  dashboard chat, lineups (propose -> approve, editable -> spawn); conductor read-only + MCP tools.
 
 ## G. Privacy rule for this repo (public)
 
