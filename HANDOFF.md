@@ -12,7 +12,7 @@ Big change since Phase 0: the hub **and** the `baton` CLI are written in **Go** 
 
 1. Open a terminal in the repo folder and run `claude`.
 2. Paste this as your first message:
-   > Read HANDOFF.md, PROGRESS.md and docs/PLAN.md, then continue. Ask me the open questions
+   > Read HANDOFF.md, PROGRESS.local.md (if present) and docs/PLAN.md, then continue. Ask me the open questions
    > for the next phase before writing code.
 
 Commands that work today (need Go and Node 24+):
@@ -33,22 +33,22 @@ Things only you can do:
 
 ## B. For Claude (fresh session, zero context): how to resume
 
-1. Read, in order: this file → `PROGRESS.md` (live log, may be newer than this file) →
+1. Read, in order: this file → `PROGRESS.local.md` if it exists (local live log, may be newer) →
    `HANDOFF.local.md` if it exists (machine facts, not committed) → `docs/GO_HUB_DESIGN.md`
-   (§0 = user decisions) → `docs/PLAN.md` → `docs/BATON_BUILD_PROMPT.md`.
+   (§0 = decisions) → `docs/PLAN.md` → the original spec, if present locally
+   (`docs/BATON_BUILD_PROMPT.local.md`; not in the repo).
 2. Check state: `git log --oneline`, `git status`. If the tables here disagree with git, trust
    git and tell the user.
-3. **Working rules the user set:**
+3. **Working rules:**
    - Ask, don't assume (AskUserQuestion). Propose improvements, implement after approval.
    - Phase by phase; ask before starting the next phase.
    - **Commit (and push) progress continuously** — stable, tested pieces; scan for personal
      info first (public repo).
    - Ask before anything that spends model quota (real claude/codex runs).
    - Prefer settings over hard-coding. Explain choices in plain language.
-   - Parallelise with subagents on right-sized models (Sonnet/medium for implementation, Opus
-     for architecture), file-disjoint tasks; don't waste quota. Internal notes and agent
-     prompts terse; user-facing text normal.
-   - Update `PROGRESS.md` after every meaningful step; this file at the end of every phase.
+   - Update `PROGRESS.local.md` after every meaningful step; this file at the end of every phase.
+   - Never commit personal material (the user's messages, quotes of them, working notes,
+     machine details) — keep it in `*.local.md` (gitignored). More working preferences: HANDOFF.local.md.
 4. Go may not be on PATH in old shells: prepend Go's bin dir (see HANDOFF.local.md).
 5. Commit messages end with the Co-Authored-By line from the session's attribution rules.
 
@@ -80,12 +80,12 @@ internal/bus            SSE fan-out ring buffer
 internal/api            HTTP API (PROTOCOL.md A11 + A12)
 internal/hub            wiring, OS lock, port fallback, admin token, stalled detection
 internal/cli            agent commands + `baton up` (foreground) + help/version
-protocol/PROTOCOL.md    BATON/1 (spec §3 verbatim + amendments A1–A12)
+protocol/PROTOCOL.md    BATON/1 (original spec §3 + amendments A1–A12)
 protocol/schema/*.json  JSON Schemas = source of truth; protocol/fixtures/ = shared examples
 e2e/                    lifecycle, CLI parity (38 cases), crash recovery (hard-killed hub)
 scripts/*.mjs           build / install / test / check (cross-platform)
 web/embed.go            embeds web/dist (dashboard comes in Phase 4)
-docs/                   PLAN.md, GO_HUB_DESIGN.md, original spec
+docs/                   PLAN.md, GO_HUB_DESIGN.md
 cli/, bin/, hub/*.ts, protocol/types.ts, scripts/gen-schemas.ts, test/, tsconfig.json
                         TypeScript reference implementation (test oracle) — delete after approval
 ```

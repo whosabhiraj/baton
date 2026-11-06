@@ -1,6 +1,6 @@
 # Baton — Build Plan (approved)
 
-This is the **authoritative plan**. It is the original spec (`docs/BATON_BUILD_PROMPT.md`)
+This is the **authoritative plan**. It is the original Baton spec (not in the repo)
 plus every change the user approved on 2026-11-06. **Where this file and the spec disagree,
 this file wins.** Anything not mentioned here follows the spec as written.
 
@@ -153,7 +153,6 @@ baton/                        # repo root
   CLAUDE.md                   # points a fresh Claude at HANDOFF.md + PLAN.md
   HANDOFF.md                  # current status, how to resume (user + Claude)
   README.md
-  docs/BATON_BUILD_PROMPT.md  # original spec (reference)
   docs/PLAN.md                # this file
   baton.config.example.yaml   # documented example; real config is ~/.baton/config.yaml
   protocol/PROTOCOL.md        # spec §3 verbatim + Amendments (§4.5)

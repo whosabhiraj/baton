@@ -1,6 +1,6 @@
 # BATON/1 protocol
 
-> Sections 3.x below are copied verbatim from the original spec (`docs/BATON_BUILD_PROMPT.md` §3).
+> Sections 3.x below are copied verbatim from the original Baton spec (§3).
 > Where they conflict with the **Amendments** at the end of this file, the Amendments win.
 
 ## 3. The protocol: BATON/1
