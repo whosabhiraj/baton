@@ -94,6 +94,8 @@ func (c *ctx) dispatch(argv []string) (int, error) {
 		return c.cmdUpOrBaton(o, false, true)
 	case "hub":
 		return c.cmdHub(o, pos)
+	case "__supervise":
+		return c.cmdSupervise()
 	case "mock":
 		return c.cmdMock(o)
 	}
