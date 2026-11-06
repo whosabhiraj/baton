@@ -1,6 +1,7 @@
 # HANDOFF — read this first
 
-Last updated: **2026-11-07**, **Phase 5 code done** (claude verified with one real run; codex waits for `baton login`).
+Last updated: **2026-11-07**, **Phase 6a done** (conductor REST routes + `baton mcp`). Phase 5's real codex
+run still waits for `baton login codex-1`.
 
 Big change since Phase 0: the hub **and** the `baton` CLI are written in **Go** (one binary).
 `docs/GO_HUB_DESIGN.md` is approved and overrides `docs/PLAN.md` §3, §4.7, §5 and §6.
@@ -25,6 +26,7 @@ Commands that work today (need Go, Node 24+ and git; `npm install` once):
 | `baton login <account>` / `baton login --status` | log an account's CLI in, inside its own config dir |
 | `baton mock [--speed N] [--seed N] [--once] [--reset]` | demo hub with a fake conductor and fake agents (`~/.baton/mock`), no quota |
 | `npm run dev:web` | dashboard dev server with hot reload; set `BATON_HUB_URL` to a running hub (e.g. the mock) and open it with `#token=<admin token>` |
+| `baton mcp` | conductor MCP stdio server (started by the hub in 6b; needs `BATON_CONDUCTOR_TOKEN`) |
 | `baton help` | agent commands (`hello`, `plan`, `step`, `progress`, `ask`, `inbox`, `done`, ...) |
 
 Things only you can do:
@@ -66,7 +68,7 @@ Things only you can do:
 | 3 `baton mock` | ✅ done (controls, approvals, kill checked by hand) | `7e40608` … |
 | 4 Dashboard | ✅ done: list + panels, 3D rail-yard map, timeline + replay, phone layout; design iterated live with the user | `4b771b3` … `20f9bfe` |
 | 5 Adapters | code done: supervisor, env allowlist, claude (real run ok), codex, opencode + refusal, custom kinds, `baton login`; real codex run pending login | `852719b` … `72e99ec` |
-| 6 Conductor | pending | — |
+| 6 Conductor | 6a done: conductor token, run/diff/merge/wait routes, real merges, `baton mcp` (18 tools). Next 6b (headless conductor), 6c (terminal chat in Bubble Tea + dashboard chat), 6d (lineup flow + real e2e) | `12da74f` |
 | 7 Hardening | pending | — |
 | 8 Remote access (future) | not planned yet | — |
 
@@ -89,6 +91,7 @@ internal/adapters       claude, codex, opencode, config-defined kinds (generic);
 internal/launch         real Launcher: start, stdout -> activity/usage, exit + diff stat, kill,
                         adoption after hub restart, preflight (OpenCode/Claude-subscription refusal)
 internal/mock           `baton mock`: fake conductor + agents through the real hub
+internal/mcpserver      `baton mcp`: the conductor's MCP stdio server, tools = thin REST calls (A16)
 internal/cli            agent commands, baton up/hub/login/mock, help
 internal/{ids,paths,redact,gitx,logx,bus,briefing}  helpers
 protocol/               PROTOCOL.md (BATON/1 + A1-A15), schema/*.json (source of truth), fixtures/
@@ -104,23 +107,28 @@ Runtime data: `~/.baton/projects/<repo-name>-<hash8>/` (override with `BATON_HOM
 brief.md, stdout.jsonl, stderr.log, supervisor.json, exit.json}`. Global config:
 `~/.baton/config.yaml`; per project: `<repo>/baton.config.yaml`.
 
-## E. Resume here (Phase 5: real codex run pending)
+## E. Resume here (Phase 6: 6a done, next 6b)
 
-Phase 5 answers (2026-11-07): split 5a/5b/5c; worker agents **fully permissive** by default
-(`permissions.mode` empty = permissive); isolated per-account config dirs + `baton login`;
-OpenCode built but disabled.
+Phase 6 answers (2026-11-07): conductor = Claude Code only, built so other kinds can be added;
+default conductor `claude-a` / opus / high, configurable; split 6a/6b/6c/6d with a check-in after
+each; terminal chat uses **Bubble Tea** (overrides the "plain REPL first" line in GO_HUB_DESIGN);
+REST + SSE stays (no WebSockets). 6a answers: merges are `--no-ff` merge commits, conflicts are
+refused (the conductor sends the agent back); a dirty checkout of the base refuses the merge and the
+approval stays pending; the conductor token may switch `hub.mode` and `account.enabled` but never
+decide approvals or change other config.
 
-Done: `internal/proc` (env allowlist), `internal/supervise` (`baton __supervise`, tree kill,
-survives hub restart), `internal/adapters` (claude, codex, opencode, config-defined kinds incl.
-`generic`), `internal/launch` (real launcher, stdout tail -> activity/usage, exit + diff stat,
-adoption after restart, preflight refusal), `baton login <id>` / `--status`. One real claude run
-verified the claude stream format (fixture is the sanitized capture). Codex and OpenCode
-fixtures are hand-written approximations.
+Done (6a, PROTOCOL.md A16): conductor session token, `GET /api/runs`, `GET /api/runs/:id`,
+`GET /api/runs/:id/diff`, `POST /api/runs/:id/merge`, `GET /api/wait` (long-poll with cursor),
+real merges on approval, `baton mcp` with 18 tools.
 
-Next: user logs in (`baton login claude-a|claude-b|codex-1`), then one tiny real codex run
-(**quota, ask first**) to capture its `--json` stream and check effort/sandbox flags and cached
-token accounting. OpenCode stays disabled until an API-key provider is chosen. Then Phase 6
-(conductor) — ask its open questions first.
+Next (6b): headless conductor owned by the hub — `claude` with stream-json in/out on the conductor
+account, `--mcp-config` pointing at `baton mcp` with a freshly minted token, conductor system prompt
+file, `history.jsonl`, restart with `--resume`, conductor state notices. Verify flags against
+`claude --help` first; any real run uses quota (**ask first**).
+
+Phase 5 leftover: user logs in (`baton login claude-a|claude-b|codex-1`), then one tiny real codex
+run (**quota, ask first**) to capture its `--json` stream and check effort/sandbox flags and cached
+token accounting. OpenCode stays disabled until an API-key provider is chosen.
 
 API surface for the dashboard (PROTOCOL.md A11–A15):
 - `GET /api/state` (runs with status, plan, step_states, open_questions, usage; accounts with
@@ -173,6 +181,11 @@ RUN_ENDED (global mapping 410); mock hub data lives in `<BATON_HOME>/mock/data`.
 - 2026-11-07: Phase 5: split 5a/5b/5c; worker agents fully permissive by default; isolated
   per-account config dirs + `baton login`; OpenCode built but disabled; first real claude run
   verified (stdin prompt, stream-json parsing, usage/cost, exit + diff stat).
+
+- 2026-11-07: Phase 6: Claude-only conductor (extensible), default claude-a/opus/high
+  (configurable), 6a-6d split, Bubble Tea terminal chat, REST + SSE (no WebSockets); merges are
+  no-ff merge commits, refused on conflict or a dirty base checkout (approval stays pending);
+  conductor token limited (mode + account enabled only, no approval decisions).
 
 ## G. Privacy rule for this repo (public)
 
