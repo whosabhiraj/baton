@@ -32,7 +32,7 @@
       "type": "object",
       "properties": {
         "id": { "type": "string", "minLength": 1 },
-        "kind": { "enum": ["merge", "spawn"] },
+        "kind": { "enum": ["merge", "spawn", "lineup"] },
         "run_id": { "type": "string" },
         "title": { "type": "string" },
         "detail": { "type": "object" },
@@ -41,7 +41,8 @@
         "created_at": { "type": "string" },
         "decided_at": { "type": "string" },
         "decided_by": { "type": "string" },
-        "note": { "type": "string" }
+        "note": { "type": "string" },
+        "result": { "type": "object", "description": "What approving did (A18 lineup: spawned[], failed[])." }
       },
       "required": ["id", "kind", "title", "requested_by", "status", "created_at"]
     },

@@ -169,6 +169,19 @@ func (s *Session) listApprovals() []Line {
 		if ds, _ := a.Detail["diff_stat"].(string); ds != "" {
 			fmt.Fprintf(&b, " (%s)", ds)
 		}
+		if a.Kind == "lineup" {
+			agents, _ := a.Detail["agents"].([]any)
+			for j, x := range agents {
+				ag, _ := x.(map[string]any)
+				str := func(k string) string { v, _ := ag[k].(string); return v }
+				steps, _ := ag["plan"].([]any)
+				model := str("model")
+				if e := str("effort"); e != "" {
+					model += "/" + e
+				}
+				fmt.Fprintf(&b, "\n   %c) %s %s %s: %s (%d steps)", 'a'+rune(j%26), str("account"), str("role"), model, clip(str("task"), 70), len(steps))
+			}
+		}
 		if n, _ := a.Detail["note"].(string); n != "" {
 			fmt.Fprintf(&b, "\n   conductor: %s", n)
 		}
@@ -198,10 +211,25 @@ func (s *Session) decide(ref string, approve bool, note string) []Line {
 	var out struct {
 		Status string `json:"status"`
 		Title  string `json:"title"`
+		Result struct {
+			Spawned []struct {
+				Callsign, Account, Role string
+			} `json:"spawned"`
+			Failed []struct {
+				Account, Role, Code, Error string
+			} `json:"failed"`
+		} `json:"result"`
 	}
 	if err := s.C.Do("POST", "/api/approvals/"+id+"/"+verb, map[string]string{"note": note}, &out); err != nil {
 		return failed(err)
 	}
 	s.approvals = nil // numbers change
-	return notice("%s: %s", out.Status, out.Title)
+	lines := notice("%s: %s", out.Status, out.Title)
+	for _, x := range out.Result.Spawned {
+		lines = append(lines, Line{KindNotice, fmt.Sprintf("  spawned %s (%s, %s)", x.Callsign, x.Account, x.Role)})
+	}
+	for _, x := range out.Result.Failed {
+		lines = append(lines, Line{KindError, fmt.Sprintf("not spawned: %s %s: %s %s", x.Account, x.Role, x.Code, x.Error)})
+	}
+	return lines
 }

@@ -118,6 +118,19 @@ func (a *api) decide(approve bool) http.HandlerFunc {
 				}
 			}
 		}
+		var lineupResult map[string]any
+		if prev, ok := a.Approvals.Get(r.PathValue("id")); ok && approve && prev.Kind == approvals.KindLineup && prev.Status == approvals.Pending {
+			a.lineupMu.Lock()
+			defer a.lineupMu.Unlock()
+			if cur, _ := a.Approvals.Get(prev.ID); cur.Status == approvals.Pending { // not approved meanwhile
+				agents, perr := a.lineupAgents(prev, body)
+				if perr != nil {
+					writeErr(w, perr)
+					return
+				}
+				lineupResult = a.spawnLineup(r.Context(), agents)
+			}
+		}
 		ap, err := a.Approvals.Decide(r.PathValue("id"), approve, actor, note)
 		switch {
 		case errors.Is(err, approvals.ErrNotFound):
@@ -129,6 +142,11 @@ func (a *api) decide(approve bool) http.HandlerFunc {
 		case err != nil:
 			writeErr(w, proto.NewError(proto.CodeInternal, "cannot save approval"))
 			return
+		}
+		if lineupResult != nil {
+			if withRes, err := a.Approvals.SetResult(ap.ID, lineupResult); err == nil {
+				ap = withRes
+			}
 		}
 		action := "approval.reject"
 		if approve {
@@ -173,18 +191,25 @@ func (a *api) kill(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{"ok": true})
 }
 
-// launch starts the agent of a fresh spawn. On failure the run is ended with exit code -1 and
-// the response is 500 LAUNCH_FAILED (with run_id).
-func (a *api) launch(w http.ResponseWriter, res *runs.SpawnResult) bool {
+// startAgent starts the agent of a fresh spawn. On failure the run is ended with exit code -1.
+func (a *api) startAgent(res *runs.SpawnResult) error {
 	if a.Launcher == nil || res.DryRun {
-		return true
+		return nil
 	}
 	err := a.Launcher.Start(*res)
+	if err != nil {
+		if run := a.Store.Get(res.RunID); run != nil {
+			_, _ = run.AppendHub("exit", map[string]any{"code": -1, "signal": nil, "diff_stat": nil, "duration_s": 0, "detail": "launch failed: " + err.Error()})
+		}
+	}
+	return err
+}
+
+// launch is startAgent for POST /api/spawn: a failure answers 500 LAUNCH_FAILED (with run_id).
+func (a *api) launch(w http.ResponseWriter, res *runs.SpawnResult) bool {
+	err := a.startAgent(res)
 	if err == nil {
 		return true
-	}
-	if run := a.Store.Get(res.RunID); run != nil {
-		_, _ = run.AppendHub("exit", map[string]any{"code": -1, "signal": nil, "diff_stat": nil, "duration_s": 0, "detail": "launch failed: " + err.Error()})
 	}
 	writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "code": proto.CodeLaunchFailed,
 		"error": "cannot start agent: " + err.Error(), "run_id": res.RunID})

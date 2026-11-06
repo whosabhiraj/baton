@@ -413,3 +413,30 @@ terminal, a plain line mode otherwise). Chat commands: `/agents /approvals /appr
 /start /stop /reset yes /quit`. The dashboard has the same chat as a sheet (button, `C`, or
 `#open=chat` in the URL fragment). `baton mock` runs a stand-in conductor (the binary itself with
 `BATON_FAKE_CLAUDE=1`, which echoes) so the chat works without a model.
+
+### A18. Phase 6d: lineups
+
+`POST /api/lineups` (admin or conductor token) `{ goal, note?, agents: SpawnRequest[] }` (1-20
+agents; spawn request fields as `/api/spawn`, unknown fields refused). Every agent is dry-run first:
+config errors (account, role, model) answer that error with `agent N (role): ...`; "busy right now"
+is not an error at this point, but a lineup that puts more agents on an account than its
+`max_concurrent` is (`409 ACCOUNT_BUSY`).
+
+- From the conductor, when `hub.mode` is `user` or `propose`, or `approvals.spawn` is on: a pending
+  approval `kind: "lineup"` (`detail: { goal, note?, agents, mode }`, title `Lineup: N agents for
+  <goal>`): `202 { ok, status: "pending", approval }`.
+- Otherwise (auto mode, or a human request): the agents are spawned now:
+  `200 { ok, status: "spawned", result }`.
+
+Approving a lineup (`POST /api/approvals/:id/approve`, body `{ note?, agents? }`) spawns the agents
+(the user's edited `agents` if given, else the proposed ones), one by one, actor `conductor`; a
+failing agent does not stop the others. The approval is decided either way and gets
+`result: { spawned: [{ index, run_id, agent_id, callsign, account, role, model }], failed: [{ index,
+account, role, code, error, run_id? }] }` (`Approval.result`, also in the `approval` notice the
+conductor's `wait_for_events` returns). An invalid edited list answers `400` and leaves it pending.
+
+In `user`/`propose` mode (or with `approvals.spawn`), `POST /api/spawn` from the conductor token
+answers `409 LINEUP_REQUIRED` unless it is a dry run. MCP tools: `propose_lineup` (above) and
+`get_settings` (`mode, max_agents_auto, approvals, routing`). The terminal chat's `/approvals`
+lists the agents of a lineup; `/approve n` spawns it as proposed, `/reject n <why>` sends it back.
+The dashboard's approvals sheet edits a lineup per agent (include, account, model, effort, task).

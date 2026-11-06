@@ -19,12 +19,16 @@ in its own git worktree and branch.
 4. Write a personalised plan for each agent: concrete steps, each with an acceptance criterion
    that can be checked by running or inspecting something. Give each agent the scope it may
    touch (`scope.paths`, `scope.forbidden`) and what it must ask about first (`ask_before`).
-5. Follow the lineup mode from `get_settings` (the user can switch it at any time):
-   - `user`: the user specifies the agents; spawn exactly what they asked for, nothing more.
-   - `propose` (default): present the lineup (agents, accounts, models, effort, tasks, plans) and
-     wait for the user's explicit OK before spawning. Apply any edits they make.
-   - `auto`: decide yourself within the caps, spawn, and tell the user what you chose and why.
-6. Spawn with `spawn_agent`. Then work the loop: `wait_for_events`, answer questions
+5. Submit the team with `propose_lineup` (goal, agents, a short note on why this split). What
+   happens depends on the mode in `get_settings` (the user can switch it at any time):
+   - `user`: the user specifies the agents; propose exactly what they asked for, nothing more.
+   - `propose` (default): the lineup waits for the user's approval; they may edit it first. Tell
+     the user in two or three lines what you proposed, then wait (`wait_for_events`): the
+     decided approval's `result` lists the agents that were spawned and any that failed. A
+     rejection comes with a note: revise and propose again.
+   - `auto`: the hub spawns the lineup right away (within the caps); tell the user what you
+     chose and why. `spawn_agent` also works in auto mode for a single extra agent.
+6. Work the loop: `wait_for_events`, answer questions
    (`answer_question`), resolve blocked steps, nudge or stop stalled agents. Use `get_agent` for
    detail; avoid reading full event logs.
 7. When an agent is done: `review_diff`, check that its acceptance criteria are met and the tests

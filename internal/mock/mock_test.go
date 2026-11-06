@@ -130,17 +130,27 @@ func TestMockScenario(t *testing.T) {
 		t.Errorf("protocol errors: %v", errs)
 	}
 
-	// finished successes ask for a merge; approving marks the run merged, rejecting does not
-	until(t, 10*time.Second, "3 merge approvals", func() bool {
+	// finished successes ask for a merge; approving marks the run merged, rejecting does not.
+	// The fake conductor also proposes one lineup.
+	ofKind := func(m map[string]any, kind string) []map[string]any {
+		var out []map[string]any
+		for _, a := range m["approvals"].([]any) {
+			if am := a.(map[string]any); am["kind"] == kind {
+				out = append(out, am)
+			}
+		}
+		return out
+	}
+	until(t, 10*time.Second, "3 merge approvals and a lineup", func() bool {
 		_, m := call(t, h, "GET", "/api/state", "")
-		return len(m["approvals"].([]any)) == 3
+		return len(ofKind(m, "merge")) == 3 && len(ofKind(m, "lineup")) == 1
 	})
 	_, m := call(t, h, "GET", "/api/state", "")
 	if c := m["conductor"].(map[string]any); c["account"] != "claude-a" {
 		t.Errorf("conductor: %v", c)
 	}
-	aps := m["approvals"].([]any)
-	yes, no := aps[0].(map[string]any), aps[1].(map[string]any)
+	aps := ofKind(m, "merge")
+	yes, no := aps[0], aps[1]
 	call(t, h, "POST", "/api/approvals/"+yes["id"].(string)+"/approve", "")
 	call(t, h, "POST", "/api/approvals/"+no["id"].(string)+"/reject", `{"note":"not yet"}`)
 	until(t, 5*time.Second, "merged flag", func() bool {

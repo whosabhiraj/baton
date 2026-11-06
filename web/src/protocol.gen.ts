@@ -444,7 +444,7 @@ export namespace ApiState {
   }
   export interface Approval {
     id: string;
-    kind: 'merge' | 'spawn';
+    kind: 'merge' | 'spawn' | 'lineup';
     run_id?: string;
     title: string;
     detail?: {};
@@ -454,6 +454,10 @@ export namespace ApiState {
     decided_at?: string;
     decided_by?: string;
     note?: string;
+    /**
+     * What approving did (A18 lineup: spawned[], failed[]).
+     */
+    result?: {};
   }
 }
 

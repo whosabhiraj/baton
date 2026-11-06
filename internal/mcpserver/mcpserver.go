@@ -227,6 +227,32 @@ type spawnIn struct {
 	DryRun     bool       `json:"dry_run,omitempty" jsonschema:"only validate and render the brief, spawn nothing"`
 }
 
+type lineupAgent struct {
+	Account    string     `json:"account" jsonschema:"account id (always explicit)"`
+	Role       string     `json:"role" jsonschema:"role, must be in the account's roles"`
+	Task       string     `json:"task" jsonschema:"this agent's mission"`
+	Plan       []planStep `json:"plan" jsonschema:"personalised plan with checkable acceptance criteria"`
+	Model      string     `json:"model,omitempty" jsonschema:"model from the account's models"`
+	Effort     string     `json:"effort,omitempty" jsonschema:"low, medium or high"`
+	Kind       string     `json:"kind,omitempty" jsonschema:"runtime kind; empty = the account's kind"`
+	Callsign   string     `json:"callsign,omitempty" jsonschema:"custom callsign; empty = automatic"`
+	Scope      *scope     `json:"scope,omitempty" jsonschema:"what the agent may touch"`
+	BaseBranch string     `json:"base_branch,omitempty" jsonschema:"branch to start from"`
+}
+
+type lineupIn struct {
+	Goal   string        `json:"goal" jsonschema:"the user's goal, one or two lines"`
+	Agents []lineupAgent `json:"agents" jsonschema:"the team: one entry per agent"`
+	Note   string        `json:"note,omitempty" jsonschema:"why this split, models and accounts (shown to the user)"`
+}
+
+type settingsOut struct {
+	Mode          string            `json:"mode"`
+	MaxAgentsAuto int               `json:"max_agents_auto"`
+	Approvals     map[string]any    `json:"approvals"`
+	Routing       map[string]string `json:"routing"`
+}
+
 type listAgentsIn struct {
 	Status     []string `json:"status,omitempty" jsonschema:"only these statuses (running, waiting, blocked, paused, stalled, rate_limited, done, failed, killed, exited)"`
 	ActiveOnly bool     `json:"active_only,omitempty" jsonschema:"only agents that have not ended"`
@@ -324,12 +350,43 @@ func NewServer(c *Client, version string) *mcp.Server {
 		func(ctx context.Context, _ empty) (json.RawMessage, error) {
 			return c.Do(ctx, "GET", "/api/accounts", nil)
 		})
-	tool(s, c, "spawn_agent", "Spawn one agent in its own git worktree and branch. Returns agent_id, callsign and run_id, or an error such as ACCOUNT_BUSY, ROLE_NOT_ALLOWED, MODEL_NOT_ALLOWED, ACCOUNT_DISABLED.",
+	tool(s, c, "spawn_agent", "Spawn one agent in its own git worktree and branch (auto mode; in user/propose mode use propose_lineup, or dry_run to check a request). Returns agent_id, callsign and run_id, or an error such as ACCOUNT_BUSY, ROLE_NOT_ALLOWED, MODEL_NOT_ALLOWED, LINEUP_REQUIRED.",
 		func(ctx context.Context, in spawnIn) (json.RawMessage, error) {
 			if strings.TrimSpace(in.Account) == "" {
 				return nil, &HubError{Status: 400, Code: "ACCOUNT_REQUIRED", Msg: "pass account explicitly"}
 			}
 			return c.Do(ctx, "POST", "/api/spawn", in)
+		})
+	tool(s, c, "propose_lineup", "Propose the team for a goal: agents with account, role, model, effort, task and plan. In user/propose mode it waits for the user's approval (status pending; the user may edit it; you get the decision from wait_for_events with the spawned agents in result). In auto mode it spawns right away.",
+		func(ctx context.Context, in lineupIn) (json.RawMessage, error) {
+			for i, a := range in.Agents {
+				if strings.TrimSpace(a.Account) == "" {
+					return nil, &HubError{Status: 400, Code: "ACCOUNT_REQUIRED", Msg: fmt.Sprintf("agent %d: pass account explicitly", i+1)}
+				}
+			}
+			return c.Do(ctx, "POST", "/api/lineups", in)
+		})
+	tool(s, c, "get_settings", "Lineup mode (user, propose, auto), the auto-mode agent cap, approval gates and role routing.",
+		func(ctx context.Context, _ empty) (json.RawMessage, error) {
+			b, err := c.Do(ctx, "GET", "/api/config", nil)
+			if err != nil {
+				return nil, err
+			}
+			var cfg struct {
+				Config struct {
+					Hub struct {
+						Mode          string         `json:"mode"`
+						MaxAgentsAuto int            `json:"max_agents_auto"`
+						Approvals     map[string]any `json:"approvals"`
+					} `json:"hub"`
+					Routing map[string]string `json:"routing"`
+				} `json:"config"`
+			}
+			if err := json.Unmarshal(b, &cfg); err != nil {
+				return nil, err
+			}
+			h := cfg.Config.Hub
+			return json.Marshal(settingsOut{Mode: h.Mode, MaxAgentsAuto: h.MaxAgentsAuto, Approvals: h.Approvals, Routing: cfg.Config.Routing})
 		})
 	tool(s, c, "list_agents", "Agents (live and finished) with status, plan, step states, open questions, usage and merged flag.",
 		func(ctx context.Context, in listAgentsIn) (json.RawMessage, error) {

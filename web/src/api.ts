@@ -78,8 +78,9 @@ export const api = {
   patchAccount: (id: string, fields: Record<string, unknown>) => call<ApiAccounts.Account>('PATCH', `/api/accounts/${enc(id)}`, fields),
   config: () => call<ApiConfig.ApiConfig>('GET', '/api/config'),
   patchConfig: (fields: Record<string, unknown>) => call<ApiConfig.ApiConfig>('PATCH', '/api/config', fields),
-  decide: (id: string, verb: 'approve' | 'reject', note: string) =>
-    call<Approval>('POST', `/api/approvals/${enc(id)}/${verb}`, note ? { note } : {}),
+  /** agents: the user's edited lineup (lineup approvals only). */
+  decide: (id: string, verb: 'approve' | 'reject', note: string, agents?: unknown[]) =>
+    call<Approval>('POST', `/api/approvals/${enc(id)}/${verb}`, { ...(note ? { note } : {}), ...(agents ? { agents } : {}) }),
   conductor: () => call<{ conductor: ConductorInfo }>('GET', '/api/conductor'),
   conductorSend: (text: string) => call<{ conductor: ConductorInfo }>('POST', '/api/conductor/send', { text }),
   conductorControl: (verb: 'start' | 'stop' | 'reset') => call<{ conductor: ConductorInfo }>('POST', `/api/conductor/${verb}`),

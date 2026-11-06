@@ -91,8 +91,8 @@ func TestTools(t *testing.T) {
 	for _, tl := range lt.Tools {
 		names = append(names, tl.Name)
 	}
-	want := []string{"answer_question", "get_agent", "kill_agent", "list_accounts", "list_agents", "list_approvals",
-		"merge_agent", "pause_agent", "read_events", "resume_agent", "review_diff", "send_message", "set_account_enabled",
+	want := []string{"answer_question", "get_agent", "get_settings", "kill_agent", "list_accounts", "list_agents", "list_approvals",
+		"merge_agent", "pause_agent", "propose_lineup", "read_events", "resume_agent", "review_diff", "send_message", "set_account_enabled",
 		"set_mode", "spawn_agent", "stop_agent", "update_plan", "wait_for_events"}
 	slices.Sort(names)
 	if !slices.Equal(names, want) {
@@ -103,6 +103,21 @@ func TestTools(t *testing.T) {
 		t.Fatal(out)
 	}
 	if out, isErr := callTool(t, cs, "spawn_agent", map[string]any{"account": "", "role": "implementer", "task": "t", "plan": []any{}}); !isErr || !strings.Contains(out, "ACCOUNT_REQUIRED") {
+		t.Fatal(out)
+	}
+	// propose mode: a direct spawn is refused, a lineup waits for the user
+	if out, _ := callTool(t, cs, "get_settings", nil); !strings.Contains(out, `"mode":"propose"`) || !strings.Contains(out, `"merge":true`) {
+		t.Fatal(out)
+	}
+	step := []any{map[string]any{"id": "s1", "title": "write", "acceptance": "file exists"}}
+	if out, isErr := callTool(t, cs, "spawn_agent", map[string]any{"account": "a1", "role": "implementer", "task": "t", "plan": step}); !isErr || !strings.Contains(out, "LINEUP_REQUIRED") {
+		t.Fatal(out)
+	}
+	if out, isErr := callTool(t, cs, "propose_lineup", map[string]any{"goal": "notes", "agents": []any{
+		map[string]any{"account": "a1", "role": "implementer", "task": "t", "plan": step}}}); isErr || !strings.Contains(out, `"status":"pending"`) {
+		t.Fatal(out)
+	}
+	if out, isErr := callTool(t, cs, "set_mode", map[string]any{"mode": "auto"}); isErr {
 		t.Fatal(out)
 	}
 	if out, isErr := callTool(t, cs, "spawn_agent", map[string]any{"account": "a1", "role": "boss", "task": "t", "plan": []any{}}); !isErr || !strings.Contains(out, "ROLE_NOT_ALLOWED") {
@@ -157,10 +172,7 @@ func TestTools(t *testing.T) {
 	if out, _ := callTool(t, cs, "merge_agent", map[string]any{"agent_id": sp.AgentID, "confirm": true, "note": "lgtm"}); !strings.Contains(out, `"status":"pending"`) {
 		t.Fatal(out)
 	}
-	if out, _ := callTool(t, cs, "list_approvals", nil); !strings.Contains(out, `"kind":"merge"`) {
-		t.Fatal(out)
-	}
-	if out, isErr := callTool(t, cs, "set_mode", map[string]any{"mode": "auto"}); isErr {
+	if out, _ := callTool(t, cs, "list_approvals", nil); !strings.Contains(out, `"kind":"merge"`) || !strings.Contains(out, `"kind":"lineup"`) {
 		t.Fatal(out)
 	}
 	if h.Config().Hub.Mode != "auto" {

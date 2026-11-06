@@ -238,6 +238,33 @@ func (e *Engine) spawn(account, role, model, task string, traits []string) strin
 	return res.RunID
 }
 
+// proposeLineup submits a two-agent lineup like a real conductor would (propose mode: it waits
+// for the user; approving it spawns fake agents through the normal launcher).
+func (e *Engine) proposeLineup() {
+	step := func(id, title, acc string) map[string]any {
+		return map[string]any{"id": id, "title": title, "acceptance": acc}
+	}
+	body := map[string]any{
+		"goal": "Add rate limiting to the public API",
+		"note": "Middleware and tests split so they can run in parallel; sonnet for the code, codex for the tests.",
+		"agents": []any{
+			map[string]any{"account": "claude-b", "role": "implementer", "model": "sonnet", "effort": "medium",
+				"task": "Add a token-bucket rate limiter middleware to the public API routes.",
+				"plan": []any{step("s1", "Write the limiter", "unit tests for the bucket pass"),
+					step("s2", "Wire it into the router", "GET /api/items returns 429 after the limit")}},
+			map[string]any{"account": "codex-1", "role": "implementer", "model": "default", "effort": "low",
+				"task": "Write integration tests for rate limiting.",
+				"plan": []any{step("s1", "Cover the 429 path", "go test ./api/... passes")}},
+		},
+	}
+	var out map[string]any
+	st, err := e.api("POST", "/api/lineups", body, &out)
+	if err != nil {
+		return
+	}
+	e.logf("conductor: proposed a lineup (%d %v)", st, out["status"])
+}
+
 // conduct runs the fake conductor until ctx ends: the opening script, then (unless once) a steady
 // stream of fresh agents. It also answers, nudges, pauses, resumes, kills and asks for merges.
 func (e *Engine) conduct(ctx context.Context) {
@@ -248,6 +275,11 @@ func (e *Engine) conduct(ctx context.Context) {
 	begin := time.Now()
 	nScript := 0
 	e.setConductor("idle")
+	go func() { // one lineup for the user to edit and approve (A18)
+		if e.pause(4) {
+			e.proposeLineup()
+		}
+	}()
 	tick := time.NewTicker(max(e.d(2), 20*time.Millisecond))
 	defer tick.Stop()
 	for {

@@ -144,6 +144,11 @@ func (a *api) spawn(w http.ResponseWriter, r *http.Request) {
 	} else {
 		actor = req.Actor
 	}
+	if isConductorReq(r) && !req.DryRun && a.lineupNeeded() {
+		writeErr(w, proto.NewError(proto.CodeLineupRequired,
+			"in "+a.mode()+" mode the user approves the team first: use propose_lineup and wait for the approval"))
+		return
+	}
 	res, perr := a.Runs.Spawn(context.WithoutCancel(r.Context()), req)
 	if perr != nil {
 		writeErr(w, perr)

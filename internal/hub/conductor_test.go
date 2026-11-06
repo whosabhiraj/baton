@@ -58,7 +58,7 @@ func TestConductorTokenLimits(t *testing.T) {
 		}
 	}
 	// config: only hub.mode and account.enabled
-	if st, r := call(t, h, "PATCH", "/api/config", tok, `{"mode":"propose"}`); st != 200 {
+	if st, r := call(t, h, "PATCH", "/api/config", tok, `{"mode":"auto"}`); st != 200 {
 		t.Fatal(st, r)
 	}
 	if st, r := call(t, h, "PATCH", "/api/config", tok, `{"idle_stop_min":5}`); st != 403 || r["code"] != "FORBIDDEN" {
@@ -330,5 +330,114 @@ func TestConductorRoutes(t *testing.T) {
 	tok := h.MintConductorToken()
 	if st, _ := call(t, h, "POST", "/api/conductor/send", tok, `{"text":"x"}`); st != 401 {
 		t.Fatal("the conductor token must not drive the conductor routes")
+	}
+}
+
+func endAll(t *testing.T, h *hub.Hub) {
+	for _, r := range h.Store().List() {
+		if !r.Ended() {
+			r.AppendHub("exit", map[string]any{"code": 0, "signal": nil, "diff_stat": nil, "duration_s": 1})
+		}
+	}
+}
+
+func TestLineupFlow(t *testing.T) {
+	h, _ := repoHub(t) // account a1: implementer, max_concurrent 1
+	tok := h.MintConductorToken()
+	if st, r := call(t, h, "PATCH", "/api/config", "tok", `{"mode":"propose"}`); st != 200 {
+		t.Fatal(st, r)
+	}
+	one := `{"account":"a1","role":"implementer","task":"parser","plan":[{"id":"s1","title":"t","acceptance":"a"}]}`
+	// propose mode: the conductor cannot spawn directly (a dry run is fine)
+	if st, r := call(t, h, "POST", "/api/spawn", tok, one); st != 409 || r["code"] != "LINEUP_REQUIRED" {
+		t.Fatal(st, r)
+	}
+	if st, r := call(t, h, "POST", "/api/spawn", tok, `{"account":"a1","role":"implementer","task":"x","dry_run":true}`); st != 200 {
+		t.Fatal(st, r)
+	}
+	// validation up front
+	if st, r := call(t, h, "POST", "/api/lineups", tok, `{"goal":"g","agents":[]}`); st != 400 {
+		t.Fatal(st, r)
+	}
+	if st, r := call(t, h, "POST", "/api/lineups", tok, `{"goal":"g","agents":[{"account":"a1","role":"boss","task":"x"}]}`); st != 409 ||
+		r["code"] != "ROLE_NOT_ALLOWED" || !strings.Contains(r["error"].(string), "agent 1") {
+		t.Fatal(st, r)
+	}
+	_, w := call(t, h, "GET", "/api/wait?timeout_s=0", tok, "")
+	cur := w["cursor"].(interface{ String() string }).String()
+
+	// more agents on an account than it can ever run at once: refused
+	if st, r := call(t, h, "POST", "/api/lineups", tok, `{"goal":"g","agents":[`+one+`,`+one+`]}`); st != 409 ||
+		!strings.Contains(r["error"].(string), "puts 2 agents on a1") {
+		t.Fatal(st, r)
+	}
+	st, r := call(t, h, "POST", "/api/lineups", tok, `{"goal":"Rewrite the parser","note":"one agent","agents":[`+one+`]}`)
+	if st != 202 || r["status"] != "pending" {
+		t.Fatal(st, r)
+	}
+	ap := r["approval"].(map[string]any)
+	if ap["kind"] != "lineup" || ap["title"] != "Lineup: 1 agent for Rewrite the parser" {
+		t.Fatal(ap)
+	}
+	_, s := call(t, h, "GET", "/api/state", "tok", "")
+	if err := proto.ValidateJSON("api.state", s); err != nil {
+		t.Fatal(err)
+	}
+	// the conductor cannot approve its own lineup
+	if st, _ := call(t, h, "POST", "/api/approvals/"+ap["id"].(string)+"/approve", tok, ""); st != 401 {
+		t.Fatal(st)
+	}
+	// the user edits the task, then approves
+	edited := `{"agents":[{"account":"a1","role":"implementer","task":"parser, edited","plan":[{"id":"s1","title":"t","acceptance":"a"}]}]}`
+	st, r = call(t, h, "POST", "/api/approvals/"+ap["id"].(string)+"/approve", "tok", edited)
+	if st != 200 || r["status"] != "approved" {
+		t.Fatal(st, r)
+	}
+	res := r["result"].(map[string]any)
+	if sp := res["spawned"].([]any); len(sp) != 1 || len(res["failed"].([]any)) != 0 {
+		t.Fatal(res)
+	}
+	rid := res["spawned"].([]any)[0].(map[string]any)["run_id"].(string)
+	if rec := h.Store().Get(rid).Record(); rec.Task != "parser, edited" || rec.Actor != "conductor" {
+		t.Fatal(rec.Task, rec.Actor)
+	}
+	// the conductor is told, with the result
+	_, w = call(t, h, "GET", "/api/wait?timeout_s=2&cursor="+cur, tok, "")
+	items := w["items"].([]any)
+	if len(items) != 1 || items[0].(map[string]any)["type"] != "approval" {
+		t.Fatal(w)
+	}
+	got := items[0].(map[string]any)["payload"].(map[string]any)["approval"].(map[string]any)
+	if got["status"] != "approved" || got["result"] == nil {
+		t.Fatal(got)
+	}
+
+	// proposed while a1 is busy (allowed), approved while still busy: it fails, the approval is decided
+	_, r = call(t, h, "POST", "/api/lineups", tok, `{"goal":"more","agents":[`+one+`]}`)
+	id2 := r["approval"].(map[string]any)["id"].(string)
+	_, r = call(t, h, "POST", "/api/approvals/"+id2+"/approve", "tok", "")
+	if f := r["result"].(map[string]any)["failed"].([]any); r["status"] != "approved" || len(f) != 1 || f[0].(map[string]any)["code"] != "ACCOUNT_BUSY" {
+		t.Fatal(r)
+	}
+
+	// a bad edit keeps the approval pending
+	_, r = call(t, h, "POST", "/api/lineups", tok, `{"goal":"x","agents":[`+one+`]}`)
+	id3 := r["approval"].(map[string]any)["id"].(string)
+	if st, _ := call(t, h, "POST", "/api/approvals/"+id3+"/approve", "tok", `{"agents":[{"bogus":1}]}`); st != 400 {
+		t.Fatal(st)
+	}
+	call(t, h, "POST", "/api/approvals/"+id3+"/reject", "tok", `{"note":"not now"}`)
+
+	// auto mode: the lineup spawns right away
+	endAll(t, h)
+	call(t, h, "PATCH", "/api/config", "tok", `{"mode":"auto"}`)
+	st, r = call(t, h, "POST", "/api/lineups", tok, `{"goal":"g","agents":[`+one+`]}`)
+	if st != 200 || r["status"] != "spawned" || len(r["result"].(map[string]any)["spawned"].([]any)) != 1 {
+		t.Fatal(st, r)
+	}
+	// and so does a direct spawn
+	endAll(t, h)
+	if st, r := call(t, h, "POST", "/api/spawn", tok, one); st != 200 {
+		t.Fatal(st, r)
 	}
 }

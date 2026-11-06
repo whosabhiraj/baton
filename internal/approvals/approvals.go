@@ -20,8 +20,9 @@ const File = "approvals.json"
 
 // Kinds and statuses.
 const (
-	KindMerge = "merge"
-	KindSpawn = "spawn"
+	KindMerge  = "merge"
+	KindSpawn  = "spawn"
+	KindLineup = "lineup" // a team of agents proposed by the conductor (detail.agents)
 
 	Pending  = "pending"
 	Approved = "approved"
@@ -47,6 +48,7 @@ type Approval struct {
 	DecidedAt   string         `json:"decided_at,omitempty"`
 	DecidedBy   string         `json:"decided_by,omitempty"`
 	Note        string         `json:"note,omitempty"`
+	Result      map[string]any `json:"result,omitempty"` // what approving did (lineup: spawned/failed)
 }
 
 // Store holds all approvals, oldest first.
@@ -157,4 +159,22 @@ func (s *Store) Pending(kind, runID string) (Approval, bool) {
 		}
 	}
 	return Approval{}, false
+}
+
+// SetResult records what approving did (e.g. which agents of a lineup were spawned).
+func (s *Store) SetResult(id string, result map[string]any) (Approval, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i := range s.list {
+		if s.list[i].ID == id {
+			old := s.list[i].Result
+			s.list[i].Result = result
+			if err := s.saveLocked(); err != nil {
+				s.list[i].Result = old
+				return Approval{}, err
+			}
+			return s.list[i], nil
+		}
+	}
+	return Approval{}, ErrNotFound
 }

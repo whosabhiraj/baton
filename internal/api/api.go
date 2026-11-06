@@ -18,6 +18,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/whosabhiraj/baton/internal/approvals"
@@ -77,6 +78,7 @@ type Deps struct {
 type api struct {
 	Deps
 	adminHash [32]byte
+	lineupMu  sync.Mutex // one lineup approval spawns at a time
 }
 
 // New builds the hub's http.Handler.
@@ -113,6 +115,7 @@ func New(d Deps) http.Handler {
 	mux.HandleFunc("/api/runs/{id}/diff", a.route("GET", authAdminOrCond, a.diff))
 	mux.HandleFunc("/api/runs/{id}/merge", a.route("POST", authAdminOrCond, a.merge))
 	mux.HandleFunc("/api/wait", a.route("GET", authAdminOrCond, a.wait))
+	mux.HandleFunc("/api/lineups", a.route("POST", authAdminOrCond, a.proposeLineup))
 	mux.HandleFunc("/api/spawn", a.route("POST", authAdminOrCond, a.spawn))
 	mux.HandleFunc("/api/accounts", a.route("GET", authAdminOrCond, a.listAccounts))
 	mux.HandleFunc("/api/accounts/{id}", a.route("PATCH", authAdminOrCond, a.patchAccount))
