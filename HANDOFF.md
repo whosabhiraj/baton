@@ -1,7 +1,6 @@
 # HANDOFF — read this first
 
-Last updated: **2026-11-06**, **Phase 2 built**, all tests green, waiting for the user's check and approval (§E).
-Next up: user checks Phase 2; then Phase 3 (`baton mock`).
+Last updated: **2026-11-06**, **Phase 2 approved**; Phase 3 (`baton mock`) questions answered, design in progress (§E).
 
 Big change since Phase 0: the hub **and** the `baton` CLI are written in **Go** (one binary).
 `docs/GO_HUB_DESIGN.md` is approved and overrides `docs/PLAN.md` §3, §4.7, §5 and §6.
@@ -58,8 +57,8 @@ Things only you can do:
 |---|---|---|
 | 0 Plan + repo init | ✅ done | `2a5a98d` |
 | 1 Protocol + CLI + spool + minimal hub (Go) | ✅ done | up to the "Phase 1 done" commit |
-| 2 Hub core | 🟡 built, all tests green, **awaiting user approval** | `d014636` … `9159f09` |
-| 3 `baton mock` | pending | — |
+| 2 Hub core | ✅ done (verified end to end; PowerShell piped-`y` fix `b4e6c60`) | `d014636` … `b4e6c60` |
+| 3 `baton mock` | 🟡 design | — |
 | 4 Dashboard | pending | — |
 | 5 Adapters | pending | — |
 | 6 Conductor | pending | — |
@@ -120,6 +119,9 @@ Next steps:
 - 2026-11-06: runtime data in the user's home (`~/.baton/projects/...`), not in the project.
 - 2026-11-06: `max_agents` 6 in auto mode; no global cap when the user picks/approves
   (per-account `max_concurrent` still applies — confirm wording in Phase 2); worktrees `keep`.
+- 2026-11-06: Phase 3: own foreground hub on a separate data dir (`~/.baton/mock/`); scripted
+  scenario then continuous fake agents (`--once`, `--seed`, `--speed`); fake agents react to
+  controls; A15 adds usage, conductor state and approvals (diff stat stays on `exit`).
 - 2026-11-06: Phase 2 defaults: per-account max_concurrent always applies; no global cap when the
   human picks/approves; auto cap 6 for the conductor; dashboard opens on `baton` (open_browser);
   hub stops after 30 idle minutes (idle_stop_min, 0 = never).
