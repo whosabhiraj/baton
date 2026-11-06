@@ -292,3 +292,35 @@ legend { padding: 0 6px; color: var(--text-2); font-size: 13px; font-weight: 500
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
+
+/* phone: table rows become two-line cards, compact shell, accounts scroll sideways */
+@media (max-width: 600px) {
+  #topbar { gap: 8px 12px; padding: 6px 12px; min-height: 0; }
+  .brand { font-size: 18px; }
+  #topbar button.quiet { font-size: 0; gap: 0; width: 36px; padding: 0; }
+  #topbar button.quiet .count { font-size: 12px; position: absolute; transform: translate(12px, -10px); min-width: 18px; height: 18px; line-height: 18px; }
+  #topbar button.quiet { position: relative; }
+  .actions { padding: 4px 0; gap: 2px; width: 100%; justify-content: space-between; }
+  .stats { gap: 2px 14px; padding-bottom: 6px; }
+  .stats > .stat:nth-child(2), .stats > .stat:nth-child(4) { display: none; }
+  #rail { padding: 10px 12px; }
+  .acct-list { grid-auto-flow: column; grid-template-columns: none; grid-auto-columns: 82%; overflow-x: auto; scroll-snap-type: x mandatory; margin: 6px -4px; padding: 0 4px 4px; }
+  .acct { scroll-snap-align: start; background: rgba(255, 255, 255, .04); }
+  #list { padding: 10px 12px; }
+  .runs thead { display: none; }
+  .runs, .runs tbody { display: block; }
+  tr.run { display: grid; grid-template-columns: 1fr auto auto; grid-template-areas: 'agent q status' 'acct acct last' 'route route route'; gap: 4px 10px; padding: 10px 4px; border-bottom: 1px solid var(--line); }
+  .runs td { display: block; padding: 0; border: 0; }
+  .runs td:nth-child(1) { grid-area: agent; }
+  .runs td:nth-child(2) { grid-area: status; }
+  .runs td:nth-child(3) { grid-area: acct; }
+  .runs td:nth-child(4) { grid-area: route; min-width: 0; }
+  .runs td:nth-child(5) { grid-area: q; }
+  .runs td:nth-child(6) { grid-area: last; text-align: right; }
+  .step { max-width: none; }
+  #detail { padding: 14px 12px; }
+  .ev { grid-template-columns: 56px 1fr; }
+  .ev .etext { grid-column: 1 / -1; }
+  .sheet { padding: 0 14px 20px; }
+  .sheet-head { margin: 0 -14px 12px; padding: 12px 14px; }
+}
