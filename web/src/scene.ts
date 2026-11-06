@@ -12,7 +12,7 @@ import { currentStep, stepProgress } from './ui/runs';
 import { ENDED } from './util';
 
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-const C = { ink: 0x0d1220, paper: 0xece6d6, mute: 0x8b94aa, brass: 0xd2a85a, hot: 0xe8844a, bad: 0xe5626a, rule: 0x263049 };
+const C = { ink: 0x121317, paper: 0xf2f1ec, mute: 0xa9adb9, brass: 0xffcd1c, hot: 0xff8a3d, bad: 0xf0524a, rule: 0x30343e };
 const OVERVIEW = { pos: new THREE.Vector3(0, 10, 17), target: new THREE.Vector3(0, 0, 0) };
 const IDLE_ROTATE_MS = 20_000;
 
@@ -49,11 +49,11 @@ export function mountScene(host: HTMLElement): SceneCtl | null {
   host.replaceChildren(renderer.domElement);
   const labels = new CSS2DRenderer();
   labels.domElement.className = 'scene-labels';
-  host.append(labels.domElement, Object.assign(document.createElement('p'), { className: 'scene-hint', textContent: 'Drag to orbit, scroll to zoom, click an agent. L switches to the list.' }));
+  host.append(labels.domElement, Object.assign(document.createElement('p'), { className: 'scene-hint', textContent: 'Drag to orbit, scroll to zoom, click an agent. L switches to the list, T shows the timeline.' }));
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(C.ink);
-  scene.fog = new THREE.FogExp2(C.ink, 0.018);
+  scene.fog = new THREE.FogExp2(C.ink, 0.016);
   const camera = new THREE.PerspectiveCamera(48, 1, 0.1, 400);
   camera.position.copy(OVERVIEW.pos);
   const controls = new OrbitControls(camera, renderer.domElement);
@@ -73,13 +73,13 @@ export function mountScene(host: HTMLElement): SceneCtl | null {
   const key = new THREE.DirectionalLight(0xfff1dc, 1.4);
   key.position.set(6, 12, 8);
   scene.add(key);
-  const coreLight = new THREE.PointLight(C.brass, 30, 30, 1.6);
+  const coreLight = new THREE.PointLight(0xfff6e0, 26, 30, 1.6);
   scene.add(coreLight);
   scene.add(starfield());
 
   // conductor: a warm core inside a slow wire shell
-  const core = new THREE.Mesh(new THREE.IcosahedronGeometry(0.85, 4), new THREE.MeshStandardMaterial({ color: 0x8a6a32, emissive: C.brass, emissiveIntensity: 0.4, roughness: 0.55, metalness: 0.3 }));
-  const shell = new THREE.Mesh(new THREE.IcosahedronGeometry(1.4, 1), new THREE.MeshBasicMaterial({ color: C.brass, wireframe: true, transparent: true, opacity: 0.16 }));
+  const core = new THREE.Mesh(new THREE.IcosahedronGeometry(0.85, 4), new THREE.MeshStandardMaterial({ color: 0xb9b8b2, emissive: C.paper, emissiveIntensity: 0.25, roughness: 0.6, metalness: 0.1 }));
+  const shell = new THREE.Mesh(new THREE.IcosahedronGeometry(1.4, 1), new THREE.MeshBasicMaterial({ color: C.paper, wireframe: true, transparent: true, opacity: 0.09 }));
   scene.add(core, shell);
   const condLabel = label('lbl lbl-cond');
   condLabel.position.set(0, -1.55, 0);
@@ -138,7 +138,7 @@ export function mountScene(host: HTMLElement): SceneCtl | null {
     const sig = JSON.stringify([a.label, a.used, a.max_concurrent, a.rate_limited, a.enabled, a.color, state.accountFilter]);
     if (el.dataset.sig === sig) return;
     el.dataset.sig = sig;
-    el.style.setProperty('--c', a.color || '#8b94aa');
+    el.style.setProperty('--c', a.color || '#a9adb9');
     el.classList.toggle('off', !a.enabled || (!!state.accountFilter && state.accountFilter !== a.id));
     el.replaceChildren(
       span('name', a.label || a.id),
@@ -155,7 +155,11 @@ export function mountScene(host: HTMLElement): SceneCtl | null {
 
   function syncRuns(): void {
     const seen = new Set<string>();
+    const now = Date.now();
     for (const r of state.runs) {
+      // the map shows the live fleet: finished agents linger 2 minutes (or while selected), then leave
+      const gone = ENDED.has(r.status) && r.ended_at && now - Date.parse(r.ended_at) > 120_000 && state.selected !== r.run_id;
+      if (gone) continue;
       seen.add(r.run_id);
       let o = agents.get(r.run_id);
       const kind = geoms[r.kind ?? ''] ? (r.kind as string) : 'generic';
@@ -204,7 +208,7 @@ export function mountScene(host: HTMLElement): SceneCtl | null {
     if (el.dataset.sig === sig) return;
     el.dataset.sig = sig;
     el.className = `lbl lbl-agent st-${r.status}${state.selected === r.run_id ? ' sel' : ''}`;
-    el.style.setProperty('--c', a?.color || '#ece6d6');
+    el.style.setProperty('--c', a?.color || '#f2f1ec');
     el.replaceChildren(
       span('cs', r.callsign || r.agent_id),
       ...(r.open_questions.length ? [span('q', '?')] : []),
@@ -362,6 +366,7 @@ export function mountScene(host: HTMLElement): SceneCtl | null {
     const busy = state.conductor.state === 'thinking' || state.conductor.state === 'acting';
     const beat = reduced ? 0.5 : 0.5 + 0.5 * Math.sin(t * (busy ? 3 : 1.2));
     core.material.emissiveIntensity = state.conductor.state === 'off' ? 0.08 : (busy ? 0.42 : 0.22) + beat * (busy ? 0.3 : 0.08);
+    core.material.emissive.lerp(busy ? COL.brass : COL.paper, 0.08);
     core.scale.setScalar(1 + (reduced ? 0 : beat * (busy ? 0.05 : 0.02)));
     coreLight.intensity = 14 + core.material.emissiveIntensity * 16;
     if (!reduced) shell.rotation.set(t * 0.05, t * 0.08, 0);
@@ -452,7 +457,7 @@ function starfield(): THREE.Points {
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  return new THREE.Points(g, new THREE.PointsMaterial({ color: 0x8b94aa, size: 0.35, sizeAttenuation: true, transparent: true, opacity: 0.55, fog: false, depthWrite: false }));
+  return new THREE.Points(g, new THREE.PointsMaterial({ color: 0xa9adb9, size: 0.3, sizeAttenuation: true, transparent: true, opacity: 0.4, fog: false, depthWrite: false }));
 }
 
 function label(cls: string): CSS2DObject {

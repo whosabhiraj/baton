@@ -1,5 +1,10 @@
 import { accountById, emit, select, state, type Run } from '../store';
-import { ago, dot, ENDED, h, renderIf, setKids } from '../util';
+import { gsap } from 'gsap';
+import { I, icon } from '../icons';
+import { ago, bullet, ENDED, h, renderIf, setKids } from '../util';
+
+const calm = matchMedia('(prefers-reduced-motion: reduce)');
+const reached = new Map<string, number>(); // run id -> steps done last render
 
 export function stepProgress(r: Run): { done: number; total: number } {
   const total = r.plan?.length ?? 0;
@@ -24,16 +29,27 @@ export function statusBadge(status: string): HTMLElement {
   return h('span', { class: 'badge st-' + status }, status.replace('_', ' '));
 }
 
-/** The plan as a row of step segments (done / active / blocked / pending), in the account color. */
-export function score(r: Run, color: string | undefined): HTMLElement {
+/** The route strip: the plan as stations on the agent's line. Done stops filled, the current
+ *  stop lit ("you are here"), blocked stops orange. When a stop is newly reached it pulses once. */
+export function route(r: Run, color: string | undefined, cls = ''): HTMLElement {
   const plan = r.plan ?? [];
   const { done, total } = stepProgress(r);
+  const here = plan.find((p) => r.step_states?.[p.id] === 'active' || r.step_states?.[p.id] === 'blocked');
   const el = h(
     'span',
-    { class: 'score', role: 'img', 'aria-label': total ? `${done} of ${total} steps done` : 'no plan yet' },
-    ...plan.map((s) => h('i', { class: 'seg seg-' + (r.step_states?.[s.id] ?? 'pending'), title: `${s.title} (${r.step_states?.[s.id] ?? 'pending'})` })),
+    { class: 'route ' + cls, role: 'img', 'aria-label': total ? `${done} of ${total} steps done` : 'no plan yet' },
+    ...plan.map((s) => {
+      const st = r.step_states?.[s.id] ?? 'pending';
+      return h('i', { class: `stn stn-${st}${s === here ? ' here' : ''}`, title: `${s.title} (${st})` });
+    }),
   );
-  el.style.setProperty('--c', color || 'var(--paper)');
+  el.style.setProperty('--c', color || '#a9adb9');
+  const before = reached.get(r.run_id + cls);
+  reached.set(r.run_id + cls, done);
+  if (before !== undefined && done > before && !calm.matches) {
+    const stn = el.querySelectorAll('.stn-done')[done - 1];
+    if (stn) requestAnimationFrame(() => gsap.fromTo(stn, { scale: 2.4 }, { scale: 1, duration: 0.55, ease: 'power3.out' }));
+  }
   return el;
 }
 
@@ -47,7 +63,7 @@ export function runsList(host: HTMLElement): () => void {
     h(
       'thead',
       {},
-      h('tr', {}, ...['Agent', 'Status', 'Account', 'Plan', 'Q', 'Last'].map((t) => h('th', { scope: 'col' }, t))),
+      h('tr', {}, ...['Agent', 'Status', 'Account', 'Route', '', 'Last event'].map((t) => h('th', { scope: 'col' }, t))),
     ),
     body,
   );
@@ -64,9 +80,10 @@ export function runsList(host: HTMLElement): () => void {
         f &&
           h(
             'button',
-            { class: 'chip', onclick: () => { state.accountFilter = null; emit(); } },
-            dot(f.color),
-            `${f.label || f.id}  x`,
+            { class: 'chip', title: 'Show all agents', onclick: () => { state.accountFilter = null; emit(); } },
+            bullet(f),
+            f.label || f.id,
+            icon(I.close, 14),
           ),
       ),
     );
@@ -102,12 +119,12 @@ function row(r: Run, now: number): HTMLElement {
         }
       },
     },
-    h('td', {}, h('span', { class: 'callsign' }, r.callsign || r.agent_id), h('div', { class: 'sub mono muted' }, [r.role, r.model || r.kind].filter(Boolean).join(' · '))),
+    h('td', {}, h('span', { class: 'callsign' }, r.callsign || r.agent_id), h('div', { class: 'sub muted' }, [r.role, r.model || r.kind].filter(Boolean).join(' · '))),
     h('td', {}, statusBadge(r.status)),
-    h('td', {}, a ? h('span', { class: 'row' }, dot(a.color), a.label || a.id) : (r.account_id ?? '-')),
-    h('td', { class: 'plan-cell' }, h('div', { class: 'row' }, score(r, a?.color), h('span', { class: 'mono muted' }, total ? `${done}/${total}` : '')), h('div', { class: 'sub step' }, currentStep(r))),
+    h('td', {}, h('span', { class: 'row acct-cell' }, bullet(a, r.account_id), a?.label || r.account_id || '-')),
+    h('td', { class: 'plan-cell' }, h('div', { class: 'row' }, route(r, a?.color), h('span', { class: 'num muted' }, total ? `${done}/${total}` : '')), h('div', { class: 'sub step' }, currentStep(r))),
     h('td', {}, r.open_questions.length > 0 ? h('span', { class: 'qmark', title: `${r.open_questions.length} open question(s)` }, '?' + (r.open_questions.length > 1 ? r.open_questions.length : '')) : ''),
-    h('td', { class: 'mono muted' }, ago(r.last_event_ts, now)),
+    h('td', { class: 'num muted' }, ago(r.last_event_ts, now)),
   );
   return tr;
 }

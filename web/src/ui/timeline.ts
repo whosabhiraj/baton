@@ -101,11 +101,11 @@ function statusAt(l: Lane, t: number): string {
 }
 
 const STATUS_COLOR: Record<string, string> = {
-  running: '#5cc8a8', starting: '#5cc8a8', waiting: '#d2a85a', blocked: '#e8844a', rate_limited: '#e8844a', stalled: '#e8844a',
-  paused: '#a99bea', done: '#ece6d6', failed: '#e5626a', killed: '#e5626a', exited: '#8b94aa',
+  running: '#3cc489', starting: '#3cc489', waiting: '#ffcd1c', blocked: '#ff8a3d', rate_limited: '#ff8a3d', stalled: '#ff8a3d',
+  paused: '#a597ff', done: '#f2f1ec', failed: '#f0524a', killed: '#f0524a', exited: '#7d8290',
 };
 const TICK_COLOR = (type: string) =>
-  type === 'question' ? '#d2a85a' : type === 'artifact' ? '#ece6d6' : type.startsWith('to_agent') ? '#9fb4e0' : type === 'done' ? '#5cc8a8' : type === 'paused' ? '#a99bea' : '#e5626a';
+  type === 'question' ? '#ffcd1c' : type === 'artifact' ? '#f2f1ec' : type.startsWith('to_agent') ? '#9fb0e8' : type === 'done' ? '#3cc489' : type === 'paused' ? '#a597ff' : '#f0524a';
 
 export function timelinePanel(host: HTMLElement): () => void {
   let win = 15 * 60_000;
@@ -194,22 +194,22 @@ export function timelinePanel(host: HTMLElement): () => void {
     // time axis
     const span = range[1] - range[0];
     const stepMs = [15e3, 30e3, 60e3, 120e3, 300e3, 600e3, 900e3, 1800e3, 3600e3].find((s) => span / s <= 8) ?? 7200e3;
-    g.font = '10.5px "JetBrains Mono Variable", monospace';
+    g.font = '500 12px Barlow, sans-serif';
     g.textBaseline = 'middle';
     for (let t = Math.ceil(range[0] / stepMs) * stepMs; t <= range[1]; t += stepMs) {
       const x = xOf(t, w);
-      g.fillStyle = '#1c2438';
+      g.fillStyle = '#262931';
       g.fillRect(x, 0, 1, hgt - AXIS);
-      g.fillStyle = '#5f6880';
+      g.fillStyle = '#7d8290';
       g.fillText(clock(new Date(t).toISOString()).slice(0, 5), x - 14, hgt - AXIS / 2);
     }
 
     rows.forEach((r, i) => {
       const l = lane(r.run_id);
       const y = i * LANE;
-      const color = accountById(r.account_id)?.color || '#ece6d6';
+      const color = accountById(r.account_id)?.color || '#f2f1ec';
       const sel = state.selected === r.run_id;
-      if (sel) (g.fillStyle = 'rgba(255,255,255,.035)'), g.fillRect(0, y, w, LANE);
+      if (sel) (g.fillStyle = '#262931'), g.fillRect(0, y, w, LANE);
       const born = Date.parse(r.created_at);
       const st = playhead === null ? r.status : at < born ? 'unborn' : statusAt(l, at);
       // gutter: status dot + callsign
@@ -217,16 +217,18 @@ export function timelinePanel(host: HTMLElement): () => void {
       g.beginPath();
       g.arc(10, y + LANE / 2, 3.5, 0, Math.PI * 2);
       g.fill();
-      g.fillStyle = sel ? '#ffffff' : '#ece6d6';
-      g.font = 'italic 16px "Instrument Serif", serif';
+      g.fillStyle = sel ? '#ffffff' : '#f2f1ec';
+      g.font = '600 14px "Barlow Semi Condensed", sans-serif';
       g.fillText(clip(g, r.callsign || r.agent_id, GUTTER - 26), 20, y + LANE / 2);
       // lifetime
       const died = r.ended_at ? Date.parse(r.ended_at) : now;
-      g.fillStyle = '#263049';
-      g.fillRect(Math.max(GUTTER, xOf(born, w)), y + LANE / 2 - 0.5, Math.max(0, xOf(Math.min(died, at), w) - Math.max(GUTTER, xOf(born, w))), 1);
+      g.fillStyle = color;
+      g.globalAlpha = 0.35;
+      g.fillRect(Math.max(GUTTER, xOf(born, w)), y + LANE / 2 - 1.5, Math.max(0, xOf(Math.min(died, at), w) - Math.max(GUTTER, xOf(born, w))), 3);
+      g.globalAlpha = 1;
       // step segments
       const plan = new Map((r.plan ?? []).map((s) => [s.id, s.title]));
-      g.font = '11px "Instrument Sans Variable", sans-serif';
+      g.font = '600 12px "Barlow Semi Condensed", sans-serif';
       for (const s of l.segs.values()) {
         if (s.start > at) continue;
         const end = Math.min(s.end ?? died, at);
@@ -240,7 +242,7 @@ export function timelinePanel(host: HTMLElement): () => void {
         g.globalAlpha = 1;
         const title = plan.get(s.id) ?? s.id;
         if (x1 - x0 > 46) {
-          g.fillStyle = '#0d1220';
+          g.fillStyle = '#16171b';
           g.fillText(clip(g, title, x1 - x0 - 10), x0 + 5, y + LANE / 2 + 0.5);
         }
       }
@@ -256,7 +258,7 @@ export function timelinePanel(host: HTMLElement): () => void {
     // playhead
     if (playhead !== null) {
       const x = xOf(playhead, w);
-      g.fillStyle = '#d2a85a';
+      g.fillStyle = '#ffcd1c';
       g.fillRect(x - 1, 0, 2, hgt - AXIS);
       readout.textContent = `replay ${clock(new Date(playhead).toISOString())}`;
       readout.classList.add('on');
@@ -267,8 +269,8 @@ export function timelinePanel(host: HTMLElement): () => void {
     playBtn.textContent = playing ? 'Pause' : 'Play';
     liveBtn.disabled = playhead === null;
     if (!rows.length) {
-      g.fillStyle = '#8b94aa';
-      g.font = '13px "Instrument Sans Variable", sans-serif';
+      g.fillStyle = '#a9adb9';
+      g.font = '14px Barlow, sans-serif';
       g.fillText('No agents yet.', GUTTER, LANE / 2);
     }
   }

@@ -1,6 +1,6 @@
 import { api, errText } from '../api';
 import { emit, refresh, state } from '../store';
-import { dot, h, renderIf, setKids, usageText } from '../util';
+import { bullet, h, renderIf, setKids, usageText } from '../util';
 
 export function accountsRail(host: HTMLElement): () => void {
   const err = h('div', { class: 'err', role: 'alert', hidden: true });
@@ -36,15 +36,15 @@ export function accountsRail(host: HTMLElement): () => void {
                 emit();
               },
             },
-            h('span', { class: 'row' }, dot(a.color), h('strong', {}, a.label || a.id), h('span', { class: 'muted' }, a.kind)),
+            h('span', { class: 'row' }, bullet(a), h('strong', {}, a.label || a.id), h('span', { class: 'muted kind' }, a.kind)),
             h(
               'span',
               { class: 'row sub' },
-              `${a.used}/${a.max_concurrent} in use`,
+              `${a.used} of ${a.max_concurrent} slots`,
               a.rate_limited && h('span', { class: 'flag' }, 'rate limited'),
               !a.enabled && h('span', { class: 'flag off' }, 'disabled'),
             ),
-            h('span', { class: 'sub muted' }, usageText(a.usage)),
+            h('span', { class: 'sub muted usage', title: usageText(a.usage) }, usageText(a.usage)),
           );
           const cb = h('input', {
             type: 'checkbox',
@@ -52,7 +52,7 @@ export function accountsRail(host: HTMLElement): () => void {
             'aria-label': `Enable ${a.label || a.id}`,
             onchange: () => void toggle(a.id, cb.checked),
           });
-          const card = h('div', { class: 'acct' + (on ? ' on' : '') }, main, h('label', { class: 'toggle', title: 'Enabled' }, cb, ' on'));
+          const card = h('div', { class: 'acct' + (on ? ' on' : '') }, main, h('label', { class: 'toggle', title: a.enabled ? 'Enabled: new agents may use it' : 'Disabled: no new agents' }, cb));
           card.style.setProperty('--accent', a.color || 'var(--muted)');
           return card;
         }),

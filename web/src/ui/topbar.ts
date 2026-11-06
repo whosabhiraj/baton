@@ -1,5 +1,6 @@
 import { accountById, eventsPerMin, setOverlay, state } from '../store';
 import { ENDED, h, renderIf, setKids } from '../util';
+import { I, icon } from '../icons';
 
 const CONN_TEXT = { connecting: 'connecting', live: 'live', down: 'offline, retrying', auth: 'not signed in' } as const;
 
@@ -8,7 +9,7 @@ export function topbar(host: HTMLElement, toggleView: () => void, toggleTimeline
   const stats = h('div', { class: 'stats' });
   const actions = h('div', { class: 'actions' });
   const notices = h('div', { class: 'notices', role: 'status' });
-  setKids(host, h('span', { class: 'brand' }, 'Baton'), status, stats, actions);
+  setKids(host, h('span', { class: 'brand' }, h('span', { class: 'brand-mark', 'aria-hidden': 'true' }), 'Baton'), status, stats, actions);
   host.after(notices);
 
   return () => {
@@ -43,11 +44,11 @@ export function topbar(host: HTMLElement, toggleView: () => void, toggleTimeline
             { class: 'warn', title: state.configIssues.map((i) => i.msg).join('\n'), onclick: () => setOverlay('config') },
             `Config problems (${state.configIssues.length})`,
           ),
-        h('button', { onclick: () => setOverlay('approvals'), class: pending ? 'badge-btn has' : 'badge-btn' }, 'Approvals', h('span', { class: 'count' }, String(pending))),
-        h('button', { onclick: () => setOverlay('config') }, 'Config'),
-        h('button', { onclick: toggleTimeline, title: 'Show or hide the timeline (T)', 'aria-pressed': state.timeline }, 'Timeline'),
-        h('button', { onclick: toggleView, title: 'Toggle list and scene (L)' }, state.view === 'list' ? 'Scene' : 'List'),
-        h('button', { class: 'primary', onclick: () => setOverlay('spawn'), title: 'Spawn an agent (S)' }, 'Spawn'),
+        h('button', { onclick: () => setOverlay('approvals'), class: pending ? 'quiet has' : 'quiet' }, icon(I.approvals), 'Approvals', h('span', { class: 'count' }, String(pending))),
+        h('button', { class: 'quiet', onclick: () => setOverlay('config') }, icon(I.config), 'Config'),
+        h('button', { class: 'quiet', onclick: toggleTimeline, title: 'Show or hide the timeline (T)', 'aria-pressed': state.timeline }, icon(I.timeline), 'Timeline'),
+        h('button', { class: 'quiet', onclick: toggleView, title: 'Switch between map and list (L)' }, icon(state.view === 'list' ? I.scene : I.list), state.view === 'list' ? 'Map' : 'List'),
+        h('button', { class: 'primary', onclick: () => setOverlay('spawn'), title: 'Spawn an agent (S)' }, icon(I.spawn), 'Spawn agent'),
       ),
     );
 

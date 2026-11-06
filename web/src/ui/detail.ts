@@ -1,7 +1,8 @@
 import { api, errText } from '../api';
 import { accountById, refresh, ringOf, runById, select, state, type Run, type StoredEvent } from '../store';
-import { clock, dot, ENDED, h, renderIf, setKids, usageText } from '../util';
-import { score, stepProgress, statusBadge } from './runs';
+import { bullet, clock, ENDED, h, renderIf, setKids, usageText } from '../util';
+import { route, stepProgress, statusBadge } from './runs';
+import { I, icon } from '../icons';
 
 const SHOW = 300;
 
@@ -82,7 +83,7 @@ function build(host: HTMLElement): (r: Run) => void {
 
   // controls (static: keeps typed text across updates)
   const msg = h('input', { type: 'text', 'aria-label': 'Message to the agent', placeholder: 'Message to the agent' });
-  const sendBtn = h('button', { type: 'submit' }, 'Send');
+  const sendBtn = h('button', { type: 'submit' }, icon(I.send), 'Send');
   const msgForm = h(
     'form',
     {
@@ -100,8 +101,8 @@ function build(host: HTMLElement): (r: Run) => void {
     msg,
     sendBtn,
   );
-  const pauseBtn = h('button', { type: 'button', onclick: () => cur && void act(() => api.control(cur!.run_id, cur!.status === 'paused' ? 'resume' : 'pause')) }, 'Pause');
-  const stopBtn = h('button', { type: 'button', onclick: () => cur && void act(() => api.control(cur!.run_id, 'stop')) }, 'Stop');
+  const pauseBtn = h('button', { type: 'button', onclick: () => cur && void act(() => api.control(cur!.run_id, cur!.status === 'paused' ? 'resume' : 'pause')) }, icon(I.pause), 'Pause');
+  const stopBtn = h('button', { type: 'button', onclick: () => cur && void act(() => api.control(cur!.run_id, 'stop')) }, icon(I.stop), 'Stop');
   const killBtn = h(
     'button',
     {
@@ -111,6 +112,7 @@ function build(host: HTMLElement): (r: Run) => void {
         if (cur && window.confirm(`Kill ${cur.callsign || cur.agent_id}? The process is terminated immediately.`)) void act(() => api.control(cur!.run_id, 'kill'));
       },
     },
+    icon(I.kill),
     'Kill',
   );
   const controls = h('div', { class: 'controls' }, msgForm, h('div', { class: 'row' }, pauseBtn, stopBtn, killBtn));
@@ -166,8 +168,8 @@ function build(host: HTMLElement): (r: Run) => void {
     renderIf(header, JSON.stringify([r.callsign, r.status, r.model, r.role, a?.label, a?.color, branch]), () =>
       setKids(
         header,
-        h('div', { class: 'row between' }, h('h2', { class: 'callsign' }, r.callsign || r.agent_id), h('button', { class: 'x', 'aria-label': 'Close panel', onclick: () => select(null) }, 'x')),
-        h('div', { class: 'row' }, statusBadge(r.status), a ? h('span', { class: 'row' }, dot(a.color), a.label || a.id) : r.account_id),
+        h('div', { class: 'row between' }, h('h2', { class: 'callsign' }, r.callsign || r.agent_id), h('button', { class: 'icon-btn', 'aria-label': 'Close panel', title: 'Close (Esc)', onclick: () => select(null) }, icon(I.close))),
+        h('div', { class: 'row' }, statusBadge(r.status), h('span', { class: 'row acct-cell' }, bullet(a, r.account_id), a?.label || r.account_id || '')),
         h(
           'dl',
           { class: 'meta' },
@@ -189,13 +191,14 @@ function build(host: HTMLElement): (r: Run) => void {
     renderIf(progress, JSON.stringify([done, total, r.usage, r.step_states, a?.color]), () =>
       setKids(
         progress,
-        total > 0 && h('div', { class: 'row' }, score(r, a?.color), h('span', { class: 'mono' }, `${done}/${total} steps`)),
-        h('div', { class: 'mono muted sub' }, usageText(r.usage as Record<string, unknown> | undefined)),
+        total > 0 && h('div', { class: 'row' }, route(r, a?.color, 'big'), h('span', { class: 'num' }, `${done} of ${total} steps`)),
+        h('div', { class: 'num muted sub' }, usageText(r.usage as Record<string, unknown> | undefined)),
       ),
     );
 
     const evidence = new Map<string, string>();
     for (const e of ring) if (e.type === 'step_done') evidence.set(String(e.payload.step_id), String(e.payload.evidence ?? e.payload.summary ?? ''));
+    plan.style.setProperty('--c', a?.color || '#a9adb9');
     renderIf(plan, JSON.stringify([r.plan, r.step_states, [...evidence]]), () =>
       setKids(
         plan,
@@ -220,7 +223,11 @@ function build(host: HTMLElement): (r: Run) => void {
     );
 
     msg.disabled = sendBtn.disabled = ended;
-    pauseBtn.textContent = r.status === 'paused' ? 'Resume' : 'Pause';
+    const paused = r.status === 'paused';
+    if (pauseBtn.dataset.p !== String(paused)) {
+      pauseBtn.dataset.p = String(paused);
+      pauseBtn.replaceChildren(icon(paused ? I.play : I.pause), paused ? 'Resume' : 'Pause');
+    }
     pauseBtn.disabled = ended;
     stopBtn.disabled = ended;
     killBtn.disabled = ended;

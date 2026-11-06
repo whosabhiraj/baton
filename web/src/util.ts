@@ -70,7 +70,26 @@ export function num(n: unknown): string {
 export function usageText(u: Record<string, unknown> | undefined): string {
   if (!u) return 'no usage yet';
   const cost = typeof u.cost_usd === 'number' ? ' / $' + u.cost_usd.toFixed(2) : '';
-  return `in ${num(u.input_tokens)} out ${num(u.output_tokens)}${cost}`;
+  return `${num(u.input_tokens)} in · ${num(u.output_tokens)} out${cost.replace(' / ', ' · ')}`;
+}
+
+/** Account route bullet: a roundel in the line colour with a 1-2 letter code (like a route sign). */
+export function bullet(a: { id: string; label?: string; color?: string } | undefined, fallback = '?'): HTMLElement {
+  const name = (a?.label || a?.id || fallback).replace(/\(.*?\)/g, '').trim();
+  const words = name.split(/[\s_-]+/).filter(Boolean);
+  const code = (words.length > 1 ? words.map((w) => w[0]).join('').slice(0, 2) : name.slice(0, 1)).toUpperCase();
+  const el = h('span', { class: 'bullet', 'aria-hidden': 'true' }, code);
+  const c = a?.color || '#a9adb9';
+  el.style.background = c;
+  el.style.color = luminance(c) > 0.45 ? '#16171b' : '#f2f1ec';
+  return el;
+}
+
+function luminance(hex: string): number {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) return 0.5;
+  const n = parseInt(m[1]!, 16);
+  return (0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255;
 }
 
 export function dot(color: string | undefined): HTMLElement {

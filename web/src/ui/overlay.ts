@@ -1,3 +1,4 @@
+import { I, icon } from '../icons';
 // Modal host: builds the panel once when it opens (so typed text survives live updates).
 import { setOverlay, state, type Overlay } from '../store';
 import { h } from '../util';
@@ -36,8 +37,8 @@ export function overlayHost(host: HTMLElement): () => void {
       panel = BUILD[shown]();
       const box = h(
         'div',
-        { class: 'modal', role: 'dialog', 'aria-modal': 'true', 'aria-label': panel.title },
-        h('div', { class: 'row between' }, h('h2', {}, panel.title), h('button', { class: 'x', 'aria-label': 'Close', onclick: () => setOverlay(null) }, 'x')),
+        { class: 'sheet', role: 'dialog', 'aria-modal': 'true', 'aria-label': panel.title },
+        h('div', { class: 'sheet-head' }, h('h2', {}, panel.title), h('button', { class: 'icon-btn', 'aria-label': 'Close', title: 'Close (Esc)', onclick: () => setOverlay(null) }, icon(I.close))),
         panel.el,
       );
       host.append(h('div', { class: 'backdrop', onclick: () => setOverlay(null) }), box);
