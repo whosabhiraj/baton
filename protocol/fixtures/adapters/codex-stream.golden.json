@@ -1,0 +1,52 @@
+[
+  {
+    "type": "activity",
+    "payload": {
+      "detail": "bash -lc ls",
+      "raw_kind": "command_execution",
+      "tool": "shell"
+    }
+  },
+  {
+    "type": "activity",
+    "payload": {
+      "detail": "go json lines",
+      "raw_kind": "web_search",
+      "tool": "web"
+    }
+  },
+  {
+    "type": "activity",
+    "payload": {
+      "detail": "docs.search",
+      "raw_kind": "mcp_tool_call",
+      "tool": "other"
+    }
+  },
+  {
+    "type": "activity",
+    "payload": {
+      "detail": "a.txt, b.txt",
+      "raw_kind": "file_change",
+      "tool": "edit"
+    }
+  },
+  {
+    "type": "usage",
+    "payload": {
+      "cache_read_tokens": 800,
+      "cache_write_tokens": 0,
+      "input_tokens": 1200,
+      "output_tokens": 150
+    }
+  },
+  {
+    "type": "usage",
+    "payload": {
+      "cache_read_tokens": 900,
+      "cache_write_tokens": 0,
+      "input_tokens": 1500,
+      "output_tokens": 200
+    }
+  }
+]

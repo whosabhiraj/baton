@@ -29,6 +29,7 @@ const usage = `usage: baton <command>
   attach                connect to the running hub (status; conductor chat comes in Phase 6)
   hub status | stop [--yes] [--keep-agents] | rotate-token
   hub serve [--project P] [--port N] [--dev]   (foreground hub; what the background hub runs)
+  login <account-id> | login --status [<account-id>]   (sign an account in, in its own isolated config dir)
   mock [--speed N] [--seed N] [--once] [--reset] [--no-browser]   (demo hub with fake agents on a scratch repo)
   all human commands accept --data-dir D to override the project data dir`
 
@@ -44,7 +45,7 @@ var maxPositionals = map[string]int{
 	"hello": 0, "heartbeat": 0, "inbox": 0, "plan": 0, "done": 0, "step": 2, "progress": 2, "artifact": 2, "ask": 1, "error": 1,
 }
 
-var laterPhase = map[string]int{"login": 5, "gc": 7}
+var laterPhase = map[string]int{"gc": 7}
 
 // Main runs the CLI and returns the process exit code.
 func Main(args []string, stdin io.Reader, stdout, stderr io.Writer, getenv func(string) string) int {
@@ -70,6 +71,9 @@ func need(v string, what string) (string, error) {
 }
 
 func (c *ctx) dispatch(argv []string) (int, error) {
+	if len(argv) > 0 && argv[0] == "login" {
+		return c.cmdLogin(argv[1:]) // own flag parsing: --status here takes no value
+	}
 	o, pos, err := parseArgs(argv)
 	if err != nil {
 		return 0, usagef("%s", err.Error())

@@ -64,7 +64,7 @@ func TestFor(t *testing.T) {
 		"mine": {Command: "mytool", Args: []string{"--x"}, Parser: "jsonl", Env: map[string]string{"A": "1"}},
 		"bad":  {},
 	}}
-	for _, k := range []string{"codex", "opencode"} {
+	for _, k := range []string{"opencode"} {
 		if _, err := For(k, cfg); err == nil || !strings.Contains(err.Error(), "not implemented") {
 			t.Errorf("%s: %v", k, err)
 		}

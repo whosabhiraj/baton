@@ -40,7 +40,7 @@ func For(kind string, cfg config.Config) (Adapter, error) {
 	case "claude":
 		return claude{}, nil
 	case "codex":
-		return nil, fmt.Errorf("codex adapter is not implemented yet (Phase 5b)")
+		return codex{}, nil
 	case "opencode":
 		return nil, fmt.Errorf("opencode adapter is not implemented yet (Phase 5c)")
 	}
