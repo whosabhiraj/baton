@@ -2,43 +2,7 @@
   {
     "type": "activity",
     "payload": {
-      "detail": "src/app.go",
-      "raw_kind": "Read",
-      "tool": "read"
-    }
-  },
-  {
-    "type": "usage",
-    "payload": {
-      "cache_read_tokens": 50,
-      "cache_write_tokens": 10,
-      "input_tokens": 100,
-      "model": "claude-sonnet-4",
-      "output_tokens": 20
-    }
-  },
-  {
-    "type": "activity",
-    "payload": {
-      "detail": "src/app.go",
-      "raw_kind": "Edit",
-      "tool": "edit"
-    }
-  },
-  {
-    "type": "usage",
-    "payload": {
-      "cache_read_tokens": 110,
-      "cache_write_tokens": 10,
-      "input_tokens": 250,
-      "model": "claude-sonnet-4",
-      "output_tokens": 60
-    }
-  },
-  {
-    "type": "activity",
-    "payload": {
-      "detail": "go test ./...",
+      "detail": "baton hello; baton step s1 start; echo \"checked by baton\" \u003e\u003e hello.txt \u0026\u0026 git add hello.txt \u0026\u0026 git commit -qm \"Add checked by baton line Co-Authored-By: Claude Sonnet 5.5 \u003cnoreply@anthropic.com\u003e\" \u0026\u0026 …",
       "raw_kind": "Bash",
       "tool": "shell"
     }
@@ -46,40 +10,50 @@
   {
     "type": "usage",
     "payload": {
-      "cache_read_tokens": 110,
-      "cache_write_tokens": 10,
-      "input_tokens": 250,
-      "model": "claude-sonnet-4",
-      "output_tokens": 75
+      "cache_read_tokens": 14455,
+      "cache_write_tokens": 16980,
+      "input_tokens": 2,
+      "model": "claude-sonnet-5-5",
+      "output_tokens": 16
     }
   },
   {
     "type": "activity",
     "payload": {
-      "detail": "explore",
-      "raw_kind": "Task",
-      "tool": "other"
+      "detail": "baton step s1 done --summary \"appended line, committed\" --evidence 17e06cd; baton done --status success --summary \"hello.txt now ends with 'checked by baton'; commit 17e06cd\"",
+      "raw_kind": "Bash",
+      "tool": "shell"
     }
   },
   {
     "type": "usage",
     "payload": {
-      "cache_read_tokens": 110,
-      "cache_write_tokens": 10,
-      "input_tokens": 450,
-      "model": "claude-sonnet-4",
-      "output_tokens": 85
+      "cache_read_tokens": 45890,
+      "cache_write_tokens": 20908,
+      "input_tokens": 4,
+      "model": "claude-sonnet-5-5",
+      "output_tokens": 32
     }
   },
   {
     "type": "usage",
     "payload": {
-      "cache_read_tokens": 110,
-      "cache_write_tokens": 10,
-      "cost_usd": 0.0123,
-      "input_tokens": 450,
-      "model": "claude-sonnet-4",
-      "output_tokens": 105
+      "cache_read_tokens": 81253,
+      "cache_write_tokens": 21149,
+      "input_tokens": 6,
+      "model": "claude-sonnet-5-5",
+      "output_tokens": 187
+    }
+  },
+  {
+    "type": "usage",
+    "payload": {
+      "cache_read_tokens": 81253,
+      "cache_write_tokens": 21149,
+      "cost_usd": 0.09695329999999999,
+      "input_tokens": 6,
+      "model": "claude-sonnet-5-5",
+      "output_tokens": 422
     }
   }
 ]

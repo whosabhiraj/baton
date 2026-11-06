@@ -1,8 +1,10 @@
 # Adapter fixtures
 
-`claude-stream.jsonl` is a hand-written approximation of `claude -p --output-format stream-json
---verbose` output. Replace it with a captured real stream in the first real run, then update
-`claude-stream.golden.json` (the events the parser must produce) to match.
+`claude-stream.jsonl` is a real `claude -p --output-format stream-json --verbose` stream
+(Claude Code 2.1.319, one tiny task), reduced to the fields the parser reads. Account data,
+local paths, MCP server lists and rate-limit details were removed; other event types keep only
+their `type`.
 
-It deliberately includes a non-JSON line and an unknown event type (both must be ignored) and two
-assistant lines with the same message id (usage must not be double counted).
+`claude-stream.golden.json` holds the events the parser must produce from it. Regenerate with
+`UPDATE_GOLDEN=1 go test ./internal/adapters/` after a deliberate parser change, and review
+the diff.
