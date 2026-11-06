@@ -1,5 +1,5 @@
 import { accountById, emit, select, state, type Run } from '../store';
-import { ago, dot, h, renderIf, setKids } from '../util';
+import { ago, dot, ENDED, h, renderIf, setKids } from '../util';
 
 export function stepProgress(r: Run): { done: number; total: number } {
   const total = r.plan?.length ?? 0;
@@ -24,6 +24,19 @@ export function statusBadge(status: string): HTMLElement {
   return h('span', { class: 'badge st-' + status }, status.replace('_', ' '));
 }
 
+/** The plan as a row of step segments (done / active / blocked / pending), in the account color. */
+export function score(r: Run, color: string | undefined): HTMLElement {
+  const plan = r.plan ?? [];
+  const { done, total } = stepProgress(r);
+  const el = h(
+    'span',
+    { class: 'score', role: 'img', 'aria-label': total ? `${done} of ${total} steps done` : 'no plan yet' },
+    ...plan.map((s) => h('i', { class: 'seg seg-' + (r.step_states?.[s.id] ?? 'pending'), title: `${s.title} (${r.step_states?.[s.id] ?? 'pending'})` })),
+  );
+  el.style.setProperty('--c', color || 'var(--paper)');
+  return el;
+}
+
 export function runsList(host: HTMLElement): () => void {
   const head = h('div', { class: 'list-head' });
   const body = h('tbody');
@@ -34,7 +47,7 @@ export function runsList(host: HTMLElement): () => void {
     h(
       'thead',
       {},
-      h('tr', {}, ...['Agent', 'Status', 'Account', 'Role / model', 'Current step', 'Progress', 'Q', 'Last event'].map((t) => h('th', { scope: 'col' }, t))),
+      h('tr', {}, ...['Agent', 'Status', 'Account', 'Plan', 'Q', 'Last'].map((t) => h('th', { scope: 'col' }, t))),
     ),
     body,
   );
@@ -61,7 +74,7 @@ export function runsList(host: HTMLElement): () => void {
     renderIf(body, sig, () => {
       const focused = document.activeElement instanceof HTMLElement ? document.activeElement.dataset.id : undefined;
       if (!rows.length) {
-        setKids(body, h('tr', {}, h('td', { colspan: 8, class: 'muted empty' }, state.loaded ? 'No agents yet. Press S to spawn one.' : 'Loading...')));
+        setKids(body, h('tr', {}, h('td', { colspan: 6, class: 'muted empty' }, state.loaded ? 'No agents yet. Press S to spawn one.' : 'Loading...')));
         return;
       }
       setKids(body, ...rows.map((r) => row(r, now)));
@@ -77,7 +90,7 @@ function row(r: Run, now: number): HTMLElement {
   const tr = h(
     'tr',
     {
-      class: 'run' + (state.selected === r.run_id ? ' sel' : ''),
+      class: 'run' + (state.selected === r.run_id ? ' sel' : '') + (ENDED.has(r.status) ? ' ended' : ''),
       tabindex: 0,
       'data-id': r.run_id,
       'aria-selected': state.selected === r.run_id,
@@ -89,14 +102,12 @@ function row(r: Run, now: number): HTMLElement {
         }
       },
     },
-    h('td', {}, h('strong', {}, r.callsign || r.agent_id), h('div', { class: 'sub muted' }, r.agent_id)),
+    h('td', {}, h('span', { class: 'callsign' }, r.callsign || r.agent_id), h('div', { class: 'sub mono muted' }, [r.role, r.model || r.kind].filter(Boolean).join(' · '))),
     h('td', {}, statusBadge(r.status)),
     h('td', {}, a ? h('span', { class: 'row' }, dot(a.color), a.label || a.id) : (r.account_id ?? '-')),
-    h('td', {}, [r.role, r.kind].filter(Boolean).join(' / ') || '-', h('div', { class: 'sub muted' }, r.model ?? '')),
-    h('td', { class: 'step' }, currentStep(r)),
-    h('td', {}, total ? h('span', { class: 'mini' }, h('progress', { max: total, value: done, 'aria-label': 'Steps done' }), ` ${done}/${total}`) : '-'),
+    h('td', { class: 'plan-cell' }, h('div', { class: 'row' }, score(r, a?.color), h('span', { class: 'mono muted' }, total ? `${done}/${total}` : '')), h('div', { class: 'sub step' }, currentStep(r))),
     h('td', {}, r.open_questions.length > 0 ? h('span', { class: 'qmark', title: `${r.open_questions.length} open question(s)` }, '?' + (r.open_questions.length > 1 ? r.open_questions.length : '')) : ''),
-    h('td', { class: 'muted' }, ago(r.last_event_ts, now)),
+    h('td', { class: 'mono muted' }, ago(r.last_event_ts, now)),
   );
   return tr;
 }

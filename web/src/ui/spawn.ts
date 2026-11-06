@@ -32,6 +32,8 @@ export function spawnPanel(): Panel {
     setKids(models, ...(a?.models ?? []).map((m) => h('option', { value: m })));
     setKids(roles, ...(a?.roles ?? []).map((m) => h('option', { value: m })));
   };
+  const free = state.accounts.find((a) => a.enabled && !a.rate_limited && a.used < a.max_concurrent);
+  if (free) account.value = free.id; // start on an account that can take an agent now
   account.addEventListener('change', syncAccount);
   syncAccount();
 

@@ -8,7 +8,7 @@ export function topbar(host: HTMLElement, toggleView: () => void): () => void {
   const stats = h('div', { class: 'stats' });
   const actions = h('div', { class: 'actions' });
   const notices = h('div', { class: 'notices', role: 'status' });
-  setKids(host, h('strong', { class: 'brand' }, 'Baton'), status, stats, actions);
+  setKids(host, h('span', { class: 'brand' }, 'Baton'), status, stats, actions);
   host.after(notices);
 
   return () => {
@@ -26,7 +26,7 @@ export function topbar(host: HTMLElement, toggleView: () => void): () => void {
     renderIf(stats, JSON.stringify([c, cText, state.mode, state.runs.length, live.length, active, epm]), () =>
       setKids(
         stats,
-        stat('conductor', cText),
+        h('span', { class: 'stat cond cond-' + c.state }, h('i', { class: 'cdot', 'aria-hidden': 'true' }), h('span', { class: 'k' }, 'conductor'), ' ', h('span', { class: 'v' }, cText)),
         stat('mode', state.mode || '-'),
         stat('agents', `${state.runs.length} total / ${active} active`),
         stat('events/min', String(epm)),

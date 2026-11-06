@@ -1,7 +1,7 @@
 import { api, errText } from '../api';
 import { accountById, refresh, ringOf, runById, select, state, type Run, type StoredEvent } from '../store';
 import { clock, dot, ENDED, h, renderIf, setKids, usageText } from '../util';
-import { stepProgress, statusBadge } from './runs';
+import { score, stepProgress, statusBadge } from './runs';
 
 const SHOW = 300;
 
@@ -166,7 +166,7 @@ function build(host: HTMLElement): (r: Run) => void {
     renderIf(header, JSON.stringify([r.callsign, r.status, r.model, r.role, a?.label, a?.color, branch]), () =>
       setKids(
         header,
-        h('div', { class: 'row between' }, h('h2', {}, r.callsign || r.agent_id), h('button', { class: 'x', 'aria-label': 'Close panel', onclick: () => select(null) }, 'x')),
+        h('div', { class: 'row between' }, h('h2', { class: 'callsign' }, r.callsign || r.agent_id), h('button', { class: 'x', 'aria-label': 'Close panel', onclick: () => select(null) }, 'x')),
         h('div', { class: 'row' }, statusBadge(r.status), a ? h('span', { class: 'row' }, dot(a.color), a.label || a.id) : r.account_id),
         h(
           'dl',
@@ -186,11 +186,11 @@ function build(host: HTMLElement): (r: Run) => void {
     );
 
     const { done, total } = stepProgress(r);
-    renderIf(progress, JSON.stringify([done, total, r.usage]), () =>
+    renderIf(progress, JSON.stringify([done, total, r.usage, r.step_states, a?.color]), () =>
       setKids(
         progress,
-        total > 0 && h('div', { class: 'row' }, h('progress', { max: total, value: done, 'aria-label': 'Plan progress' }), ` ${done}/${total} steps`),
-        h('div', { class: 'muted' }, 'Usage: ' + usageText(r.usage as Record<string, unknown> | undefined)),
+        total > 0 && h('div', { class: 'row' }, score(r, a?.color), h('span', { class: 'mono' }, `${done}/${total} steps`)),
+        h('div', { class: 'mono muted sub' }, usageText(r.usage as Record<string, unknown> | undefined)),
       ),
     );
 
@@ -206,7 +206,6 @@ function build(host: HTMLElement): (r: Run) => void {
                 'li',
                 { class: 'step-' + st },
                 h('span', { class: 'sbadge' }, st),
-                ' ',
                 h('strong', {}, s.title),
                 s.acceptance && h('div', { class: 'sub muted' }, 'Accept: ' + s.acceptance),
                 evidence.get(s.id) && h('div', { class: 'sub' }, 'Evidence: ' + evidence.get(s.id)),
