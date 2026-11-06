@@ -147,3 +147,12 @@ func TestRotateToken(t *testing.T) {
 		t.Fatalf("stopped %d started %v", f.stopped, f.started)
 	}
 }
+
+// Windows PowerShell 5.1 pipes `"y" | baton ...` as BOM + "y\r\n"; that must count as yes.
+func TestAskAcceptsBOMPrefixedYes(t *testing.T) {
+	var errb bytes.Buffer
+	c := &ctx{stdin: strings.NewReader(string(rune(0xFEFF)) + "y\r\n"), stderr: &errb}
+	if !c.ask("ok? ") {
+		t.Fatal("BOM-prefixed y was read as no")
+	}
+}

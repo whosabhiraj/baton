@@ -47,6 +47,8 @@ func openURL(url string) {
 func (c *ctx) ask(question string) bool {
 	fmt.Fprint(c.stderr, question)
 	line, _ := bufio.NewReader(c.stdin).ReadString('\n')
+	// Windows PowerShell 5.1 prefixes piped text with a UTF-8 BOM ("y" | baton ...).
+	line = strings.TrimPrefix(line, string(rune(0xFEFF)))
 	switch strings.ToLower(strings.TrimSpace(line)) {
 	case "y", "yes":
 		return true
