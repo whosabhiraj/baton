@@ -494,6 +494,14 @@ func (r *Run) Deliver(typ string, payload map[string]any) (int, *proto.Error) {
 	if r.st.ended {
 		return 0, proto.NewError(proto.CodeRunEnded, "run has ended")
 	}
+	if typ == "answer" {
+		// An answer must match an open question; otherwise a blocked agent would wait for its
+		// timeout while the caller believes it answered.
+		qid, _ := payload["qid"].(string)
+		if !r.st.hasOpenQuestion(qid) {
+			return 0, proto.NewError(proto.CodeUnknownQID, "no open question with qid "+qid+" in this run")
+		}
+	}
 	n := r.nextInbox + 1
 	ts := nowTS(time.Now())
 	msg := proto.InboxMessage{V: proto.Version, N: n, TS: ts, Type: typ, Payload: payload}

@@ -216,7 +216,7 @@ Auth is `Authorization: Bearer <token>`. **Admin token** = the hub's dashboard/A
 | `GET /api/state` | admin | — | `{ ok: true, runs: RunSummary[] }` (run record minus token hash, plus `last_seq`, `last_event_ts`, `open_questions`, `step_states`) |
 | `GET /api/stream` | admin (header, or `?token=` for EventSource) | `Last-Event-ID` | SSE; each event `id: <global n>`, `event: baton`, `data: StoredEvent`. If the id is older than the in-memory buffer, the hub sends `event: reset` and the client re-fetches `/api/state`. |
 | `POST /api/runs/:id/message` | admin | `{ text, from? }` (`from` default `human`) | `{ ok: true, n }` |
-| `POST /api/runs/:id/answer` | admin | `{ qid, text }` | `{ ok: true, n }` |
+| `POST /api/runs/:id/answer` | admin | `{ qid, text }` | `{ ok: true, n }`; `409 UNKNOWN_QID` if `qid` is not an open question of the run (A13) |
 | `POST /api/runs/:id/plan_update` | admin | `{ steps }` | `{ ok: true, n }` |
 | `POST /api/runs/:id/pause` · `resume` · `stop` | admin | `{ reason? }` | `{ ok: true, n }` |
 | `POST /api/dev/runs` | admin, dev mode only | `{ agent_id?, callsign?, role?, kind?, model?, account_id?, plan? }` | `{ ok: true, run_id, agent_id, token, run_dir, env }` — `env` is the full `BATON_*` set for the agent |
@@ -231,3 +231,10 @@ Auth is `Authorization: Bearer <token>`. **Admin token** = the hub's dashboard/A
 - `GET /api/health` additionally returns `instance`: `{ ok: true, name: "baton", v: 1, instance }`.
 - `POST /api/hub/shutdown` (admin) answers `{ ok: true }` and then shuts the hub down gracefully.
 - Phase 6 will add `GET /api/wait` and `/api/conductor/*`.
+
+### A13. Answers must match an open question
+
+`POST /api/runs/:id/answer` is refused with `409 UNKNOWN_QID` unless `qid` belongs to a
+`question` of that run that has not been answered yet. A delivered answer closes the question,
+so a second answer to the same `qid` is refused too. This stops a mistyped qid from being
+accepted while the agent keeps waiting (`ask --blocking` only consumes the matching answer).

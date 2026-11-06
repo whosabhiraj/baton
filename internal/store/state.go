@@ -25,6 +25,16 @@ type Question struct {
 	Seq      int64    `json:"seq,omitempty"`
 }
 
+// hasOpenQuestion reports whether qid is an unanswered question of the run.
+func (s *State) hasOpenQuestion(qid string) bool {
+	for _, q := range s.Questions {
+		if q.QID == qid {
+			return true
+		}
+	}
+	return false
+}
+
 // State is everything derived from a run's event log. It is rebuilt on startup by replaying
 // events.jsonl through Apply, and kept current by calling Apply on every append.
 type State struct {

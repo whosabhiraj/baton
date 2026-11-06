@@ -14,6 +14,7 @@ const (
 	CodeRunEnded         = "RUN_ENDED"
 	CodeNotFound         = "NOT_FOUND"
 	CodeInternal         = "INTERNAL"
+	CodeUnknownQID       = "UNKNOWN_QID" // answer for a qid that is not an open question of the run
 )
 
 // Error is a protocol error carrying the HTTP status the API should answer with.
@@ -44,6 +45,8 @@ func statusFor(code string) int {
 		return http.StatusNotFound
 	case CodeRunEnded:
 		return http.StatusGone
+	case CodeUnknownQID:
+		return http.StatusConflict
 	default:
 		return http.StatusInternalServerError
 	}

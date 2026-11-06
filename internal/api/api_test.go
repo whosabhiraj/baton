@@ -213,6 +213,11 @@ func TestAdminDeliverRoutes(t *testing.T) {
 	e.expectErr("POST", "/api/runs/nope/message", adminTok, `{"text":"x"}`, 404, "NOT_FOUND")
 	e.expectErr("POST", "/api/runs/rA/message", adminTok, `{"text":""}`, 400, "INVALID_PAYLOAD")
 	e.expectErr("POST", "/api/runs/rA/message", adminTok, `[1]`, 400, "INVALID_PAYLOAD")
+	// answers must match an open question
+	e.expectErr("POST", "/api/runs/rA/answer", adminTok, `{"qid":"q_1","text":"yes"}`, 409, "UNKNOWN_QID")
+	if st, m := e.do("POST", "/api/ingest", tok, `{"v":1,"run_id":"rA","agent_id":"a-rA","type":"question","msg_id":"mq1","payload":{"qid":"q_1","text":"ok?","blocking":true}}`); st != 200 {
+		t.Fatalf("question ingest: %d %v", st, m)
+	}
 	for i, c := range []struct{ path, body string }{
 		{"message", `{"text":"hi","from":"conductor"}`},
 		{"answer", `{"qid":"q_1","text":"yes"}`},
@@ -226,6 +231,8 @@ func TestAdminDeliverRoutes(t *testing.T) {
 			t.Fatalf("%s: %d %v", c.path, st, m)
 		}
 	}
+	// the question is answered now: a second answer is refused
+	e.expectErr("POST", "/api/runs/rA/answer", adminTok, `{"qid":"q_1","text":"again"}`, 409, "UNKNOWN_QID")
 	_, m := e.do("GET", "/api/runs/rA/inbox", tok, "")
 	msgs := m["messages"].([]any)
 	if len(msgs) != 6 || msgs[0].(map[string]any)["payload"].(map[string]any)["from"] != "conductor" {
