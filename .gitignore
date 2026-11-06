@@ -1,0 +1,8 @@
+node_modules/
+dist/
+runs/
+.baton/
+*.log
+.env
+.env.*
+*.local.md
