@@ -1,6 +1,6 @@
 # HANDOFF — read this first
 
-Last updated: **2026-11-07**, **Phase 3 approved**; Phase 4 (dashboard) not started — its open questions are in §E, unanswered.
+Last updated: **2026-11-07**, **Phase 4a in progress** (scaffold committed; UI being built). Phase 4 questions answered — see §E.
 
 Big change since Phase 0: the hub **and** the `baton` CLI are written in **Go** (one binary).
 `docs/GO_HUB_DESIGN.md` is approved and overrides `docs/PLAN.md` §3, §4.7, §5 and §6.
@@ -61,7 +61,7 @@ Things only you can do:
 | 1 Protocol + CLI + spool + minimal hub (Go) | ✅ done | up to the "Phase 1 done" commit |
 | 2 Hub core | ✅ done (verified end to end; PowerShell piped-`y` fix `b4e6c60`) | `d014636` … `b4e6c60` |
 | 3 `baton mock` | ✅ done (controls, approvals, kill checked by hand) | `a5f9baf` … this commit |
-| 4 Dashboard | pending — open questions in §E | — |
+| 4 Dashboard | 4a in progress (scaffold `24bf6c7`) | `24bf6c7` … |
 | 5 Adapters | pending | — |
 | 6 Conductor | pending | — |
 | 7 Hardening | pending | — |
@@ -95,13 +95,24 @@ Runtime data: `~/.baton/projects/<repo-name>-<hash8>/` (override with `BATON_HOM
 `admin.token`, `hub.lock`, `hub.port`, `runs/<run_id>/{run.json, events.jsonl, outbox.jsonl,
 outbox.offset, inbox/}`.
 
-## E. Resume here (Phase 4 start — nothing built yet)
+## E. Resume here (Phase 4a in progress)
 
-State: Phases 0–3 done and pushed (last code commit `e66c275`). Working tree clean except the
-untracked `.github/` (CI file, see §A). No Phase 4 code exists; `web/` only has `embed.go` and an
-empty `dist/`.
+Phase 4 answers (2026-11-07, all the recommended options):
+1. Split: **4a** working dashboard without 3D (list view, agent panel with plan, events, question +
+   answer box, controls, approvals, usage, spawn form, account toggles, config editor) → **4b** 3D
+   scene → **4c** timeline/replay. Conductor chat panel moves to Phase 6. The user checks after each step.
+2. 3D: **lean first** (account orbits, agent shapes by kind, status looks, progress arcs, edges,
+   click-to-focus, bloom, reduced-motion); pulses/particles/ring bursts/completed shelf only on request.
+3. Login: `baton` / `baton mock` open `http://127.0.0.1:<port>/#token=...`; the page stores it in
+   localStorage and strips it from the address bar; paste box as fallback. (Done in `24bf6c7`.)
+4. Approval gates: keep the current defaults — merges need a human click, spawns don't.
 
-What Phase 3 left for the dashboard to use (all in PROTOCOL.md A11–A15):
+State: scaffold done in `24bf6c7` (`npm run gen:types` → `web/src/protocol.gen.ts`, check = drift +
+`tsc -p web`, build/install build the dashboard first, hub serves the embedded `web/dist`). The 4a
+UI (vanilla TS in `web/src`) is being written; when it lands: `npm run check`, visual check
+against `baton mock --speed 5`, commit, ask the user to check, then ask before starting 4b.
+
+API surface for the dashboard (PROTOCOL.md A11–A15):
 - `GET /api/state` (runs with status, plan, step_states, open_questions, usage; accounts with
   used/max, rate_limited, usage totals; conductor state; pending approvals; config_ok/issues)
   and `GET /api/stream` (SSE: `event: baton` = stored events, `event: hub` = notices
@@ -111,25 +122,8 @@ What Phase 3 left for the dashboard to use (all in PROTOCOL.md A11–A15):
   `GET /api/approvals`, `POST /api/approvals/:id/{approve,reject}`, `GET /api/audit`,
   `GET /api/runs/:id/events?since=` (timeline/replay).
 - Answer body is `{"qid": "...", "text": "..."}`. Admin auth = `Authorization: Bearer <admin token>`
-  (SSE: `?token=`). Dev against `baton mock --speed 5` (no quota; data in `<BATON_HOME>/mock`).
-
-**First action for the next agent: ask the user these four questions** (one AskUserQuestion
-call, options as written, recommended option first and marked "(Recommended)"). They were
-prepared in the previous session but never answered. Do not write Phase 4 code until the user
-has answered them:
-1. Scope/split: (a) 4a working dashboard without 3D (list view, agent panel with plan, events,
-   question + answer box, controls, approvals, usage, spawn form, account toggles, config editor),
-   4b 3D scene, 4c timeline/replay; conductor chat panel moved to Phase 6 (needs the real
-   conductor); user checks after each step. (b) everything at once incl. chat placeholder.
-   (c) only 4a now, decide on 3D/timeline later.
-2. 3D scene fidelity: (a) lean first — account orbits, agent shapes by kind, status looks,
-   progress arcs, edges, click-to-focus, bloom, reduced-motion; pulses/particles/ring bursts/
-   completed shelf only on request. (b) full spec §7.1 in one go.
-3. Dashboard login: (a) `baton` / `baton mock` open `http://127.0.0.1:<port>/#token=...`; the page
-   stores it in localStorage and strips it from the address bar (fragment never reaches the
-   server); paste box as fallback. (b) paste the printed token once.
-4. Approval gate defaults (PLAN §7 Q3): (a) keep current config defaults — merges need a human
-   click, spawns don't (propose mode asks for the lineup anyway). (b) both. (c) neither.
+  (SSE: `?token=`). Dev against `baton mock --speed 5` (no quota; data in `<BATON_HOME>/mock`);
+  `npm run dev:web` with `BATON_HUB_URL=<mock url>` for hot reload.
 
 Constraints for Phase 4: keep it lean (no over-engineering); stack per spec = Vite + TypeScript +
 three.js, no React; types generated from `protocol/schema`; served embedded from `web/dist`, Vite
