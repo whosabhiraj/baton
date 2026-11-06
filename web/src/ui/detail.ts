@@ -1,6 +1,6 @@
 import { api, errText } from '../api';
 import { accountById, refresh, ringOf, runById, select, state, type Run, type StoredEvent } from '../store';
-import { bullet, clock, ENDED, h, renderIf, setKids, usageText } from '../util';
+import { bullet, clock, ENDED, h, lineColor, renderIf, setKids, usageText } from '../util';
 import { route, stepProgress, statusBadge } from './runs';
 import { I, icon } from '../icons';
 
@@ -198,7 +198,7 @@ function build(host: HTMLElement): (r: Run) => void {
 
     const evidence = new Map<string, string>();
     for (const e of ring) if (e.type === 'step_done') evidence.set(String(e.payload.step_id), String(e.payload.evidence ?? e.payload.summary ?? ''));
-    plan.style.setProperty('--c', a?.color || '#a9adb9');
+    plan.style.setProperty('--c', lineColor(a?.color));
     renderIf(plan, JSON.stringify([r.plan, r.step_states, [...evidence]]), () =>
       setKids(
         plan,

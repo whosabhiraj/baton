@@ -2,7 +2,7 @@
 // a replay playhead (lanes then show each agent's step and status at that moment).
 import { api } from '../api';
 import { accountById, eventHooks, resetHooks, select, state, type Run, type StoredEvent } from '../store';
-import { clock, ENDED, h } from '../util';
+import { clock, ENDED, h, lineColor, PAL, STATUS_COLOR } from '../util';
 import { visibleRuns } from './runs';
 
 type Seg = { id: string; start: number; end?: number; blocked: boolean };
@@ -100,12 +100,9 @@ function statusAt(l: Lane, t: number): string {
   return s;
 }
 
-const STATUS_COLOR: Record<string, string> = {
-  running: '#3cc489', starting: '#3cc489', waiting: '#ffcd1c', blocked: '#ff8a3d', rate_limited: '#ff8a3d', stalled: '#ff8a3d',
-  paused: '#a597ff', done: '#f2f1ec', failed: '#f0524a', killed: '#f0524a', exited: '#7d8290',
-};
 const TICK_COLOR = (type: string) =>
-  type === 'question' ? '#ffcd1c' : type === 'artifact' ? '#f2f1ec' : type.startsWith('to_agent') ? '#9fb0e8' : type === 'done' ? '#3cc489' : type === 'paused' ? '#a597ff' : '#f0524a';
+  type === 'question' ? PAL.signal : type === 'artifact' ? PAL.text : type.startsWith('to_agent') ? PAL.text2 : type === 'done' ? PAL.go : type === 'paused' ? PAL.hold : PAL.stop;
+const SANS = '"Mona Sans Variable", system-ui, sans-serif';
 
 export function timelinePanel(host: HTMLElement): () => void {
   let win = 15 * 60_000;
@@ -194,41 +191,41 @@ export function timelinePanel(host: HTMLElement): () => void {
     // time axis
     const span = range[1] - range[0];
     const stepMs = [15e3, 30e3, 60e3, 120e3, 300e3, 600e3, 900e3, 1800e3, 3600e3].find((s) => span / s <= 8) ?? 7200e3;
-    g.font = '500 12px Barlow, sans-serif';
+    g.font = '400 11px "JetBrains Mono Variable", ui-monospace, monospace';
     g.textBaseline = 'middle';
     for (let t = Math.ceil(range[0] / stepMs) * stepMs; t <= range[1]; t += stepMs) {
       const x = xOf(t, w);
-      g.fillStyle = '#262931';
+      g.fillStyle = PAL.line;
       g.fillRect(x, 0, 1, hgt - AXIS);
-      g.fillStyle = '#7d8290';
+      g.fillStyle = PAL.text3;
       g.fillText(clock(new Date(t).toISOString()).slice(0, 5), x - 14, hgt - AXIS / 2);
     }
 
     rows.forEach((r, i) => {
       const l = lane(r.run_id);
       const y = i * LANE;
-      const color = accountById(r.account_id)?.color || '#f2f1ec';
+      const color = lineColor(accountById(r.account_id)?.color);
       const sel = state.selected === r.run_id;
-      if (sel) (g.fillStyle = '#262931'), g.fillRect(0, y, w, LANE);
+      if (sel) (g.fillStyle = PAL.raise), g.fillRect(0, y, w, LANE);
       const born = Date.parse(r.created_at);
       const st = playhead === null ? r.status : at < born ? 'unborn' : statusAt(l, at);
       // gutter: status dot + callsign
-      g.fillStyle = STATUS_COLOR[st] ?? '#2a3148';
+      g.fillStyle = STATUS_COLOR[st] ?? PAL.line2;
       g.beginPath();
       g.arc(10, y + LANE / 2, 3.5, 0, Math.PI * 2);
       g.fill();
-      g.fillStyle = sel ? '#ffffff' : '#f2f1ec';
-      g.font = '600 14px "Barlow Semi Condensed", sans-serif';
+      g.fillStyle = PAL.text;
+      g.font = `${sel ? 600 : 500} 13px ${SANS}`;
       g.fillText(clip(g, r.callsign || r.agent_id, GUTTER - 26), 20, y + LANE / 2);
       // lifetime
       const died = r.ended_at ? Date.parse(r.ended_at) : now;
       g.fillStyle = color;
-      g.globalAlpha = 0.35;
+      g.globalAlpha = 0.3;
       g.fillRect(Math.max(GUTTER, xOf(born, w)), y + LANE / 2 - 1.5, Math.max(0, xOf(Math.min(died, at), w) - Math.max(GUTTER, xOf(born, w))), 3);
       g.globalAlpha = 1;
       // step segments
       const plan = new Map((r.plan ?? []).map((s) => [s.id, s.title]));
-      g.font = '600 12px "Barlow Semi Condensed", sans-serif';
+      g.font = `500 12px ${SANS}`;
       for (const s of l.segs.values()) {
         if (s.start > at) continue;
         const end = Math.min(s.end ?? died, at);
@@ -236,13 +233,13 @@ export function timelinePanel(host: HTMLElement): () => void {
         const x1 = xOf(end, w);
         if (x1 < GUTTER || x1 - x0 < 1) continue;
         const open = s.end === undefined || s.end > at;
-        g.fillStyle = s.blocked && !open ? '#e8844a' : color;
-        g.globalAlpha = open ? 0.55 : 0.9;
+        g.fillStyle = s.blocked && !open ? PAL.warn : color;
+        g.globalAlpha = open ? 0.45 : 0.8;
         roundRect(g, x0, y + 6, x1 - x0, LANE - 12, 3);
         g.globalAlpha = 1;
         const title = plan.get(s.id) ?? s.id;
         if (x1 - x0 > 46) {
-          g.fillStyle = '#16171b';
+          g.fillStyle = PAL.ground;
           g.fillText(clip(g, title, x1 - x0 - 10), x0 + 5, y + LANE / 2 + 0.5);
         }
       }
@@ -258,8 +255,8 @@ export function timelinePanel(host: HTMLElement): () => void {
     // playhead
     if (playhead !== null) {
       const x = xOf(playhead, w);
-      g.fillStyle = '#ffcd1c';
-      g.fillRect(x - 1, 0, 2, hgt - AXIS);
+      g.fillStyle = PAL.signal;
+      g.fillRect(x - 0.5, 0, 1, hgt - AXIS);
       readout.textContent = `replay ${clock(new Date(playhead).toISOString())}`;
       readout.classList.add('on');
     } else {
@@ -269,8 +266,8 @@ export function timelinePanel(host: HTMLElement): () => void {
     playBtn.textContent = playing ? 'Pause' : 'Play';
     liveBtn.disabled = playhead === null;
     if (!rows.length) {
-      g.fillStyle = '#a9adb9';
-      g.font = '14px Barlow, sans-serif';
+      g.fillStyle = PAL.text2;
+      g.font = `14px ${SANS}`;
       g.fillText('No agents yet.', GUTTER, LANE / 2);
     }
   }

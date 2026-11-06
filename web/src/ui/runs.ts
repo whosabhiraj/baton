@@ -1,7 +1,7 @@
 import { accountById, emit, select, state, type Run } from '../store';
 import { gsap } from 'gsap';
 import { I, icon } from '../icons';
-import { ago, bullet, ENDED, h, renderIf, setKids } from '../util';
+import { ago, bullet, ENDED, h, lineColor, renderIf, setKids } from '../util';
 
 const calm = matchMedia('(prefers-reduced-motion: reduce)');
 const reached = new Map<string, number>(); // run id -> steps done last render
@@ -30,7 +30,7 @@ export function statusBadge(status: string): HTMLElement {
 }
 
 /** The route strip: the plan as stations on the agent's line. Done stops filled, the current
- *  stop lit ("you are here"), blocked stops orange. When a stop is newly reached it pulses once. */
+ *  stop lit ("you are here"), blocked stops in the warn colour. When a stop is newly reached it pulses once. */
 export function route(r: Run, color: string | undefined, cls = ''): HTMLElement {
   const plan = r.plan ?? [];
   const { done, total } = stepProgress(r);
@@ -43,7 +43,7 @@ export function route(r: Run, color: string | undefined, cls = ''): HTMLElement 
       return h('i', { class: `stn stn-${st}${s === here ? ' here' : ''}`, title: `${s.title} (${st})` });
     }),
   );
-  el.style.setProperty('--c', color || '#a9adb9');
+  el.style.setProperty('--c', lineColor(color));
   const before = reached.get(r.run_id + cls);
   reached.set(r.run_id + cls, done);
   if (before !== undefined && done > before && !calm.matches) {

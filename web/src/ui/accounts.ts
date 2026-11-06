@@ -1,6 +1,6 @@
 import { api, errText } from '../api';
 import { emit, refresh, state } from '../store';
-import { bullet, h, renderIf, setKids, usageText } from '../util';
+import { bullet, h, lineColor, renderIf, setKids, usageText } from '../util';
 
 /** Capacity as a mini line: one station per slot, the first `used` filled. */
 function slots(a: { used: number; max_concurrent: number; color?: string }): HTMLElement {
@@ -11,7 +11,7 @@ function slots(a: { used: number; max_concurrent: number; color?: string }): HTM
     h('span', { class: 'route slots' }, ...Array.from({ length: max }, (_, i) => h('i', { class: 'stn' + (i < a.used ? ' stn-done' : '') }))),
     `${a.used}/${a.max_concurrent}`,
   );
-  (el.firstChild as HTMLElement).style.setProperty('--c', a.color || '#a9adb9');
+  (el.firstChild as HTMLElement).style.setProperty('--c', lineColor(a.color));
   return el;
 }
 
@@ -65,9 +65,7 @@ export function accountsRail(host: HTMLElement): () => void {
             'aria-label': `Enable ${a.label || a.id}`,
             onchange: () => void toggle(a.id, cb.checked),
           });
-          const card = h('div', { class: 'acct' + (on ? ' on' : '') }, main, h('label', { class: 'toggle', title: a.enabled ? 'Enabled: new agents may use it' : 'Disabled: no new agents' }, cb));
-          card.style.setProperty('--accent', a.color || 'var(--muted)');
-          return card;
+          return h('div', { class: 'acct' + (on ? ' on' : '') }, main, h('label', { class: 'toggle', title: a.enabled ? 'Enabled: new agents may use it' : 'Disabled: no new agents' }, cb));
         }),
       );
     });
