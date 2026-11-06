@@ -27,7 +27,14 @@ export function topbar(host: HTMLElement, toggleView: () => void, toggleTimeline
     renderIf(stats, JSON.stringify([c, cText, state.mode, state.runs.length, live.length, active, epm]), () =>
       setKids(
         stats,
-        h('span', { class: 'stat cond cond-' + c.state }, h('i', { class: 'cdot', 'aria-hidden': 'true' }), h('span', { class: 'k' }, 'conductor'), ' ', h('span', { class: 'v' }, cText)),
+        h(
+          'button',
+          { class: 'stat cond cond-' + c.state + ' stat-btn', onclick: () => setOverlay('chat'), title: 'Open the conductor chat (C)' },
+          h('i', { class: 'cdot', 'aria-hidden': 'true' }),
+          h('span', { class: 'k' }, 'conductor'),
+          ' ',
+          h('span', { class: 'v' }, cText),
+        ),
         stat('mode', state.mode || '-'),
         stat('agents', `${state.runs.length} total / ${active} active`),
         stat('events/min', String(epm)),
@@ -44,6 +51,7 @@ export function topbar(host: HTMLElement, toggleView: () => void, toggleTimeline
             { class: 'warn', title: state.configIssues.map((i) => i.msg).join('\n'), onclick: () => setOverlay('config') },
             `Config problems (${state.configIssues.length})`,
           ),
+        h('button', { class: 'quiet', onclick: () => setOverlay('chat'), title: 'Conductor chat (C)' }, icon(I.chat), 'Chat'),
         h('button', { onclick: () => setOverlay('approvals'), class: pending ? 'quiet has' : 'quiet' }, icon(I.approvals), 'Approvals', h('span', { class: 'count' }, String(pending))),
         h('button', { class: 'quiet', onclick: () => setOverlay('config') }, icon(I.config), 'Config'),
         h('button', { class: 'quiet', onclick: toggleTimeline, title: 'Show or hide the timeline (T)', 'aria-pressed': state.timeline }, icon(I.timeline), 'Timeline'),

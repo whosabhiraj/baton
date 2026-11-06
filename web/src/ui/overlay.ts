@@ -3,6 +3,7 @@ import { I, icon } from '../icons';
 import { setOverlay, state, type Overlay } from '../store';
 import { h } from '../util';
 import { approvalsPanel } from './approvals';
+import { chatPanel } from './chat';
 import { configPanel } from './config';
 import { spawnPanel } from './spawn';
 
@@ -10,12 +11,14 @@ export interface Panel {
   title: string;
   el: HTMLElement;
   update?: () => void;
+  close?: () => void; // called when the sheet closes (streams, timers)
 }
 
 const BUILD: Record<Exclude<Overlay, null>, () => Panel> = {
   spawn: spawnPanel,
   approvals: approvalsPanel,
   config: configPanel,
+  chat: chatPanel,
 };
 
 export function overlayHost(host: HTMLElement): () => void {
@@ -28,6 +31,7 @@ export function overlayHost(host: HTMLElement): () => void {
       if (shown === null) opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
       shown = state.overlay;
       host.replaceChildren();
+      panel?.close?.();
       panel = null;
       host.hidden = shown === null;
       if (shown === null) {

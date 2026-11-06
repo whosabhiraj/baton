@@ -211,6 +211,7 @@ tr.run:focus-visible { outline-offset: -2px; }
 
 /* sheets (spawn, approvals, config): slide in from the right, not modals */
 #overlay { position: fixed; inset: 0; z-index: 10; }
+#scene { isolation: isolate; } /* the map's label layer sets z-indexes per label: keep them under the sheets */
 .backdrop { position: absolute; inset: 0; background: rgba(0, 0, 0, .6); animation: fade 160ms ease-out; }
 .sheet { position: absolute; top: 0; right: 0; bottom: 0; width: min(560px, 100vw); overflow: auto; background: var(--panel); border-left: 1px solid var(--line); padding: 0 22px 24px; box-shadow: -16px 0 40px rgba(0, 0, 0, .5); animation: slide 200ms cubic-bezier(.2, .8, .2, 1); }
 .sheet-head { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between; margin: 0 -22px 16px; padding: 14px 22px; background: var(--panel); border-bottom: 1px solid var(--line); }
@@ -227,6 +228,27 @@ legend { padding: 0 6px; color: var(--text-2); font-size: 12.5px; }
 .step-row input { min-width: 0; }
 .approval { border-radius: var(--r); padding: 12px 14px; margin-bottom: 10px; display: grid; gap: 8px; background: var(--ground); box-shadow: inset 0 0 0 1px var(--line); }
 .issues { color: var(--warn); font-size: 13px; padding-left: 18px; }
+
+/* conductor chat sheet: the log scrolls, the input stays at the bottom */
+.chat { display: flex; flex-direction: column; height: calc(100dvh - 86px); min-height: 320px; }
+.chat-status { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+.chat-status .stat.cond { display: inline-flex; align-items: center; gap: 6px; overflow: visible; }
+.chat-status button { margin-left: auto; }
+.warn-text { color: var(--warn); font-size: 12.5px; }
+.chat-log { flex: 1; overflow: auto; padding: 4px 0 10px; }
+.chat-gap { height: 10px; }
+.chat-who { font-size: 12px; font-weight: 600; color: var(--text-2); margin-bottom: 2px; }
+.chat-who.cond { color: var(--text); }
+.chat-line { white-space: pre-wrap; word-break: break-word; line-height: 1.5; }
+.chat-line.k-you { color: var(--text); }
+.chat-line.k-conductor { color: #d6d4cf; }
+.chat-line.k-hub { font: 400 11.5px/1.5 var(--mono); color: var(--text-3); }
+.chat-line.k-tool, .chat-line.k-meta { font: 400 11.5px/1.55 var(--mono); color: var(--text-3); padding-left: 2px; }
+.chat-line.k-error { font: 400 11.5px/1.55 var(--mono); color: #e3a7a1; }
+.chat-input { display: flex; gap: 8px; align-items: flex-end; padding-top: 10px; border-top: 1px solid var(--line); }
+.chat-input textarea { flex: 1; resize: none; min-height: 64px; }
+.stat-btn { background: transparent; border: 0; padding: 0; min-height: 0; height: auto; cursor: pointer; text-align: left; }
+.stat-btn:hover .v { color: var(--text); }
 .brief { max-height: 50vh; }
 
 .login-wrap { display: grid; place-items: center; height: 100%; }

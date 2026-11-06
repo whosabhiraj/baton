@@ -518,8 +518,18 @@ func (m *Manager) startLocked() error {
 	m.sess.Wanted = true
 	m.saveSessionLocked()
 	m.setStateLocked(StateIdle)
-	m.record(Entry{Dir: "hub", Event: "started", Text: fmt.Sprintf("account %s, model %s, effort %s, session %s (resume %v)",
-		r.acct.ID, r.model, r.effort, m.sess.SessionID, m.sess.Used)})
+	parts := []string{r.acct.ID}
+	for _, p := range []string{r.model, r.effort} {
+		if p != "" {
+			parts = append(parts, p)
+		}
+	}
+	if m.sess.Used {
+		parts = append(parts, "conversation resumed")
+	} else {
+		parts = append(parts, "new conversation")
+	}
+	m.record(Entry{Dir: "hub", Event: "started", Text: strings.Join(parts, " · ")})
 	go m.readLoop(stdout, m.done)
 	go m.waitLoop(cmd, m.done)
 	return nil

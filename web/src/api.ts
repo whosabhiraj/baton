@@ -80,4 +80,20 @@ export const api = {
   patchConfig: (fields: Record<string, unknown>) => call<ApiConfig.ApiConfig>('PATCH', '/api/config', fields),
   decide: (id: string, verb: 'approve' | 'reject', note: string) =>
     call<Approval>('POST', `/api/approvals/${enc(id)}/${verb}`, note ? { note } : {}),
+  conductor: () => call<{ conductor: ConductorInfo }>('GET', '/api/conductor'),
+  conductorSend: (text: string) => call<{ conductor: ConductorInfo }>('POST', '/api/conductor/send', { text }),
+  conductorControl: (verb: 'start' | 'stop' | 'reset') => call<{ conductor: ConductorInfo }>('POST', `/api/conductor/${verb}`),
 };
+
+/** GET /api/conductor (A17). */
+export interface ConductorInfo {
+  running: boolean;
+  wanted: boolean;
+  session_id?: string;
+  account?: string;
+  model?: string;
+  effort?: string;
+  last_error?: string;
+  problem?: string;
+  history: number;
+}

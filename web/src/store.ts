@@ -8,7 +8,7 @@ export type Account = ApiAccounts.Account;
 export type StoredEvent = ApiEvents.StoredEvent;
 export type ConfigIssue = { file?: string; path?: string; line?: number; msg?: string };
 export type Conn = 'connecting' | 'live' | 'down' | 'auth';
-export type Overlay = null | 'spawn' | 'approvals' | 'config';
+export type Overlay = null | 'spawn' | 'approvals' | 'config' | 'chat';
 
 const RING = 500;
 

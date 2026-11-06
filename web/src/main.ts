@@ -2,7 +2,7 @@ import '@fontsource-variable/mona-sans';
 import '@fontsource-variable/jetbrains-mono';
 import './style.css';
 import { setUnauthorizedHandler } from './api';
-import { initToken, loginBox } from './auth';
+import { initToken, loginBox, startSheet } from './auth';
 import { connect, disconnect } from './stream';
 import { emit, refresh, select, setOverlay, state, subscribe } from './store';
 import { accountsRail } from './ui/accounts';
@@ -98,6 +98,9 @@ function start(): void {
     if (k === 's' && !state.overlay) {
       e.preventDefault();
       setOverlay('spawn');
+    } else if (k === 'c' && !state.overlay) {
+      e.preventDefault();
+      setOverlay('chat');
     } else if (k === 'l') toggleView();
     else if (k === 't') toggleTimeline();
     else if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && !state.overlay) {
@@ -115,6 +118,7 @@ function start(): void {
 
   connect();
   void refresh();
+  if (startSheet === 'chat' || startSheet === 'approvals' || startSheet === 'spawn' || startSheet === 'config') setOverlay(startSheet);
   emit();
 }
 

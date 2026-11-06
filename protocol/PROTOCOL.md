@@ -403,8 +403,13 @@ acting (tool use)`.
 | `POST /api/conductor/start` / `stop` / `reset` | — | same; stop is remembered across hub restarts; reset also forgets the conversation |
 | `POST /api/conductor/send` | `{ text }` | same; starts the conductor if needed |
 | `GET /api/conductor/history` | `?after=N&limit=L` (default 500, newest kept) | `{ ok, entries, last }` |
+| `GET /api/conductor/stream` | SSE; admin via header or `?token=`; `Last-Event-ID` or `?after=N` (absent = the last 200 entries) | `event: state` (ConductorState) first and on every change; `event: entry` (`id:` = entry `n`) for each history entry |
 
 `409 NO_CONDUCTOR`: the hub has no conductor (no repo, or `baton mock`) or it cannot start (message
 says why: no claude account, account disabled, CLI not found). `BATON_CONDUCTOR_CLI` (hub env)
-overrides the claude command. `baton` (no args) starts the conductor and prints one status line;
-`baton attach` prints it.
+overrides the claude command. `baton` (no args) starts the conductor, prints one status line and, in a terminal, opens the
+chat (`--no-chat` skips it); `baton attach` prints the status, then opens the chat (Bubble Tea in a
+terminal, a plain line mode otherwise). Chat commands: `/agents /approvals /approve /reject /mode
+/start /stop /reset yes /quit`. The dashboard has the same chat as a sheet (button, `C`, or
+`#open=chat` in the URL fragment). `baton mock` runs a stand-in conductor (the binary itself with
+`BATON_FAKE_CLAUDE=1`, which echoes) so the chat works without a model.

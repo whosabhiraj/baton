@@ -88,9 +88,13 @@ func (m *model) render() string {
 	var b strings.Builder
 	prevKind := ""
 	for i, l := range m.lines {
-		gap := i > 0 && (l.Kind == KindYou || l.Kind == KindHub || (l.Kind == KindConductor && prevKind != KindConductor && prevKind != KindTool))
-		if gap {
+		// the conductor's turn starts with its first text or tool line after a message
+		turn := (l.Kind == KindConductor || l.Kind == KindTool) && (prevKind == KindYou || prevKind == KindHub || prevKind == "")
+		if i > 0 && (l.Kind == KindYou || l.Kind == KindHub || turn) {
 			b.WriteByte('\n')
+		}
+		if turn {
+			b.WriteString(stCondTag.Render("conductor") + "\n")
 		}
 		switch l.Kind {
 		case KindYou:
@@ -98,9 +102,6 @@ func (m *model) render() string {
 		case KindHub:
 			b.WriteString(stHubTag.Render("baton · " + clip(l.Text, w-8)))
 		case KindConductor:
-			if prevKind != KindConductor && prevKind != KindTool {
-				b.WriteString(stCondTag.Render("conductor") + "\n")
-			}
 			b.WriteString(body.Render(l.Text))
 		case KindTool:
 			b.WriteString(stDim.Render("  ↳ " + clip(l.Text, w-4)))

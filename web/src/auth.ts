@@ -2,14 +2,16 @@ import { h } from './util';
 
 const KEY = 'baton.token';
 
-/** Read #token=... from the URL (once), store it, strip it from the address bar. */
+/** Sheet named by #open=... (e.g. the conductor chat: #open=chat), read once by initToken. */
+export let startSheet = '';
+
+/** Read #token=... (and #open=...) from the URL once, store the token, strip the fragment. */
 export function initToken(): string {
   const p = new URLSearchParams(location.hash.replace(/^#/, ''));
   const t = p.get('token');
-  if (t) {
-    localStorage.setItem(KEY, t);
-    history.replaceState(null, '', location.pathname + location.search);
-  }
+  startSheet = p.get('open') ?? '';
+  if (t) localStorage.setItem(KEY, t);
+  if (t || startSheet) history.replaceState(null, '', location.pathname + location.search);
   return getToken();
 }
 
