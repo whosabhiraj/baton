@@ -42,7 +42,7 @@ func (c *ctx) cmdMock(o opts) (int, error) {
 		fmt.Fprintf(c.stdout, "admin token: %s\n", h.AdminToken)
 		fmt.Fprintf(c.stdout, "data dir: %s (fake agents only; Ctrl+C stops)\n", mock.Dir())
 		if !o.flag("no-browser") && config.Load(mock.ConfigPath(), "").Config.Hub.OpenBrowser {
-			openBrowser(h.URL + "/")
+			openBrowser(dashboardURL(h.URL, h.AdminToken))
 		}
 	})
 	return 0, err

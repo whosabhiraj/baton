@@ -1,6 +1,6 @@
 // Shared helpers for the npm task scripts (cross-platform; no shell).
 import { spawnSync } from 'node:child_process';
-import { readFileSync, mkdirSync } from 'node:fs';
+import { existsSync, readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -41,3 +41,21 @@ export function version() {
 
 export const ldflags = () => `-X ${VERSION_PKG}=${version()}`;
 export { mkdirSync };
+
+const nodeBin = (pkg, file) => join(root, 'node_modules', pkg, file);
+export const hasWebDeps = () => existsSync(nodeBin('vite', 'bin/vite.js'));
+
+/** Run a dev tool from node_modules (no shell, so it works the same on every OS). */
+export function runTool(pkg, file, args) {
+  run(process.execPath, [nodeBin(pkg, file), ...args]);
+}
+
+/** Build the dashboard into web/dist (skipped with a note when `npm install` was not run). */
+export function buildWeb() {
+  if (!hasWebDeps()) {
+    console.log('dashboard: skipped (run `npm install` first); the hub will show a "not built" page');
+    return;
+  }
+  runTool('vite', 'bin/vite.js', ['build', 'web']);
+  writeFileSync(join(root, 'web', 'dist', '.gitkeep'), ''); // vite empties dist; keep the tracked placeholder
+}

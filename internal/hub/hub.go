@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"log/slog"
 	"net"
 	"net/http"
@@ -28,6 +29,7 @@ import (
 	"github.com/whosabhiraj/baton/internal/runs"
 	"github.com/whosabhiraj/baton/internal/spool"
 	"github.com/whosabhiraj/baton/internal/store"
+	"github.com/whosabhiraj/baton/web"
 )
 
 // Files kept in the data dir by the hub itself.
@@ -228,7 +230,8 @@ func Start(ctx context.Context, o Options) (*Hub, error) {
 		Conductor: func() proto.ConductorState { h.condMu.Lock(); defer h.condMu.Unlock(); return h.conductor }, Config: h.cfg, Touch: func() { h.lastAdm.Store(time.Now().UnixNano()) },
 		Store: h.store, Bus: h.broker, AdminToken: h.AdminToken, Instance: ids.UUID(), Dev: o.Dev,
 		Port: h.Port, URL: h.URL, Done: h.stopCh, Logger: log,
-		Shutdown: func() { _ = h.Close(context.Background()) },
+		Shutdown:  func() { _ = h.Close(context.Background()) },
+		Dashboard: dashboard(),
 	})
 	h.srv = &http.Server{Handler: handler, ReadHeaderTimeout: 10 * time.Second}
 	h.serveWG.Add(1)
@@ -480,3 +483,12 @@ func (h *Hub) RequestApproval(kind, runID, title string, detail map[string]any, 
 
 // Done is closed after shutdown completes.
 func (h *Hub) Done() <-chan struct{} { return h.done }
+
+// dashboard serves the embedded web/dist build, or nil (the "not built" page) if absent.
+func dashboard() http.Handler {
+	sub, err := fs.Sub(web.Dist, "dist")
+	if err != nil {
+		return nil
+	}
+	return api.StaticDashboard(sub)
+}

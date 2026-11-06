@@ -156,3 +156,12 @@ func TestAskAcceptsBOMPrefixedYes(t *testing.T) {
 		t.Fatal("BOM-prefixed y was read as no")
 	}
 }
+
+func TestDashboardURL(t *testing.T) {
+	if got := dashboardURL("http://127.0.0.1:7777/", "bt_admin_x"); got != "http://127.0.0.1:7777/#token=bt_admin_x" {
+		t.Fatal(got)
+	}
+	if got := dashboardURL("http://127.0.0.1:7777", ""); got != "http://127.0.0.1:7777/" {
+		t.Fatal(got)
+	}
+}

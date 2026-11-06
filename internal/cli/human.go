@@ -43,6 +43,16 @@ func openURL(url string) {
 	}
 }
 
+// dashboardURL is the page to open: the admin token rides in the fragment, which the browser
+// never sends to the server; the dashboard stores it and strips it from the address bar.
+func dashboardURL(hubURL, token string) string {
+	u := strings.TrimRight(hubURL, "/") + "/"
+	if token != "" {
+		u += "#token=" + token
+	}
+	return u
+}
+
 // ask prints a question on stderr and reads one line from stdin; only y/yes means yes (EOF = no).
 func (c *ctx) ask(question string) bool {
 	fmt.Fprint(c.stderr, question)
@@ -160,7 +170,7 @@ func (c *ctx) cmdUpOrBaton(o opts, conductor, attach bool) (int, error) {
 	if !o.flag("no-browser") {
 		repo, _, _ := project(o)
 		if loadConfig(repo).Config.Hub.OpenBrowser {
-			openBrowser(in.URL + "/")
+			openBrowser(dashboardURL(in.URL, readAdminToken(dataDir)))
 		}
 	}
 	return 0, nil

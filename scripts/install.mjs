@@ -1,9 +1,10 @@
-// npm run install:baton: go install, then say where it landed and how to put it on PATH.
+// npm run install:baton: build the dashboard, go install, then say where it landed and how to put it on PATH.
 import { existsSync } from 'node:fs';
 import { delimiter, join } from 'node:path';
-import { capture, exe, ldflags, requireGo, run } from './_lib.mjs';
+import { buildWeb, capture, exe, ldflags, requireGo, run } from './_lib.mjs';
 
 requireGo();
+buildWeb();
 run('go', ['install', '-ldflags', ldflags(), './cmd/baton']);
 const bin = capture('go', ['env', 'GOBIN']) || join(capture('go', ['env', 'GOPATH']).split(delimiter)[0], 'bin');
 const target = join(bin, `baton${exe}`);

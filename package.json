@@ -10,6 +10,9 @@
   },
   "scripts": {
     "build": "node scripts/build.mjs",
+    "build:web": "node scripts/build-web.mjs",
+    "dev:web": "vite web",
+    "gen:types": "node scripts/gen-types.mjs",
     "install:baton": "node scripts/install.mjs",
     "test": "node scripts/test.mjs",
     "check": "node scripts/check.mjs"
