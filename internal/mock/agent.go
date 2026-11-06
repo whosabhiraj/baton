@@ -71,10 +71,14 @@ func (a *agent) sleep(sec float64) bool {
 func (a *agent) run() {
 	defer close(a.done)
 	a.send("hello", map[string]any{"brief_ack": true, "model": a.res.Model, "cwd": a.res.Worktree})
-	n := 3 + a.rng.Intn(3)
-	for i := 0; i < n; i++ {
-		s := stepPool[i]
-		a.steps = append(a.steps, proto.PlanStep{ID: fmt.Sprintf("s%d", i+1), Title: s[0], Acceptance: s[1]})
+	if r := a.e.hub.Store().Get(a.res.RunID); r != nil { // keep the plan given at spawn
+		a.steps = append(a.steps, r.Record().Plan...)
+	}
+	if n := 3 + a.rng.Intn(3); len(a.steps) == 0 { // rng drawn either way: seeded runs stay reproducible
+		for i := 0; i < n; i++ {
+			s := stepPool[i]
+			a.steps = append(a.steps, proto.PlanStep{ID: fmt.Sprintf("s%d", i+1), Title: s[0], Acceptance: s[1]})
+		}
 	}
 	a.send("plan", map[string]any{"steps": stepsJSON(a.steps)})
 	for i := 0; i < len(a.steps) && a.alive(); i++ {

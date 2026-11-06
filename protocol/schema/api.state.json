@@ -77,6 +77,8 @@
         "role": { "type": "string" },
         "kind": { "type": "string" },
         "model": { "type": "string" },
+        "branch": { "type": "string" },
+        "base_branch": { "type": "string" },
         "status": {
           "type": "string",
           "enum": ["starting", "running", "waiting", "blocked", "paused", "stalled", "rate_limited", "done", "failed", "killed", "exited"]

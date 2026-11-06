@@ -1,0 +1,48 @@
+// Modal host: builds the panel once when it opens (so typed text survives live updates).
+import { setOverlay, state, type Overlay } from '../store';
+import { h } from '../util';
+import { approvalsPanel } from './approvals';
+import { configPanel } from './config';
+import { spawnPanel } from './spawn';
+
+export interface Panel {
+  title: string;
+  el: HTMLElement;
+  update?: () => void;
+}
+
+const BUILD: Record<Exclude<Overlay, null>, () => Panel> = {
+  spawn: spawnPanel,
+  approvals: approvalsPanel,
+  config: configPanel,
+};
+
+export function overlayHost(host: HTMLElement): () => void {
+  let shown: Overlay = null;
+  let panel: Panel | null = null;
+  let opener: HTMLElement | null = null;
+
+  return () => {
+    if (state.overlay !== shown) {
+      if (shown === null) opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      shown = state.overlay;
+      host.replaceChildren();
+      panel = null;
+      host.hidden = shown === null;
+      if (shown === null) {
+        opener?.focus();
+        return;
+      }
+      panel = BUILD[shown]();
+      const box = h(
+        'div',
+        { class: 'modal', role: 'dialog', 'aria-modal': 'true', 'aria-label': panel.title },
+        h('div', { class: 'row between' }, h('h2', {}, panel.title), h('button', { class: 'x', 'aria-label': 'Close', onclick: () => setOverlay(null) }, 'x')),
+        panel.el,
+      );
+      host.append(h('div', { class: 'backdrop', onclick: () => setOverlay(null) }), box);
+      queueMicrotask(() => box.querySelector<HTMLElement>('input:not([type=hidden]), select, textarea, button.primary')?.focus());
+    }
+    panel?.update?.();
+  };
+}

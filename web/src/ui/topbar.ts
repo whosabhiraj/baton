@@ -1,0 +1,62 @@
+import { accountById, eventsPerMin, setOverlay, state } from '../store';
+import { ENDED, h, renderIf, setKids } from '../util';
+
+const CONN_TEXT = { connecting: 'connecting', live: 'live', down: 'offline, retrying', auth: 'not signed in' } as const;
+
+export function topbar(host: HTMLElement, toggleView: () => void): () => void {
+  const status = h('span', { class: 'pill', 'aria-live': 'polite' });
+  const stats = h('div', { class: 'stats' });
+  const actions = h('div', { class: 'actions' });
+  const notices = h('div', { class: 'notices', role: 'status' });
+  setKids(host, h('strong', { class: 'brand' }, 'Baton'), status, stats, actions);
+  host.after(notices);
+
+  return () => {
+    status.className = 'pill conn-' + state.conn;
+    status.textContent = CONN_TEXT[state.conn];
+    status.title = state.connNote;
+
+    const live = state.runs.filter((r) => !ENDED.has(r.status));
+    const active = state.runs.filter((r) => r.status === 'running').length;
+    const c = state.conductor;
+    const cacct = accountById(c.account);
+    const cText = c.state === 'off' ? 'off' : [c.state, cacct?.label ?? c.account, c.model].filter(Boolean).join(' / ');
+    const epm = eventsPerMin();
+
+    renderIf(stats, JSON.stringify([c, cText, state.mode, state.runs.length, live.length, active, epm]), () =>
+      setKids(
+        stats,
+        stat('conductor', cText),
+        stat('mode', state.mode || '-'),
+        stat('agents', `${state.runs.length} total / ${active} active`),
+        stat('events/min', String(epm)),
+      ),
+    );
+
+    const pending = state.approvals.length;
+    renderIf(actions, JSON.stringify([state.configOk, state.configIssues, pending, state.view]), () =>
+      setKids(
+        actions,
+        !state.configOk &&
+          h(
+            'button',
+            { class: 'warn', title: state.configIssues.map((i) => i.msg).join('\n'), onclick: () => setOverlay('config') },
+            `Config problems (${state.configIssues.length})`,
+          ),
+        h('button', { onclick: () => setOverlay('approvals'), class: pending ? 'badge-btn has' : 'badge-btn' }, 'Approvals', h('span', { class: 'count' }, String(pending))),
+        h('button', { onclick: () => setOverlay('config') }, 'Config'),
+        h('button', { onclick: toggleView, title: 'Toggle list and scene (L)' }, state.view === 'list' ? 'Scene' : 'List'),
+        h('button', { class: 'primary', onclick: () => setOverlay('spawn'), title: 'Spawn an agent (S)' }, 'Spawn'),
+      ),
+    );
+
+    renderIf(notices, state.notices.join('|'), () => {
+      setKids(notices, ...state.notices.map((n) => h('div', { class: 'notice' }, n)));
+      notices.hidden = state.notices.length === 0;
+    });
+  };
+}
+
+function stat(label: string, value: string): HTMLElement {
+  return h('span', { class: 'stat' }, h('span', { class: 'k' }, label), ' ', h('span', { class: 'v' }, value));
+}

@@ -56,6 +56,8 @@ type Summary struct {
 	Role          string            `json:"role,omitempty"`
 	Kind          string            `json:"kind,omitempty"`
 	Model         string            `json:"model,omitempty"`
+	Branch        string            `json:"branch,omitempty"`
+	BaseBranch    string            `json:"base_branch,omitempty"`
 	Status        proto.RunStatus   `json:"status"`
 	CreatedAt     string            `json:"created_at"`
 	EndedAt       string            `json:"ended_at,omitempty"`
@@ -242,7 +244,7 @@ func (r *Run) Summary() Summary {
 	}
 	sum := Summary{
 		RunID: r.rec.RunID, AgentID: r.rec.AgentID, Callsign: r.rec.Callsign, AccountID: r.rec.AccountID,
-		Role: r.rec.Role, Kind: r.rec.Kind, Model: r.rec.Model, Status: r.st.Status(),
+		Role: r.rec.Role, Kind: r.rec.Kind, Model: r.rec.Model, Branch: r.rec.Branch, BaseBranch: r.rec.BaseBranch, Status: r.st.Status(),
 		CreatedAt: r.rec.CreatedAt, EndedAt: r.rec.EndedAt, TokenRevoked: r.rec.TokenRevoked,
 		Plan: append([]proto.PlanStep{}, plan...), LastSeq: r.st.LastSeq, LastEventTS: r.st.LastTS,
 		OpenQuestions: append([]Question{}, r.st.Questions...), StepStates: map[string]string{},

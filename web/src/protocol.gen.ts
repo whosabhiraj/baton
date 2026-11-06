@@ -385,6 +385,8 @@ export namespace ApiState {
     role?: string;
     kind?: string;
     model?: string;
+    branch?: string;
+    base_branch?: string;
     status:
       | 'starting'
       | 'running'
