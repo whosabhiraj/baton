@@ -1,7 +1,7 @@
 # HANDOFF — read this first
 
-Last updated: **2026-11-06**, end of **Phase 1** (approved).
-Next up: **Phase 2** (hub core: daemon, runs, worktrees, config). Ask its open questions first.
+Last updated: **2026-11-06**, **Phase 2 in progress** (session ended mid-phase; see §E).
+Next up: finish Phase 2 wiring (§E), run all tests, show the user, get approval.
 
 Big change since Phase 0: the hub **and** the `baton` CLI are written in **Go** (one binary).
 `docs/GO_HUB_DESIGN.md` is approved and overrides `docs/PLAN.md` §3, §4.7, §5 and §6.
@@ -58,7 +58,7 @@ Things only you can do:
 |---|---|---|
 | 0 Plan + repo init | ✅ done | `2a5a98d` |
 | 1 Protocol + CLI + spool + minimal hub (Go) | ✅ done | up to the "Phase 1 done" commit |
-| 2 Hub core | next | — |
+| 2 Hub core | 🟡 in progress: config, audit, runs/worktrees/briefs, daemon + human commands done; hub/API wiring in flight | `d014636` … `35d8fba` |
 | 3 `baton mock` | pending | — |
 | 4 Dashboard | pending | — |
 | 5 Adapters | pending | — |
@@ -92,12 +92,26 @@ Runtime data: `~/.baton/projects/<repo-name>-<hash8>/` (override with `BATON_HOM
 `admin.token`, `hub.lock`, `hub.port`, `runs/<run_id>/{run.json, events.jsonl, outbox.jsonl,
 outbox.offset, inbox/}`.
 
-## E. Open follow-ups
+## E. Resume here (Phase 2)
 
-1. CI: `.github/workflows/ci.yml` is untracked; push it once the git token has `workflow`
-   scope (or add it via the GitHub web UI), then watch the first run on all 3 OSes.
-2. Spool warnings are only logged, not published to the dashboard (design §5.2) — Phase 2.
-3. Phase 1 additions after review: `UNKNOWN_QID` (PROTOCOL.md A13).
+Done and committed: `internal/config` (+ `baton.config.example.yaml`, `protocol/schema/config.json`),
+`internal/audit`, `internal/runs` + `internal/briefing`, `internal/gitx`, `internal/daemon`,
+`internal/logx`, human commands in `internal/cli` (`baton`, `up`, `attach`, `hub serve|status|stop|rotate-token`).
+
+Remaining ("P2-D wiring"; may be partly in the working tree: check `git status`, review, finish, test):
+1. `hub.Options`: `Repo`, `GlobalConfig`, `ProjectConfig`, `ConfigPoll`, `IdleStop`; Start runs the
+   config watcher, audit log and runs manager; heartbeat timeout read live from config.
+2. Bus carries hub notices → SSE `event: hub` (`config_reloaded`, `spool_warning`, `idle_stop`).
+3. API (admin; actor via `X-Baton-Actor`): `POST /api/spawn`, `GET /api/accounts`,
+   `PATCH /api/accounts/{id}`, `GET|PATCH /api/config`, `GET /api/audit`; `/api/state` gains
+   accounts, mode, config_ok, config_issues, instance; audit entry for every control action.
+4. Idle stop: no live runs + no SSE clients + no admin requests for `hub.idle_stop_min` (30).
+5. `store.Run.SetExtra`; PROTOCOL.md A14 for the new routes/events; `e2e/phase2_test.go`.
+6. Then `hub serve` passes `Repo` to `hub.Options` (internal/cli/up.go); optional `Hub.Instance`.
+7. Phase 2 acceptance: kill hub mid-run → recover (crash test), live config edit applies, broken
+   config reported while the hub keeps running, one hub per project (daemon test). Then `npm run check`.
+
+Other follow-up: CI file stays untracked until the git token has `workflow` scope.
 
 ## F. Decisions log (details in PLAN.md §4 and GO_HUB_DESIGN.md §0)
 
@@ -111,6 +125,9 @@ outbox.offset, inbox/}`.
 - 2026-11-06: runtime data in the user's home (`~/.baton/projects/...`), not in the project.
 - 2026-11-06: `max_agents` 6 in auto mode; no global cap when the user picks/approves
   (per-account `max_concurrent` still applies — confirm wording in Phase 2); worktrees `keep`.
+- 2026-11-06: Phase 2 defaults: per-account max_concurrent always applies; no global cap when the
+  human picks/approves; auto cap 6 for the conductor; dashboard opens on `baton` (open_browser);
+  hub stops after 30 idle minutes (idle_stop_min, 0 = never).
 - 2026-11-06: Phase 1 approved; TypeScript reference removed; answers must match an open question (A13).
 - 2026-11-06: **hub + CLI in Go, one binary**; JSON Schema is the protocol master; CI on 3 OSes;
   port 7777 preferred with fallback (2222 rejected: common alt-SSH port); `hub stop` asks,
