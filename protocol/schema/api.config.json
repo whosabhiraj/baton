@@ -1,0 +1,30 @@
+{
+  "$id": "baton/1/api.config",
+  "title": "api.config",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "GET /api/config response and PATCH /api/config response (A14). config is the effective (last good) configuration.",
+  "type": "object",
+  "properties": {
+    "config": { "type": "object" },
+    "issues": { "type": "array", "items": { "$ref": "#/$defs/issue" } },
+    "global_path": { "type": "string" },
+    "project_path": { "type": "string" },
+    "version": { "type": "integer", "minimum": 0 },
+    "ok": { "type": "boolean", "description": "false when the files have error-level issues (the last good config stays in effect)." }
+  },
+  "required": ["config", "issues", "global_path", "project_path", "version", "ok"],
+  "additionalProperties": {},
+  "$defs": {
+    "issue": {
+      "type": "object",
+      "properties": {
+        "file": { "type": "string" },
+        "path": { "type": "string" },
+        "line": { "type": "integer", "minimum": 0 },
+        "msg": { "type": "string", "minLength": 1 }
+      },
+      "required": ["file", "path", "msg"],
+      "additionalProperties": {}
+    }
+  }
+}

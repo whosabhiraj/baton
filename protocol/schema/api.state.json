@@ -6,7 +6,12 @@
   "type": "object",
   "properties": {
     "ok": { "type": "boolean", "const": true },
-    "runs": { "type": "array", "items": { "$ref": "#/$defs/run_summary" } }
+    "runs": { "type": "array", "items": { "$ref": "#/$defs/run_summary" } },
+    "accounts": { "type": "array", "items": { "type": "object" }, "description": "Same shape as GET /api/accounts (A14)." },
+    "mode": { "type": "string", "description": "hub.mode of the live config (A14)." },
+    "config_ok": { "type": "boolean" },
+    "config_issues": { "type": "array", "items": { "type": "object" } },
+    "instance": { "type": "string" }
   },
   "required": ["ok", "runs"],
   "additionalProperties": {},

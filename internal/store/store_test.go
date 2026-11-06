@@ -425,3 +425,41 @@ func TestIngestFixtures(t *testing.T) {
 		})
 	}
 }
+
+func TestSetExtraPersists(t *testing.T) {
+	dir := t.TempDir()
+	s, err := store.Open(dir, store.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := newRun(t, s)
+	if err := r.SetExtra("merged", true); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.SetExtra("status", "x"); err == nil {
+		t.Fatal("core field must be refused")
+	}
+	if err := r.SetExtra("note", map[string]any{"a": 1}); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.SetExtra("note", nil); err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile(filepath.Join(r.Dir(), paths.RunRecordFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var m map[string]any
+	if err := json.Unmarshal(b, &m); err != nil {
+		t.Fatal(err)
+	}
+	if m["merged"] != true || m["note"] != nil || m["run_id"] != "r_TEST" {
+		t.Fatalf("run.json = %s", b)
+	}
+	s.Close()
+	s2 := openStore(t, dir)
+	b2, _ := os.ReadFile(filepath.Join(s2.Get("r_TEST").Dir(), paths.RunRecordFile))
+	if !bytes.Contains(b2, []byte(`"merged": true`)) {
+		t.Fatalf("lost after reopen: %s", b2)
+	}
+}

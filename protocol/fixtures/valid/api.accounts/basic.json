@@ -1,0 +1,17 @@
+[
+  {
+    "id": "a1",
+    "label": "Main",
+    "kind": "claude",
+    "color": "#3b82f6",
+    "enabled": true,
+    "max_concurrent": 2,
+    "used": 1,
+    "roles": [
+      "implementer"
+    ],
+    "models": [],
+    "rate_limited": false,
+    "permissions_mode": "default"
+  }
+]

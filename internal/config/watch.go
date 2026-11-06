@@ -13,6 +13,12 @@ type Watcher struct {
 	cur    *Snapshot
 	cancel context.CancelFunc
 	done   chan struct{}
+
+	reloadMu    sync.Mutex // serialises Reload (poller and callers)
+	globalPath  string
+	projectPath string
+	last        [2]fileSig
+	onChange    func(*Snapshot)
 }
 
 type fileSig struct {
@@ -33,10 +39,10 @@ func Watch(ctx context.Context, globalPath, projectPath string, interval time.Du
 		interval = 2 * time.Second
 	}
 	ctx, cancel := context.WithCancel(ctx)
-	w := &Watcher{cancel: cancel, done: make(chan struct{})}
+	w := &Watcher{cancel: cancel, done: make(chan struct{}), globalPath: globalPath, projectPath: projectPath, onChange: onChange}
 	g, p := readSource(globalPath), readSource(projectPath)
 	w.cur = build(g, p)
-	last := [2]fileSig{sigOf(g), sigOf(p)}
+	w.last = [2]fileSig{sigOf(g), sigOf(p)}
 	go func() {
 		defer close(w.done)
 		t := time.NewTicker(interval)
@@ -47,29 +53,39 @@ func Watch(ctx context.Context, globalPath, projectPath string, interval time.Du
 				return
 			case <-t.C:
 			}
-			g, p := readSource(globalPath), readSource(projectPath)
-			sig := [2]fileSig{sigOf(g), sigOf(p)}
-			if sig == last {
-				continue
-			}
-			last = sig
-			next := build(g, p)
-			w.mu.Lock()
-			prev := w.cur
-			if next.OK() {
-				next.Version = prev.Version + 1
-			} else {
-				next.Config = prev.Config
-				next.Version = prev.Version
-			}
-			w.cur = next
-			w.mu.Unlock()
-			if onChange != nil {
-				onChange(next)
-			}
+			w.Reload()
 		}
 	}()
 	return w
+}
+
+// Reload re-reads both files now. If they changed since the last look the snapshot is
+// replaced (a failed load keeps the last good Config and Version) and onChange is called.
+// It returns the current snapshot either way.
+func (w *Watcher) Reload() *Snapshot {
+	w.reloadMu.Lock()
+	defer w.reloadMu.Unlock()
+	g, p := readSource(w.globalPath), readSource(w.projectPath)
+	sig := [2]fileSig{sigOf(g), sigOf(p)}
+	if sig == w.last {
+		return w.Current()
+	}
+	w.last = sig
+	next := build(g, p)
+	w.mu.Lock()
+	prev := w.cur
+	if next.OK() {
+		next.Version = prev.Version + 1
+	} else {
+		next.Config = prev.Config
+		next.Version = prev.Version
+	}
+	w.cur = next
+	w.mu.Unlock()
+	if w.onChange != nil {
+		w.onChange(next)
+	}
+	return next
 }
 
 // Current returns the latest snapshot (treat as read-only).

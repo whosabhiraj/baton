@@ -238,3 +238,46 @@ Auth is `Authorization: Bearer <token>`. **Admin token** = the hub's dashboard/A
 `question` of that run that has not been answered yet. A delivered answer closes the question,
 so a second answer to the same `qid` is refused too. This stops a mistyped qid from being
 accepted while the agent keeps waiting (`ask --blocking` only consumes the matching answer).
+
+### A14. Phase 2 API: spawn, accounts, config, audit, hub notices
+
+All routes below are **admin**-auth. Mutating admin routes read the caller from the header
+`X-Baton-Actor: human|conductor` (default `human`; anything else is `400 INVALID_PAYLOAD`). The actor
+is recorded in the audit log. Every authenticated admin request (not `/api/health`) counts as activity
+for idle stop.
+
+| Route | Body / query | Response |
+|---|---|---|
+| `POST /api/spawn` | `SpawnRequest`: `{ account?, role, kind?, model?, effort?, callsign?, task, plan?, scope?{paths,forbidden,ask_before}, base_branch?, dry_run?, actor? }` (unknown fields refused; `actor` in the body overrides the header) | `200` `api.spawn`: `{ run_id, agent_id, callsign, account_id, role, kind, model, branch, base_branch, worktree, run_dir, brief?, env?, dry_run }`. `env` = the full `BATON_*` set incl. the run token (omitted for dry runs, which create nothing and return the rendered `brief`). Errors: `400 INVALID_PAYLOAD / ACCOUNT_REQUIRED / UNKNOWN_ACCOUNT`; `409 ACCOUNT_DISABLED / ROLE_NOT_ALLOWED / MODEL_NOT_ALLOWED / ACCOUNT_BUSY / MAX_AGENTS / CALLSIGN_TAKEN / NOT_A_REPO` (also when the hub was started without a git repo); `500 GIT_ERROR`. |
+| `GET /api/accounts` | — | bare JSON array (`api.accounts`) of `{ id, label, kind, color, enabled, max_concurrent, used, roles[], models[], rate_limited, permissions_mode }`. `used` = live (not ended) runs; `rate_limited` = any live run has status `rate_limited`; `permissions_mode` defaults to `default`. |
+| `PATCH /api/accounts/:id` | `{ <account field>: value, ... }` (YAML key names, e.g. `max_concurrent`, `enabled`, `roles`) | `200` the updated account (one `api.accounts` element). Fields are applied in alphabetical order, each written back to the YAML file that defines the account (comments kept), then the config is reloaded. `404 NOT_FOUND` unknown account; `400 CONFIG_INVALID` `{ ok:false, code, error, issues:[string] }` if a value or field is refused (fields before it stay applied). |
+| `GET /api/config` | — | `200` `api.config`: `{ config, issues[{file,path,line?,msg}], global_path, project_path, version, ok }`. `ok:false` = the files currently have errors; `config` is then the last good one. |
+| `PATCH /api/config` | `{ "mode": "auto", "worktrees.cleanup": "keep", ... }` (dotted hub keys) | `200` same as `GET /api/config`; `400 CONFIG_INVALID` as above. |
+| `GET /api/audit?limit=N` | `limit` default 100, `0` = all | `{ entries: [{ ts, actor, action, target?, detail? }] }`, oldest first. |
+| `GET /api/state` | — | additionally: `accounts` (as `/api/accounts`), `mode` (hub.mode), `config_ok`, `config_issues[]`, `instance` (as in health). |
+
+**Audit actions** (`actor` = header, or `hub`): `spawn` (target run id; detail `account, role, model,
+run_id, dry_run`), `config.account` (target account id; detail `field, value, file`), `config.hub`
+(target `hub`; detail `field, value, file`), `deliver.message|answer|plan_update|pause|resume|stop`
+(target run id; detail `n`), `hub.shutdown`, `dev.run` (target run id).
+
+**SSE hub notices.** Besides `event: baton`, `GET /api/stream` sends `event: hub` frames with the same
+global `id:` sequence and replay buffer. `data` is a JSON object with a `type` (schema `api.notice`):
+
+| `type` | Fields | When |
+|---|---|---|
+| `config_reloaded` | `version, ok, issues[]` | a config file changed on disk (or was edited through the API); `ok:false` = the new content has errors and the last good config stays in effect |
+| `spool_warning` | `run_id, code, detail` | the hub skipped or repaired a bad line in a run's outbox (e.g. `INVALID_PAYLOAD`, `SPOOL_UTF16`, `SPOOL_TRUNCATED`) |
+| `idle_stop` | `after_min` (number) | the hub is about to stop itself (see below) |
+
+**Live configuration.** The hub polls the global and project config files (default every 2 s). A
+broken file never stops the hub: the last good config stays in effect and `config_reloaded` carries
+`ok:false`. The stalled detector reads `hub.heartbeat_timeout_s` on every tick (an account's own
+`heartbeat_timeout_s` wins for its runs).
+
+**Idle stop.** The hub stops itself when it has had no live (not ended) run, no SSE subscriber and
+no admin API request for `hub.idle_stop_min` minutes (`0` = never; re-read live). It sends the
+`idle_stop` notice, logs, and shuts down gracefully.
+
+**Run record.** `run.json` may carry extra top-level fields written by the hub (e.g. `"merged": true`);
+readers must ignore unknown fields (already required by A-rules for run records).

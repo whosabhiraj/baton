@@ -112,3 +112,31 @@ func TestClose(t *testing.T) {
 		t.Fatal("subscribe after close should be dropped")
 	}
 }
+
+func TestNoticesAndSubscribers(t *testing.T) {
+	b := New(10, 10)
+	if b.Subscribers() != 0 {
+		t.Fatal("subs")
+	}
+	sub, _, _ := b.Subscribe(0, false)
+	if b.Subscribers() != 1 {
+		t.Fatal("subs")
+	}
+	b.Publish(ev(1))
+	id := b.PublishNotice("idle_stop", map[string]any{"after_min": 5})
+	if id != 2 {
+		t.Fatalf("id %d", id)
+	}
+	if it := <-sub.C; it.Notice != nil || it.N != 1 {
+		t.Fatalf("%+v", it)
+	}
+	it := <-sub.C
+	if it.Notice == nil || it.Notice.Type != "idle_stop" || it.N != 2 {
+		t.Fatalf("%+v", it)
+	}
+	_, replay, reset := b.Subscribe(1, true)
+	if reset || len(replay) != 1 || replay[0].Notice == nil {
+		t.Fatalf("replay %+v reset %v", replay, reset)
+	}
+	sub.Close()
+}

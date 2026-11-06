@@ -15,10 +15,18 @@ const (
 	DefaultSubBuffer = 1024
 )
 
-// Item is one broker event with its global id.
+// Notice is a hub-level message that is not a run event (config reloaded, spool warning, idle
+// stop). It travels the same ring and id sequence as events and is sent as SSE `event: hub`.
+type Notice struct {
+	Type string
+	Data map[string]any
+}
+
+// Item is one broker entry with its global id: a run event (Notice == nil) or a hub notice.
 type Item struct {
-	N  uint64
-	Ev proto.StoredEvent
+	N      uint64
+	Ev     proto.StoredEvent
+	Notice *Notice
 }
 
 // Sub is a subscription.
@@ -63,10 +71,26 @@ func New(ring, subBuffer int) *Broker {
 // Publish assigns the next global id, stores the event in the ring and delivers it to every
 // subscriber without blocking; a subscriber whose buffer is full is dropped.
 func (b *Broker) Publish(ev proto.StoredEvent) uint64 {
+	return b.publish(Item{Ev: ev})
+}
+
+// PublishNotice publishes a hub notice (delivered like an event, SSE event name "hub").
+func (b *Broker) PublishNotice(typ string, data map[string]any) uint64 {
+	return b.publish(Item{Notice: &Notice{Type: typ, Data: data}})
+}
+
+// Subscribers returns the number of live subscribers.
+func (b *Broker) Subscribers() int {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return len(b.subs)
+}
+
+func (b *Broker) publish(it Item) uint64 {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.n++
-	it := Item{N: b.n, Ev: ev}
+	it.N = b.n
 	if b.count < len(b.ring) {
 		b.ring[(b.head+b.count)%len(b.ring)] = it
 		b.count++

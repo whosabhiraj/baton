@@ -63,7 +63,7 @@ func (c *ctx) cmdHubServe(o opts) (int, error) {
 		return 0, err
 	}
 	cfg := loadConfig(repo).Config
-	opt := hub.Options{Dev: o.flag("dev"), DataDir: dataDir, Port: cfg.Hub.Port, PortFallback: true, Bind: cfg.Hub.Bind}
+	opt := hub.Options{Dev: o.flag("dev"), DataDir: dataDir, Repo: repo, Port: cfg.Hub.Port, PortFallback: true, Bind: cfg.Hub.Bind}
 	if cfg.Hub.HeartbeatTimeoutS > 0 {
 		opt.HeartbeatTimeout = time.Duration(cfg.Hub.HeartbeatTimeoutS) * time.Second
 	}

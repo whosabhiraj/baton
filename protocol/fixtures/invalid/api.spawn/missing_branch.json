@@ -1,0 +1,16 @@
+{
+  "input": {
+    "run_id": "r_01",
+    "agent_id": "x",
+    "callsign": "F",
+    "account_id": "a1",
+    "role": "r",
+    "kind": "k",
+    "model": "",
+    "base_branch": "main",
+    "worktree": "/w",
+    "run_dir": "/r",
+    "dry_run": false
+  },
+  "code": "INVALID_PAYLOAD"
+}

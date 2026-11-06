@@ -1,0 +1,12 @@
+{
+  "input": {
+    "entries": [
+      {
+        "ts": "2026-11-06T10:00:00.000Z",
+        "actor": "robot",
+        "action": "spawn"
+      }
+    ]
+  },
+  "code": "INVALID_PAYLOAD"
+}

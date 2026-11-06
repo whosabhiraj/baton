@@ -1,0 +1,17 @@
+{
+  "run_id": "r_01",
+  "agent_id": "cc-a1-0001",
+  "callsign": "Falcon",
+  "account_id": "a1",
+  "role": "implementer",
+  "kind": "claude",
+  "model": "",
+  "branch": "baton/cc-a1-0001",
+  "base_branch": "main",
+  "worktree": "/d/worktrees/cc-a1-0001",
+  "run_dir": "/d/runs/r_01",
+  "env": {
+    "BATON_RUN_ID": "r_01"
+  },
+  "dry_run": false
+}

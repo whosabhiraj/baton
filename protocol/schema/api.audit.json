@@ -1,0 +1,26 @@
+{
+  "$id": "baton/1/api.audit",
+  "title": "api.audit",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "GET /api/audit response (A14): the newest entries, oldest first.",
+  "type": "object",
+  "properties": {
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "ts": { "type": "string" },
+          "actor": { "type": "string", "enum": ["human", "conductor", "hub"] },
+          "action": { "type": "string", "minLength": 1 },
+          "target": { "type": "string" },
+          "detail": { "type": "object" }
+        },
+        "required": ["ts", "actor", "action"],
+        "additionalProperties": {}
+      }
+    }
+  },
+  "required": ["entries"],
+  "additionalProperties": {}
+}

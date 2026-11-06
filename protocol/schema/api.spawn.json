@@ -1,0 +1,25 @@
+{
+  "$id": "baton/1/api.spawn",
+  "title": "api.spawn",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "POST /api/spawn 200 response (A14): the new (or, with dry_run, would-be) run.",
+  "type": "object",
+  "properties": {
+    "run_id": { "type": "string", "minLength": 1 },
+    "agent_id": { "type": "string", "minLength": 1 },
+    "callsign": { "type": "string" },
+    "account_id": { "type": "string" },
+    "role": { "type": "string" },
+    "kind": { "type": "string" },
+    "model": { "type": "string" },
+    "branch": { "type": "string" },
+    "base_branch": { "type": "string" },
+    "worktree": { "type": "string" },
+    "run_dir": { "type": "string" },
+    "brief": { "type": "string", "description": "Rendered brief; only present for dry runs." },
+    "env": { "type": "object", "additionalProperties": { "type": "string" }, "description": "BATON_* environment for the agent process, includes the run token. Omitted for dry runs." },
+    "dry_run": { "type": "boolean" }
+  },
+  "required": ["run_id", "agent_id", "callsign", "account_id", "role", "kind", "model", "branch", "base_branch", "worktree", "run_dir", "dry_run"],
+  "additionalProperties": {}
+}

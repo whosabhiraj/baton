@@ -14,13 +14,17 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/whosabhiraj/baton/internal/api"
+	"github.com/whosabhiraj/baton/internal/audit"
 	"github.com/whosabhiraj/baton/internal/bus"
+	"github.com/whosabhiraj/baton/internal/config"
 	"github.com/whosabhiraj/baton/internal/ids"
 	"github.com/whosabhiraj/baton/internal/proto"
 	"github.com/whosabhiraj/baton/internal/redact"
+	"github.com/whosabhiraj/baton/internal/runs"
 	"github.com/whosabhiraj/baton/internal/spool"
 	"github.com/whosabhiraj/baton/internal/store"
 )
@@ -44,8 +48,14 @@ type Options struct {
 	Dev              bool          // enables POST /api/dev/runs
 	AdminToken       string        // "" = load/create <DataDir>/admin.token (persistent per project)
 	SpoolPoll        time.Duration // default 250ms
-	HeartbeatTimeout time.Duration // default 120s; stalled detection
+	HeartbeatTimeout time.Duration // 0 = live config hub.heartbeat_timeout_s (account override per run); >0 fixes it (tests)
 	Logger           *slog.Logger  // nil = discard
+
+	Repo          string        // git top-level of the target project; "" = no runs manager (POST /api/spawn -> 409 NOT_A_REPO)
+	GlobalConfig  string        // "" = config.GlobalPath()
+	ProjectConfig string        // "" = config.ProjectPath(Repo) when Repo is set, else none
+	ConfigPoll    time.Duration // config file poll interval; default 2s
+	IdleStop      time.Duration // 0 = config hub.idle_stop_min (0 there = never); <0 = disabled; >0 overrides the config
 }
 
 // Hub is a running hub.
@@ -61,7 +71,12 @@ type Hub struct {
 	broker   *bus.Broker
 	spool    *spool.Manager
 	srv      *http.Server
-	timeout  time.Duration
+	timeout  time.Duration // fixed heartbeat timeout (tests); 0 = from live config
+	idleStop time.Duration
+	cfg      *config.Watcher
+	audit    *audit.Log
+	runs     *runs.Manager
+	lastAdm  atomic.Int64  // unix nanos of the last admin API request
 	stopCh   chan struct{} // closed first on shutdown: ends SSE streams and background loops
 	detWG    sync.WaitGroup
 	serveWG  sync.WaitGroup
@@ -100,8 +115,8 @@ func Start(ctx context.Context, o Options) (*Hub, error) {
 	if o.SpoolPoll <= 0 {
 		o.SpoolPoll = 250 * time.Millisecond
 	}
-	if o.HeartbeatTimeout <= 0 {
-		o.HeartbeatTimeout = 120 * time.Second
+	if o.HeartbeatTimeout < 0 {
+		o.HeartbeatTimeout = 0
 	}
 	inner := o.Logger
 	if inner == nil {
@@ -125,8 +140,13 @@ func Start(ctx context.Context, o Options) (*Hub, error) {
 		return nil, fmt.Errorf("%w (%s)", ErrAlreadyRunning, dataDir)
 	}
 	h := &Hub{DataDir: dataDir, log: log, lock: lock, timeout: o.HeartbeatTimeout,
-		stopCh: make(chan struct{}), done: make(chan struct{})}
+		idleStop: o.IdleStop, stopCh: make(chan struct{}), done: make(chan struct{})}
+	h.lastAdm.Store(time.Now().UnixNano())
 	fail := func(err error) (*Hub, error) {
+		h.cfg.Stop()
+		if h.audit != nil {
+			_ = h.audit.Close()
+		}
 		if h.store != nil {
 			h.store.Close()
 		}
@@ -142,12 +162,34 @@ func Start(ctx context.Context, o Options) (*Hub, error) {
 	}
 
 	h.broker = bus.New(bus.DefaultRing, bus.DefaultSubBuffer)
+	gp, pp := o.GlobalConfig, o.ProjectConfig
+	if gp == "" {
+		gp = config.GlobalPath()
+	}
+	if pp == "" && o.Repo != "" {
+		pp = config.ProjectPath(o.Repo)
+	}
+	h.cfg = config.Watch(context.Background(), gp, pp, o.ConfigPoll, func(s *config.Snapshot) {
+		issues := s.Issues
+		if issues == nil {
+			issues = []config.Issue{}
+		}
+		log.Info("config reloaded", "version", s.Version, "ok", s.OK(), "issues", len(s.Issues))
+		h.broker.PublishNotice("config_reloaded", map[string]any{"version": s.Version, "ok": s.OK(), "issues": issues})
+	})
+	if s := h.cfg.Current(); !s.OK() {
+		log.Warn("config has errors; using last good/default values", "issues", len(s.Issues))
+	}
+	if h.audit, err = audit.Open(dataDir); err != nil {
+		return fail(fmt.Errorf("hub: open audit log: %w", err))
+	}
 	h.store, err = store.Open(dataDir, store.Options{Logger: log, Publish: func(ev proto.StoredEvent) { h.broker.Publish(ev) }})
 	if err != nil {
 		return fail(fmt.Errorf("hub: open store: %w", err))
 	}
 	h.spool = spool.NewManager(h.store, o.SpoolPoll, log, func(runID, code, msg string, off int64) {
 		log.Warn("outbox line skipped", "run", runID, "code", code, "msg", msg, "offset", off)
+		h.broker.PublishNotice("spool_warning", map[string]any{"run_id": runID, "code": code, "detail": msg})
 	})
 	h.spool.DrainAll() // A3: before the listener opens
 
@@ -163,7 +205,16 @@ func Start(ctx context.Context, o Options) (*Hub, error) {
 		}
 	}
 
+	if o.Repo != "" {
+		h.runs, err = runs.New(runs.Options{Repo: o.Repo, DataDir: dataDir, Store: h.store,
+			Config: func() config.Config { return h.cfg.Current().Config }, HubURL: func() string { return h.URL }, Logger: log})
+		if err != nil {
+			log.Warn("spawning disabled", "repo", o.Repo, "err", err)
+			h.runs = nil
+		}
+	}
 	handler := api.New(api.Deps{
+		Runs: h.runs, Audit: h.audit, Config: h.cfg, Touch: func() { h.lastAdm.Store(time.Now().UnixNano()) },
 		Store: h.store, Bus: h.broker, AdminToken: h.AdminToken, Instance: ids.UUID(), Dev: o.Dev,
 		Port: h.Port, URL: h.URL, Done: h.stopCh, Logger: log,
 		Shutdown: func() { _ = h.Close(context.Background()) },
@@ -179,6 +230,8 @@ func Start(ctx context.Context, o Options) (*Hub, error) {
 	h.spool.Start()
 	h.detWG.Add(1)
 	go h.detectStalls()
+	h.detWG.Add(1)
+	go h.watchIdle()
 
 	go func() {
 		select {
@@ -244,15 +297,34 @@ func listen(o Options, dataDir string) (net.Listener, error) {
 	return nil, fmt.Errorf("hub: cannot listen on %s port %d: %w", o.Bind, o.Port, lastErr)
 }
 
+// stallTimeout is the heartbeat timeout for a run: fixed (tests) or live from the config, with
+// the run's account override.
+func (h *Hub) stallTimeout(r *store.Run, cfg *config.Config) time.Duration {
+	if h.timeout > 0 {
+		return h.timeout
+	}
+	sec := cfg.Hub.HeartbeatTimeoutS
+	if acc, ok := cfg.Account(r.Record().AccountID); ok && acc.HeartbeatTimeoutS > 0 {
+		sec = acc.HeartbeatTimeoutS
+	}
+	if sec <= 0 {
+		sec = 120
+	}
+	return time.Duration(sec) * time.Second
+}
+
 // detectStalls periodically emits hub stalled events for silent runs (A4).
 func (h *Hub) detectStalls() {
 	defer h.detWG.Done()
-	iv := h.timeout / 4
-	if iv < 10*time.Millisecond {
-		iv = 10 * time.Millisecond
-	}
-	if iv > 5*time.Second {
-		iv = 5 * time.Second
+	iv := 500 * time.Millisecond
+	if h.timeout > 0 {
+		iv = h.timeout / 4
+		if iv < 10*time.Millisecond {
+			iv = 10 * time.Millisecond
+		}
+		if iv > 5*time.Second {
+			iv = 5 * time.Second
+		}
 	}
 	t := time.NewTicker(iv)
 	defer t.Stop()
@@ -267,10 +339,71 @@ func (h *Hub) detectStalls() {
 						h.log.Error("stall detector panic", "panic", fmt.Sprint(p))
 					}
 				}()
+				cfg := h.cfg.Current().Config
 				for _, r := range h.store.List() {
-					r.CheckStalled(now, h.timeout)
+					r.CheckStalled(now, h.stallTimeout(r, &cfg))
 				}
 			}()
+		}
+	}
+}
+
+// idleAfter is the effective idle-stop delay (0 = never).
+func (h *Hub) idleAfter() time.Duration {
+	switch {
+	case h.idleStop < 0:
+		return 0
+	case h.idleStop > 0:
+		return h.idleStop
+	}
+	return time.Duration(h.cfg.Current().Config.Hub.IdleStopMin) * time.Minute
+}
+
+// watchIdle stops the hub once it has had no live runs, no SSE subscribers and no admin API
+// request for the idle-stop delay.
+func (h *Hub) watchIdle() {
+	defer h.detWG.Done()
+	iv := time.Second
+	if h.idleStop > 0 && h.idleStop/4 < iv {
+		if iv = h.idleStop / 4; iv < 10*time.Millisecond {
+			iv = 10 * time.Millisecond
+		}
+	}
+	t := time.NewTicker(iv)
+	defer t.Stop()
+	lastBusy := time.Now()
+	for {
+		select {
+		case <-h.stopCh:
+			return
+		case now := <-t.C:
+			busy := h.broker.Subscribers() > 0
+			if !busy {
+				for _, r := range h.store.List() {
+					if !r.Ended() {
+						busy = true
+						break
+					}
+				}
+			}
+			if busy {
+				lastBusy = now
+			}
+			after := h.idleAfter()
+			if after <= 0 {
+				continue
+			}
+			last := lastBusy
+			if adm := time.Unix(0, h.lastAdm.Load()); adm.After(last) {
+				last = adm
+			}
+			if now.Sub(last) < after {
+				continue
+			}
+			h.log.Info("idle: stopping hub", "after", after.String())
+			h.broker.PublishNotice("idle_stop", map[string]any{"after_min": after.Minutes()})
+			go func() { _ = h.Close(context.Background()) }()
+			return
 		}
 	}
 }
@@ -293,8 +426,12 @@ func (h *Hub) Close(ctx context.Context) error {
 		}
 		h.serveWG.Wait()
 		h.detWG.Wait()
+		h.cfg.Stop()
 		h.spool.Stop()
 		h.spool.DrainAll()
+		if err := h.audit.Close(); err != nil && h.closeErr == nil {
+			h.closeErr = err
+		}
 		if err := h.store.Close(); err != nil && h.closeErr == nil {
 			h.closeErr = err
 		}

@@ -546,3 +546,21 @@ func TestExampleYAML(t *testing.T) {
 		t.Fatalf("schema: %v", err)
 	}
 }
+
+func TestWatchReloadNow(t *testing.T) {
+	gp := filepath.Join(t.TempDir(), "g.yaml")
+	write(t, gp, "hub:\n  port: 8001\n")
+	var calls atomic.Int32
+	w := Watch(context.Background(), gp, "", time.Hour, func(*Snapshot) { calls.Add(1) })
+	defer w.Stop()
+	if s := w.Reload(); s.Version != 1 || calls.Load() != 0 {
+		t.Fatalf("no change: %+v calls=%d", s, calls.Load())
+	}
+	write(t, gp, "hub:\n  port: 8002\n")
+	if s := w.Reload(); s.Config.Hub.Port != 8002 || s.Version != 2 || calls.Load() != 1 {
+		t.Fatalf("changed: %+v calls=%d", s, calls.Load())
+	}
+	if s := w.Reload(); s.Version != 2 || calls.Load() != 1 {
+		t.Fatal("second reload must be a no-op")
+	}
+}

@@ -547,3 +547,66 @@ func TestStreamEndsOnShutdown(t *testing.T) {
 		t.Fatal("stream should close")
 	}
 }
+
+func TestPhase2RoutesWithoutBackends(t *testing.T) {
+	e := newEnv(t, nil)
+	e.expectErr("POST", "/api/spawn", adminTok, `{}`, 409, "NOT_A_REPO")
+	e.expectErr("POST", "/api/spawn", "", `{}`, 401, "UNAUTHORIZED")
+	e.expectErr("GET", "/api/config", adminTok, "", 404, "NOT_FOUND")
+	e.expectErr("PATCH", "/api/config", adminTok, `{"mode":"user"}`, 404, "NOT_FOUND")
+	e.expectErr("PATCH", "/api/accounts/x", adminTok, `{"enabled":false}`, 404, "NOT_FOUND")
+	e.expectErr("POST", "/api/config", adminTok, `{}`, 404, "NOT_FOUND")
+	st, m := e.do("GET", "/api/audit?limit=5", adminTok, "")
+	if st != 200 || len(m["entries"].([]any)) != 0 {
+		t.Fatalf("%d %v", st, m)
+	}
+	e.expectErr("GET", "/api/audit?limit=x", adminTok, "", 400, "INVALID_PAYLOAD")
+	st, m = e.do("GET", "/api/state", adminTok, "")
+	if st != 200 || m["instance"] != "inst-1" || m["config_ok"] != true {
+		t.Fatalf("%d %v", st, m)
+	}
+}
+
+func TestTouchOnAdminOnly(t *testing.T) {
+	var n atomic.Int32
+	e := newEnv(t, func(d *api.Deps) { d.Touch = func() { n.Add(1) } })
+	e.do("GET", "/api/health", "", "")
+	e.do("GET", "/api/state", "wrong", "")
+	if n.Load() != 0 {
+		t.Fatalf("touched %d", n.Load())
+	}
+	e.do("GET", "/api/state", adminTok, "")
+	if n.Load() != 1 {
+		t.Fatalf("touched %d", n.Load())
+	}
+}
+
+func TestSSEHubNotice(t *testing.T) {
+	e := newEnv(t, nil)
+	req, _ := http.NewRequest("GET", e.srv.URL+"/api/stream", nil)
+	req.Header.Set("Authorization", "Bearer "+adminTok)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	go func() {
+		time.Sleep(100 * time.Millisecond)
+		e.br.PublishNotice("idle_stop", map[string]any{"after_min": 5, "type": "evil"})
+	}()
+	sc := bufio.NewScanner(resp.Body)
+	var sawEvent bool
+	for sc.Scan() {
+		l := sc.Text()
+		if l == "event: hub" {
+			sawEvent = true
+		}
+		if sawEvent && strings.HasPrefix(l, "data: ") {
+			if l != `data: {"after_min":5,"type":"idle_stop"}` {
+				t.Fatalf("data %q", l)
+			}
+			return
+		}
+	}
+	t.Fatal("no hub event")
+}

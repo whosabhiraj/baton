@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -389,7 +390,7 @@ func (r *Run) appendLocked(evp *proto.StoredEvent) *proto.Error {
 	return nil
 }
 
-func (r *Run) saveRecordLocked() {
+func (r *Run) saveRecordLocked() error {
 	r.rec.Status = r.st.Status()
 	b, err := json.MarshalIndent(r.rec, "", "  ")
 	if err == nil {
@@ -397,9 +398,52 @@ func (r *Run) saveRecordLocked() {
 	}
 	if err != nil {
 		r.s.log.Error("run.json write failed", "run", r.id, "err", err)
-		return
+		return err
 	}
 	r.savedStat = r.rec.Status
+	return nil
+}
+
+// SetExtra stores an unknown-to-the-schema field in run.json (kept across restarts), e.g.
+// "merged": true. A nil value removes the key. Core record fields cannot be overwritten.
+func (r *Run) SetExtra(key string, v any) error {
+	if key == "" {
+		return errors.New("store: empty extra key")
+	}
+	if protoKnownKey(key) {
+		return fmt.Errorf("store: %q is a core run.json field", key)
+	}
+	var raw json.RawMessage
+	if v != nil {
+		b, err := json.Marshal(v)
+		if err != nil {
+			return err
+		}
+		raw = b
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	m := make(map[string]json.RawMessage, len(r.rec.Extra)+1)
+	for k, x := range r.rec.Extra {
+		m[k] = x
+	}
+	if raw == nil {
+		delete(m, key)
+	} else {
+		m[key] = raw
+	}
+	r.rec.Extra = m
+	return r.saveRecordLocked()
+}
+
+func protoKnownKey(k string) bool {
+	switch k {
+	case "run_id", "agent_id", "callsign", "account_id", "role", "kind", "model", "effort", "task", "repo",
+		"branch", "base_branch", "worktree", "actor", "status", "created_at", "ended_at", "token_sha256",
+		"token_revoked", "plan":
+		return true
+	}
+	return false
 }
 
 // Events returns stored events with seq > since, in order.

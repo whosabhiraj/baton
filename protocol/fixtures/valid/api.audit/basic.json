@@ -1,0 +1,14 @@
+{
+  "entries": [
+    {
+      "ts": "2026-11-06T10:00:00.000Z",
+      "actor": "human",
+      "action": "spawn",
+      "target": "r_1",
+      "detail": {
+        "account": "a1",
+        "dry_run": false
+      }
+    }
+  ]
+}

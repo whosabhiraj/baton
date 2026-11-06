@@ -1,0 +1,19 @@
+{
+  "config": {
+    "hub": {
+      "mode": "propose"
+    }
+  },
+  "issues": [
+    {
+      "file": "/h/config.yaml",
+      "path": "hub.port",
+      "line": 3,
+      "msg": "must be 1-65535"
+    }
+  ],
+  "global_path": "/h/config.yaml",
+  "project_path": "",
+  "version": 2,
+  "ok": false
+}

@@ -18,8 +18,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/whosabhiraj/baton/internal/audit"
 	"github.com/whosabhiraj/baton/internal/bus"
+	"github.com/whosabhiraj/baton/internal/config"
 	"github.com/whosabhiraj/baton/internal/proto"
+	"github.com/whosabhiraj/baton/internal/runs"
 	"github.com/whosabhiraj/baton/internal/store"
 )
 
@@ -34,6 +37,13 @@ type Deps struct {
 	Port int
 	// URL is the hub base URL put into agent env; empty = derived from the request Host.
 	URL string
+	// Runs spawns agents (nil = POST /api/spawn answers 409 NOT_A_REPO). Audit and Config may be
+	// nil (tests): audit entries are then dropped and the config routes answer 404.
+	Runs   *runs.Manager
+	Audit  *audit.Log
+	Config *config.Watcher
+	// Touch, if set, is called for every authenticated admin request (idle-stop bookkeeping).
+	Touch func()
 	// Shutdown is called (asynchronously, after the response) by POST /api/hub/shutdown.
 	Shutdown func()
 	// Done is closed when the hub shuts down; it ends SSE streams.
@@ -82,6 +92,12 @@ func New(d Deps) http.Handler {
 	for _, t := range []string{"message", "answer", "plan_update", "pause", "resume", "stop"} {
 		mux.HandleFunc("/api/runs/{id}/"+t, a.route("POST", authAdmin, a.deliver(t)))
 	}
+	mux.HandleFunc("/api/spawn", a.route("POST", authAdmin, a.spawn))
+	mux.HandleFunc("/api/accounts", a.route("GET", authAdmin, a.listAccounts))
+	mux.HandleFunc("/api/accounts/{id}", a.route("PATCH", authAdmin, a.patchAccount))
+	mux.HandleFunc("GET /api/config", a.route("GET", authAdmin, a.getConfig))
+	mux.HandleFunc("PATCH /api/config", a.route("PATCH", authAdmin, a.patchConfig))
+	mux.HandleFunc("/api/audit", a.route("GET", authAdmin, a.auditList))
 	mux.HandleFunc("/api/dev/runs", a.route("POST", authAdmin, a.devRun))
 	mux.HandleFunc("/api/hub/shutdown", a.route("POST", authAdmin, a.shutdown))
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
@@ -187,6 +203,9 @@ func (a *api) route(method string, class authClass, h http.HandlerFunc) http.Han
 			if !a.isAdmin(tok) {
 				writeErr(w, proto.NewError(proto.CodeUnauthorized, "admin token required"))
 				return
+			}
+			if a.Touch != nil {
+				a.Touch()
 			}
 		}
 		r.Body = http.MaxBytesReader(w, r.Body, a.MaxBody)
@@ -346,7 +365,13 @@ func (a *api) events(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *api) state(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, 200, map[string]any{"ok": true, "runs": a.Store.Summaries()})
+	out := map[string]any{"ok": true, "runs": a.Store.Summaries(), "accounts": a.accounts(), "instance": a.Instance,
+		"mode": "", "config_ok": true, "config_issues": []config.Issue{}}
+	if a.Config != nil {
+		s := a.Config.Current()
+		out["mode"], out["config_ok"], out["config_issues"] = s.Config.Hub.Mode, s.OK(), issuesOf(s.Issues)
+	}
+	writeJSON(w, 200, out)
 }
 
 func (a *api) deliver(typ string) http.HandlerFunc {
@@ -371,11 +396,13 @@ func (a *api) deliver(typ string) http.HandlerFunc {
 			writeErr(w, perr)
 			return
 		}
+		a.recordReq(r, "deliver."+typ, run.ID(), map[string]any{"n": n})
 		writeJSON(w, 200, map[string]any{"ok": true, "n": n})
 	}
 }
 
 func (a *api) shutdown(w http.ResponseWriter, r *http.Request) {
+	a.recordReq(r, "hub.shutdown", "", nil)
 	writeJSON(w, 200, map[string]any{"ok": true})
 	if a.Shutdown != nil {
 		go a.Shutdown()
@@ -428,6 +455,7 @@ func (a *api) devRun(w http.ResponseWriter, r *http.Request) {
 		"BATON_URL": base, "BATON_TOKEN": tok, "BATON_RUN_ID": run.ID(), "BATON_AGENT_ID": run.AgentID(),
 		"BATON_RUN_DIR": run.Dir(), "BATON_BRIEF": brief,
 	}
+	a.recordReq(r, "dev.run", run.ID(), map[string]any{"agent_id": run.AgentID(), "role": c.Role, "account_id": c.AccountID})
 	writeJSON(w, 200, map[string]any{
 		"ok": true, "run_id": run.ID(), "agent_id": run.AgentID(), "token": tok, "run_dir": run.Dir(), "env": env,
 	})
@@ -485,6 +513,18 @@ func (a *api) stream(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	send := func(it bus.Item) bool {
+		if it.Notice != nil {
+			m := map[string]any{}
+			for k, v := range it.Notice.Data {
+				m[k] = v
+			}
+			m["type"] = it.Notice.Type
+			b, err := json.Marshal(m)
+			if err != nil {
+				return true
+			}
+			return write("id: " + strconv.FormatUint(it.N, 10) + "\nevent: hub\ndata: " + string(b) + "\n\n")
+		}
 		var buf bytes.Buffer
 		enc := json.NewEncoder(&buf)
 		enc.SetEscapeHTML(false)
