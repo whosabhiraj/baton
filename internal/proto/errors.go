@@ -28,6 +28,11 @@ const (
 	CodeNotARepo        = "NOT_A_REPO"        // target folder is not a git repository
 	CodeGit             = "GIT_ERROR"         // a git command failed
 	CodeConfigInvalid   = "CONFIG_INVALID"    // config write rejected by validation
+
+	// Phase 3 (A15).
+	CodeAlreadyDecided = "ALREADY_DECIDED" // approval already approved/rejected
+	CodeNotSupported   = "NOT_SUPPORTED"   // no launcher (kill)
+	CodeLaunchFailed   = "LAUNCH_FAILED"   // launcher could not start the agent
 )
 
 // Error is a protocol error carrying the HTTP status the API should answer with.
@@ -59,7 +64,7 @@ func statusFor(code string) int {
 	case CodeRunEnded:
 		return http.StatusGone
 	case CodeUnknownQID, CodeAccountDisabled, CodeRoleNotAllowed, CodeModelNotAllowed,
-		CodeAccountBusy, CodeMaxAgents, CodeNotARepo, CodeCallsignTaken:
+		CodeAccountBusy, CodeMaxAgents, CodeNotARepo, CodeCallsignTaken, CodeAlreadyDecided, CodeNotSupported:
 		return http.StatusConflict
 	case CodeAccountRequired, CodeUnknownAccount, CodeConfigInvalid:
 		return http.StatusBadRequest

@@ -1,0 +1,17 @@
+{
+  "$id": "baton/1/hub.usage",
+  "title": "hub.usage",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Cumulative usage of the run so far (A15); the latest event wins.",
+  "type": "object",
+  "properties": {
+    "input_tokens": { "type": "integer", "minimum": 0 },
+    "output_tokens": { "type": "integer", "minimum": 0 },
+    "cache_read_tokens": { "type": "integer", "minimum": 0 },
+    "cache_write_tokens": { "type": "integer", "minimum": 0 },
+    "cost_usd": { "type": "number", "minimum": 0 },
+    "model": { "type": "string" }
+  },
+  "required": ["input_tokens", "output_tokens"],
+  "additionalProperties": {}
+}

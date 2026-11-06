@@ -19,9 +19,21 @@
         "roles": { "type": "array", "items": { "type": "string" } },
         "models": { "type": "array", "items": { "type": "string" } },
         "rate_limited": { "type": "boolean", "description": "Any live run of the account has status rate_limited." },
-        "permissions_mode": { "type": "string" }
+        "permissions_mode": { "type": "string" },
+        "usage": {
+          "type": "object",
+          "description": "Sum of the latest cumulative usage of each run of the account (A15).",
+          "properties": {
+            "input_tokens": { "type": "integer", "minimum": 0 },
+            "output_tokens": { "type": "integer", "minimum": 0 },
+            "cache_read_tokens": { "type": "integer", "minimum": 0 },
+            "cache_write_tokens": { "type": "integer", "minimum": 0 },
+            "cost_usd": { "type": "number", "minimum": 0 }
+          },
+          "required": ["input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens", "cost_usd"]
+        }
       },
-      "required": ["id", "label", "kind", "color", "enabled", "max_concurrent", "used", "roles", "models", "rate_limited", "permissions_mode"],
+      "required": ["id", "label", "kind", "color", "enabled", "max_concurrent", "used", "roles", "models", "rate_limited", "permissions_mode", "usage"],
       "additionalProperties": {}
     }
   }

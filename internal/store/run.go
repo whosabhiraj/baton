@@ -65,6 +65,7 @@ type Summary struct {
 	LastEventTS   string            `json:"last_event_ts,omitempty"`
 	OpenQuestions []Question        `json:"open_questions"`
 	StepStates    map[string]string `json:"step_states"`
+	Usage         map[string]any    `json:"usage,omitempty"` // latest cumulative usage (A15)
 }
 
 // loadRun opens an existing run directory: reads run.json, recovers events.jsonl, rebuilds
@@ -248,6 +249,12 @@ func (r *Run) Summary() Summary {
 	}
 	for k, v := range r.st.Steps {
 		sum.StepStates[k] = v
+	}
+	if r.st.Usage != nil {
+		sum.Usage = make(map[string]any, len(r.st.Usage))
+		for k, v := range r.st.Usage {
+			sum.Usage[k] = v
+		}
 	}
 	return sum
 }

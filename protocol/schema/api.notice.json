@@ -27,6 +27,23 @@
     },
     {
       "properties": {
+        "type": { "const": "conductor" },
+        "state": { "enum": ["off", "idle", "thinking", "acting"] },
+        "account": { "type": "string" },
+        "model": { "type": "string" },
+        "since": { "type": "string" }
+      },
+      "required": ["type", "state", "since"]
+    },
+    {
+      "properties": {
+        "type": { "const": "approval" },
+        "approval": { "type": "object" }
+      },
+      "required": ["type", "approval"]
+    },
+    {
+      "properties": {
         "type": { "const": "idle_stop" },
         "after_min": { "type": "number", "minimum": 0 }
       },

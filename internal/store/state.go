@@ -47,7 +47,8 @@ type State struct {
 	stepOrder []string
 	Steps     map[string]string
 	Questions []Question
-	InboxN    int // highest to_agent n seen
+	Usage     map[string]any // latest hub usage payload (cumulative), nil = none
+	InboxN    int            // highest to_agent n seen
 	inboxSeen map[int]bool
 }
 
@@ -248,6 +249,8 @@ func (s *State) Apply(ev proto.StoredEvent) {
 		s.ended = true
 	case "stalled":
 		s.stalled = true
+	case "usage":
+		s.Usage = p
 	}
 }
 

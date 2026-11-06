@@ -18,6 +18,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/whosabhiraj/baton/internal/approvals"
 	"github.com/whosabhiraj/baton/internal/audit"
 	"github.com/whosabhiraj/baton/internal/bus"
 	"github.com/whosabhiraj/baton/internal/config"
@@ -42,6 +43,11 @@ type Deps struct {
 	Runs   *runs.Manager
 	Audit  *audit.Log
 	Config *config.Watcher
+	// Approvals, Conductor, OnApproval and Launcher are the Phase 3 hooks (A15); all optional.
+	Approvals  *approvals.Store
+	Conductor  func() proto.ConductorState
+	OnApproval func(approvals.Approval)
+	Launcher   runs.Launcher
 	// Touch, if set, is called for every authenticated admin request (idle-stop bookkeeping).
 	Touch func()
 	// Shutdown is called (asynchronously, after the response) by POST /api/hub/shutdown.
@@ -97,6 +103,10 @@ func New(d Deps) http.Handler {
 	mux.HandleFunc("/api/accounts/{id}", a.route("PATCH", authAdmin, a.patchAccount))
 	mux.HandleFunc("GET /api/config", a.route("GET", authAdmin, a.getConfig))
 	mux.HandleFunc("PATCH /api/config", a.route("PATCH", authAdmin, a.patchConfig))
+	mux.HandleFunc("/api/runs/{id}/kill", a.route("POST", authAdmin, a.kill))
+	mux.HandleFunc("/api/approvals", a.route("GET", authAdmin, a.listApprovals))
+	mux.HandleFunc("/api/approvals/{id}/approve", a.route("POST", authAdmin, a.decide(true)))
+	mux.HandleFunc("/api/approvals/{id}/reject", a.route("POST", authAdmin, a.decide(false)))
 	mux.HandleFunc("/api/audit", a.route("GET", authAdmin, a.auditList))
 	mux.HandleFunc("/api/dev/runs", a.route("POST", authAdmin, a.devRun))
 	mux.HandleFunc("/api/hub/shutdown", a.route("POST", authAdmin, a.shutdown))
@@ -366,7 +376,7 @@ func (a *api) events(w http.ResponseWriter, r *http.Request) {
 
 func (a *api) state(w http.ResponseWriter, r *http.Request) {
 	out := map[string]any{"ok": true, "runs": a.Store.Summaries(), "accounts": a.accounts(), "instance": a.Instance,
-		"mode": "", "config_ok": true, "config_issues": []config.Issue{}}
+		"mode": "", "conductor": a.conductor(), "approvals": a.pendingApprovals(), "config_ok": true, "config_issues": []config.Issue{}}
 	if a.Config != nil {
 		s := a.Config.Current()
 		out["mode"], out["config_ok"], out["config_issues"] = s.Config.Hub.Mode, s.OK(), issuesOf(s.Issues)

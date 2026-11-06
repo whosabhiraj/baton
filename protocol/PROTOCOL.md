@@ -281,3 +281,34 @@ no admin API request for `hub.idle_stop_min` minutes (`0` = never; re-read live)
 
 **Run record.** `run.json` may carry extra top-level fields written by the hub (e.g. `"merged": true`);
 readers must ignore unknown fields (already required by A-rules for run records).
+
+### A15. Phase 3: usage, conductor state, approvals, kill
+
+**`usage` event** (hub-only, schema `hub.usage`): `{ input_tokens, output_tokens, cache_read_tokens?,
+cache_write_tokens?, cost_usd?, model? }` (integers >= 0, cost number >= 0). It carries the run's
+**cumulative** totals; the latest event wins. `RunSummary.usage` holds the latest payload (omitted
+if none). Each element of `GET /api/accounts` (and `/api/state` `accounts`) gets `usage`: the sum over
+the account's runs of each run's latest usage (`input_tokens, output_tokens, cache_read_tokens,
+cache_write_tokens, cost_usd`; zeros when none).
+
+**Additions to `GET /api/state`**: `conductor` = `{ state: off|idle|thinking|acting, account?, model?,
+since }` (default `{state:"off"}`), and `approvals` = the pending approvals.
+
+| Route (admin) | Body / query | Response |
+|---|---|---|
+| `GET /api/approvals` | `?status=pending\|approved\|rejected` (default all) | bare array of approvals, oldest first |
+| `POST /api/approvals/:id/approve` and `/reject` | `{ note? }` | `200` the approval; `404 NOT_FOUND`; `409 ALREADY_DECIDED` |
+| `POST /api/runs/:id/kill` | — | `200 { ok:true }`; `409 NOT_SUPPORTED` (no launcher); `404 NOT_FOUND`; `409 RUN_ENDED` (note: 409, not 410, on this route) |
+
+Approval: `{ id ("ap_"+short id), kind: merge|spawn, run_id?, title, detail?, requested_by, status:
+pending|approved|rejected, created_at, decided_at?, decided_by?, note? }`, stored in
+`<dataDir>/approvals.json`. The decider is the `X-Baton-Actor` header (default `human`).
+
+**Spawn** with a launcher: after a successful non-dry spawn the hub starts the agent; if that fails the
+run gets a hub `exit` with `code:-1` and the response is `500 LAUNCH_FAILED` (`{ ok:false, code, error,
+run_id }`).
+
+**SSE hub notices** (extends A14): `conductor` (`state, account?, model?, since`) when the conductor
+state changes; `approval` (`approval`) when an approval is requested or decided.
+
+**Audit actions**: `approval.request|approve|reject` (target approval id), `kill` (target run id).

@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/whosabhiraj/baton/internal/api"
+	"github.com/whosabhiraj/baton/internal/approvals"
 	"github.com/whosabhiraj/baton/internal/audit"
 	"github.com/whosabhiraj/baton/internal/bus"
 	"github.com/whosabhiraj/baton/internal/config"
@@ -51,11 +52,13 @@ type Options struct {
 	HeartbeatTimeout time.Duration // 0 = live config hub.heartbeat_timeout_s (account override per run); >0 fixes it (tests)
 	Logger           *slog.Logger  // nil = discard
 
-	Repo          string        // git top-level of the target project; "" = no runs manager (POST /api/spawn -> 409 NOT_A_REPO)
-	GlobalConfig  string        // "" = config.GlobalPath()
-	ProjectConfig string        // "" = config.ProjectPath(Repo) when Repo is set, else none
-	ConfigPoll    time.Duration // config file poll interval; default 2s
-	IdleStop      time.Duration // 0 = config hub.idle_stop_min (0 there = never); <0 = disabled; >0 overrides the config
+	Repo          string                   // git top-level of the target project; "" = no runs manager (POST /api/spawn -> 409 NOT_A_REPO)
+	GlobalConfig  string                   // "" = config.GlobalPath()
+	ProjectConfig string                   // "" = config.ProjectPath(Repo) when Repo is set, else none
+	ConfigPoll    time.Duration            // config file poll interval; default 2s
+	Launcher      runs.Launcher            // starts/kills agent processes (nil = spawn only records the run)
+	OnApproval    func(approvals.Approval) // called after a human decision
+	IdleStop      time.Duration            // 0 = config hub.idle_stop_min (0 there = never); <0 = disabled; >0 overrides the config
 }
 
 // Hub is a running hub.
@@ -65,24 +68,27 @@ type Hub struct {
 	DataDir    string
 	Port       int
 
-	log      *slog.Logger
-	lock     *fileLock
-	store    *store.Store
-	broker   *bus.Broker
-	spool    *spool.Manager
-	srv      *http.Server
-	timeout  time.Duration // fixed heartbeat timeout (tests); 0 = from live config
-	idleStop time.Duration
-	cfg      *config.Watcher
-	audit    *audit.Log
-	runs     *runs.Manager
-	lastAdm  atomic.Int64  // unix nanos of the last admin API request
-	stopCh   chan struct{} // closed first on shutdown: ends SSE streams and background loops
-	detWG    sync.WaitGroup
-	serveWG  sync.WaitGroup
-	done     chan struct{}
-	closeMu  sync.Once
-	closeErr error
+	log       *slog.Logger
+	lock      *fileLock
+	store     *store.Store
+	broker    *bus.Broker
+	spool     *spool.Manager
+	srv       *http.Server
+	timeout   time.Duration // fixed heartbeat timeout (tests); 0 = from live config
+	idleStop  time.Duration
+	cfg       *config.Watcher
+	audit     *audit.Log
+	runs      *runs.Manager
+	approvals *approvals.Store
+	condMu    sync.Mutex
+	conductor proto.ConductorState
+	lastAdm   atomic.Int64  // unix nanos of the last admin API request
+	stopCh    chan struct{} // closed first on shutdown: ends SSE streams and background loops
+	detWG     sync.WaitGroup
+	serveWG   sync.WaitGroup
+	done      chan struct{}
+	closeMu   sync.Once
+	closeErr  error
 }
 
 // ErrAlreadyRunning is returned by Start when another hub holds the data dir's lock.
@@ -187,6 +193,10 @@ func Start(ctx context.Context, o Options) (*Hub, error) {
 	if err != nil {
 		return fail(fmt.Errorf("hub: open store: %w", err))
 	}
+	if h.approvals, err = approvals.Open(dataDir); err != nil {
+		return fail(fmt.Errorf("hub: open approvals: %w", err))
+	}
+	h.conductor = proto.ConductorState{State: "off"}
 	h.spool = spool.NewManager(h.store, o.SpoolPoll, log, func(runID, code, msg string, off int64) {
 		log.Warn("outbox line skipped", "run", runID, "code", code, "msg", msg, "offset", off)
 		h.broker.PublishNotice("spool_warning", map[string]any{"run_id": runID, "code": code, "detail": msg})
@@ -214,7 +224,8 @@ func Start(ctx context.Context, o Options) (*Hub, error) {
 		}
 	}
 	handler := api.New(api.Deps{
-		Runs: h.runs, Audit: h.audit, Config: h.cfg, Touch: func() { h.lastAdm.Store(time.Now().UnixNano()) },
+		Runs: h.runs, Audit: h.audit, Approvals: h.approvals, OnApproval: o.OnApproval, Launcher: o.Launcher,
+		Conductor: func() proto.ConductorState { h.condMu.Lock(); defer h.condMu.Unlock(); return h.conductor }, Config: h.cfg, Touch: func() { h.lastAdm.Store(time.Now().UnixNano()) },
 		Store: h.store, Bus: h.broker, AdminToken: h.AdminToken, Instance: ids.UUID(), Dev: o.Dev,
 		Port: h.Port, URL: h.URL, Done: h.stopCh, Logger: log,
 		Shutdown: func() { _ = h.Close(context.Background()) },
@@ -440,6 +451,31 @@ func (h *Hub) Close(ctx context.Context) error {
 	})
 	<-h.done
 	return h.closeErr
+}
+
+// Store gives access to the run store (adapters and the mock engine append hub events).
+func (h *Hub) Store() *store.Store { return h.store }
+
+// SetConductor records what the conductor is doing and publishes a `conductor` notice.
+func (h *Hub) SetConductor(c proto.ConductorState) {
+	if c.Since == "" {
+		c.Since = time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
+	}
+	h.condMu.Lock()
+	h.conductor = c
+	h.condMu.Unlock()
+	h.broker.PublishNotice("conductor", map[string]any{"state": c.State, "account": c.Account, "model": c.Model, "since": c.Since})
+}
+
+// RequestApproval stores a pending approval, publishes an `approval` notice and audits it.
+func (h *Hub) RequestApproval(kind, runID, title string, detail map[string]any, by string) (approvals.Approval, error) {
+	ap, err := h.approvals.Add(kind, runID, title, detail, by)
+	if err != nil {
+		return ap, err
+	}
+	_ = h.audit.Append(audit.Entry{Actor: by, Action: "approval.request", Target: ap.ID, Detail: map[string]any{"kind": kind, "run_id": runID}})
+	h.broker.PublishNotice("approval", map[string]any{"approval": ap})
+	return ap, nil
 }
 
 // Done is closed after shutdown completes.

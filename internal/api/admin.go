@@ -52,17 +52,18 @@ func (a *api) recordReq(r *http.Request, action, target string, detail map[strin
 // ---- accounts ----
 
 type accountView struct {
-	ID              string   `json:"id"`
-	Label           string   `json:"label"`
-	Kind            string   `json:"kind"`
-	Color           string   `json:"color"`
-	Enabled         bool     `json:"enabled"`
-	MaxConcurrent   int      `json:"max_concurrent"`
-	Used            int      `json:"used"`
-	Roles           []string `json:"roles"`
-	Models          []string `json:"models"`
-	RateLimited     bool     `json:"rate_limited"`
-	PermissionsMode string   `json:"permissions_mode"`
+	ID              string         `json:"id"`
+	Label           string         `json:"label"`
+	Kind            string         `json:"kind"`
+	Color           string         `json:"color"`
+	Enabled         bool           `json:"enabled"`
+	MaxConcurrent   int            `json:"max_concurrent"`
+	Used            int            `json:"used"`
+	Roles           []string       `json:"roles"`
+	Models          []string       `json:"models"`
+	RateLimited     bool           `json:"rate_limited"`
+	PermissionsMode string         `json:"permissions_mode"`
+	Usage           map[string]any `json:"usage"`
 }
 
 func nonNil(s []string) []string {
@@ -88,6 +89,7 @@ func (a *api) accounts() []accountView {
 			limited[sum.AccountID] = true
 		}
 	}
+	usage := a.accountUsage()
 	for _, ac := range a.Config.Current().Config.Accounts {
 		mode := ac.Permissions.Mode
 		if mode == "" {
@@ -96,7 +98,7 @@ func (a *api) accounts() []accountView {
 		out = append(out, accountView{
 			ID: ac.ID, Label: ac.Label, Kind: ac.Kind, Color: ac.Color, Enabled: ac.Enabled,
 			MaxConcurrent: ac.MaxConcurrent, Used: used[ac.ID], Roles: nonNil(ac.Roles), Models: nonNil(ac.Models),
-			RateLimited: limited[ac.ID], PermissionsMode: mode,
+			RateLimited: limited[ac.ID], PermissionsMode: mode, Usage: usageOf(usage[ac.ID]),
 		})
 	}
 	return out
@@ -151,6 +153,9 @@ func (a *api) spawn(w http.ResponseWriter, r *http.Request) {
 	a.record(actor, "spawn", target, map[string]any{
 		"account": res.AccountID, "role": res.Role, "model": res.Model, "run_id": res.RunID, "dry_run": res.DryRun,
 	})
+	if !a.launch(w, res) {
+		return
+	}
 	writeJSON(w, 200, res)
 }
 

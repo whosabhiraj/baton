@@ -625,3 +625,10 @@ func (m *Manager) CleanupDue(now time.Time) []string {
 	}
 	return out
 }
+
+// Launcher starts and kills the agent process of a run (the real one in Phase 5, a fake one in
+// `baton mock`). Kill appends the run's `killed` event itself.
+type Launcher interface {
+	Start(res SpawnResult) error
+	Kill(runID string) error
+}
