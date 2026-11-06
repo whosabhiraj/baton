@@ -1,8 +1,18 @@
 node_modules/
-dist/
 runs/
 .baton/
 *.log
 .env
 .env.*
 *.local.md
+/dist/
+web/dist/*
+!web/dist/.gitkeep
+
+# Go build outputs (a stray `go build ./cmd/baton` at the repo root)
+/baton
+/baton.exe
+*.exe
+*.test
+*.test.exe
+*.out
