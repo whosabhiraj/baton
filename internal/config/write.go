@@ -11,6 +11,8 @@ import (
 	"sync"
 
 	"go.yaml.in/yaml/v3"
+
+	"github.com/whosabhiraj/baton/internal/store"
 )
 
 var writeMu sync.Mutex
@@ -271,30 +273,5 @@ func writeAtomic(path string, data []byte, isGlobal bool) error {
 	if st, err := os.Stat(path); err == nil {
 		mode = st.Mode().Perm()
 	}
-	tmp, err := os.CreateTemp(dir, ".baton-config-*.tmp")
-	if err != nil {
-		return err
-	}
-	name := tmp.Name()
-	fail := func(err error) error {
-		tmp.Close()
-		_ = os.Remove(name)
-		return err
-	}
-	if _, err := tmp.Write(data); err != nil {
-		return fail(err)
-	}
-	if err := tmp.Sync(); err != nil {
-		return fail(err)
-	}
-	if err := tmp.Close(); err != nil {
-		_ = os.Remove(name)
-		return err
-	}
-	_ = os.Chmod(name, mode)
-	if err := os.Rename(name, path); err != nil {
-		_ = os.Remove(name)
-		return err
-	}
-	return nil
+	return store.WriteFileAtomic(path, data, mode)
 }

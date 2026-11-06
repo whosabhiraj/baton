@@ -262,7 +262,7 @@ func trunc(s string, n int) string {
 // send posts one envelope to /api/ingest, as the baton CLI does.
 func (a *agent) send(typ string, p map[string]any) {
 	b, _ := json.Marshal(map[string]any{"v": 1, "run_id": a.res.RunID, "agent_id": a.res.AgentID,
-		"ts": time.Now().UTC().Format("2006-01-02T15:04:05.000Z"), "type": typ, "payload": p, "msg_id": ids.UUID()})
+		"ts": proto.NowTS(), "type": typ, "payload": p, "msg_id": ids.UUID()})
 	req, _ := http.NewRequest("POST", a.res.Env["BATON_URL"]+"/api/ingest", bytes.NewReader(b))
 	req.Header.Set("Authorization", "Bearer "+a.res.Env["BATON_TOKEN"])
 	req.Header.Set("Content-Type", "application/json")

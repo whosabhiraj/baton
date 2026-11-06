@@ -116,7 +116,7 @@ func (c *ctx) send(typ string, p payload, quiet bool) (int, error) {
 		return 0, usagef("invalid %s: %s", typ, perr.Msg)
 	}
 	e := c.env
-	msg := wireMsg{V: 1, RunID: e.runID, AgentID: e.agentID, TS: time.Now().UTC().Format("2006-01-02T15:04:05.000Z"),
+	msg := wireMsg{V: 1, RunID: e.runID, AgentID: e.agentID, TS: proto.NowTS(),
 		Type: typ, Payload: vp, MsgID: ids.UUID()}
 	line := proto.MarshalLine(msg)
 	if line == nil {

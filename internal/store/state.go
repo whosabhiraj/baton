@@ -275,4 +275,4 @@ func (s *State) removeQuestion(qid string) {
 }
 
 // nowTS formats t the way event timestamps are written (RFC 3339, millisecond, UTC).
-func nowTS(t time.Time) string { return t.UTC().Format("2006-01-02T15:04:05.000Z") }
+func nowTS(t time.Time) string { return t.UTC().Format(proto.TSFormat) }

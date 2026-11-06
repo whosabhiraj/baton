@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 )
 
 // Version is the protocol version carried in every envelope as "v".
@@ -292,3 +293,9 @@ type ConductorState struct {
 	Model   string `json:"model,omitempty"`
 	Since   string `json:"since,omitempty"`
 }
+
+// TSFormat is the wire timestamp format (UTC, millisecond precision).
+const TSFormat = "2006-01-02T15:04:05.000Z"
+
+// NowTS returns the current time in TSFormat.
+func NowTS() string { return time.Now().UTC().Format(TSFormat) }

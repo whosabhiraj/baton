@@ -11,8 +11,8 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
-	"time"
 
+	"github.com/whosabhiraj/baton/internal/proto"
 	"github.com/whosabhiraj/baton/internal/redact"
 )
 
@@ -61,7 +61,7 @@ func (l *Log) Path() string { return l.path }
 // Append writes e as one line. TS is filled (UTC, ms) when empty; Detail is redacted.
 func (l *Log) Append(e Entry) error {
 	if e.TS == "" {
-		e.TS = time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
+		e.TS = proto.NowTS()
 	}
 	if e.Detail != nil {
 		if d, ok := redact.Value(e.Detail).(map[string]any); ok {

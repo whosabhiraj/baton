@@ -459,7 +459,7 @@ func (h *Hub) Store() *store.Store { return h.store }
 // SetConductor records what the conductor is doing and publishes a `conductor` notice.
 func (h *Hub) SetConductor(c proto.ConductorState) {
 	if c.Since == "" {
-		c.Since = time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
+		c.Since = proto.NowTS()
 	}
 	h.condMu.Lock()
 	h.conductor = c

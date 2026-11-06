@@ -9,9 +9,9 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/whosabhiraj/baton/internal/ids"
+	"github.com/whosabhiraj/baton/internal/proto"
 	"github.com/whosabhiraj/baton/internal/store"
 )
 
@@ -80,7 +80,7 @@ func (s *Store) saveLocked() error {
 	return store.WriteFileAtomic(s.path, b, 0o644)
 }
 
-func now() string { return time.Now().UTC().Format("2006-01-02T15:04:05.000Z") }
+func now() string { return proto.NowTS() }
 
 // Add stores a new pending approval.
 func (s *Store) Add(kind, runID, title string, detail map[string]any, by string) (Approval, error) {
