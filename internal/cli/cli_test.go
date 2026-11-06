@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/whosabhiraj/baton/internal/config"
 	"github.com/whosabhiraj/baton/internal/hub"
 )
 
@@ -222,16 +223,15 @@ func TestUsageErrorsExit2(t *testing.T) {
 		{"bool with value", []string{"error", "x", "--fatal=1"}, ""},
 		{"flag missing value", []string{"error", "x", "--note"}, ""},
 		{"flag ambiguous value", []string{"artifact", "file", "x", "--note", "-y"}, ""},
-		{"no command", []string{}, ""},
 		{"extra positional", []string{"hello", "extra"}, ""},
 		{"extra positional step", []string{"step", "a", "start", "b"}, ""},
 		{"ask missing text", []string{"ask"}, ""},
 		{"ask bad timeout", []string{"ask", "q", "--blocking", "--timeout", "abc"}, ""},
 		{"ask neg timeout", []string{"ask", "q", "--timeout=-1"}, ""},
 		{"error missing msg", []string{"error"}, ""},
-		{"later phase", []string{"attach"}, ""},
-		{"later phase hub", []string{"hub", "stop"}, ""},
-		{"up bad port", []string{"up", "--port", "abc"}, ""},
+		{"hub no sub", []string{"hub"}, ""},
+		{"hub bad sub", []string{"hub", "nope"}, ""},
+		{"serve bad port", []string{"hub", "serve", "--port", "abc", "--data-dir", "x"}, ""},
 	}
 	for _, c := range bad {
 		t.Run(c.name, func(t *testing.T) {
@@ -280,9 +280,6 @@ func TestHelpVersionNoEnv(t *testing.T) {
 	}
 	if code, out, _ := r.do("", "version"); code != 0 || out != "baton dev" {
 		t.Fatal(out)
-	}
-	if _, _, e := r.do(""); e != "baton: missing command. Try: baton help" {
-		t.Fatal(e)
 	}
 }
 
@@ -539,7 +536,12 @@ func TestParseArgs(t *testing.T) {
 
 // ---- up ----
 
-func TestUp(t *testing.T) {
+func TestHubServe(t *testing.T) {
+	oldCfg := loadConfig
+	defer func() { loadConfig = oldCfg }()
+	loadConfig = func(string) *config.Snapshot {
+		return &config.Snapshot{Config: config.Config{Hub: config.Hub{Port: 7777}}}
+	}
 	var got hub.Options
 	oldStart, oldClose, oldCtx := startHub, closeHub, upStopCtx
 	defer func() { startHub, closeHub, upStopCtx = oldStart, oldClose, oldCtx }()
@@ -556,7 +558,7 @@ func TestUp(t *testing.T) {
 	done := make(chan struct{})
 	var out, errb bytes.Buffer
 	go func() {
-		Main([]string{"up", "--dev", "--data-dir", dd, "--admin-token-file", tokFile}, strings.NewReader(""), &out, &errb, func(string) string { return "" })
+		Main([]string{"hub", "serve", "--dev", "--data-dir", dd, "--admin-token-file", tokFile}, strings.NewReader(""), &out, &errb, func(string) string { return "" })
 		close(done)
 	}()
 	time.Sleep(100 * time.Millisecond)
@@ -577,7 +579,7 @@ func TestUp(t *testing.T) {
 	stopCtx2, stop2 := context.WithCancel(context.Background())
 	stop2()
 	upStopCtx = func() (context.Context, context.CancelFunc) { return stopCtx2, stop2 }
-	Main([]string{"up", "--port", "9100", "--data-dir", dd}, strings.NewReader(""), &out, &errb, func(string) string { return "" })
+	Main([]string{"hub", "serve", "--port", "9100", "--data-dir", dd}, strings.NewReader(""), &out, &errb, func(string) string { return "" })
 	if got.Port != 9100 || got.PortFallback {
 		t.Fatalf("%+v", got)
 	}
@@ -585,7 +587,7 @@ func TestUp(t *testing.T) {
 	// already running
 	startHub = func(context.Context, hub.Options) (*hub.Hub, error) { return nil, hub.ErrAlreadyRunning }
 	errb.Reset()
-	if code := Main([]string{"up", "--data-dir", dd}, strings.NewReader(""), &out, &errb, func(string) string { return "" }); code != 1 || !strings.Contains(errb.String(), "already running") {
+	if code := Main([]string{"hub", "serve", "--data-dir", dd}, strings.NewReader(""), &out, &errb, func(string) string { return "" }); code != 1 || !strings.Contains(errb.String(), "already running") {
 		t.Fatal(code, errb.String())
 	}
 }

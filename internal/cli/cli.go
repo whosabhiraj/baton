@@ -24,7 +24,12 @@ const usage = `usage: baton <command>
   progress <0-100> "note" | artifact <file|diff|commit|url|log> <ref> [--note]
   ask "question" [--options a,b] [--blocking] [--timeout s] | inbox | heartbeat
   done --status success|partial|failed --summary ".." [--followups ".."] | error "msg" [--fatal]
-  up [--port N] [--dev]   (foreground hub for manual testing)`
+  (no command)          start the project hub in the background, print the dashboard URL, open it
+  up [--no-browser]     same, without the conductor line
+  attach                connect to the running hub (status; conductor chat comes in Phase 6)
+  hub status | stop [--yes] [--keep-agents] | rotate-token
+  hub serve [--project P] [--port N] [--dev]   (foreground hub; what the background hub runs)
+  all human commands accept --data-dir D to override the project data dir`
 
 type ctx struct {
 	stdin          io.Reader
@@ -38,7 +43,7 @@ var maxPositionals = map[string]int{
 	"hello": 0, "heartbeat": 0, "inbox": 0, "plan": 0, "done": 0, "step": 2, "progress": 2, "artifact": 2, "ask": 1, "error": 1,
 }
 
-var laterPhase = map[string]int{"attach": 2, "hub": 2, "mock": 3, "login": 5, "gc": 7}
+var laterPhase = map[string]int{"mock": 3, "login": 5, "gc": 7}
 
 // Main runs the CLI and returns the process exit code.
 func Main(args []string, stdin io.Reader, stdout, stderr io.Writer, getenv func(string) string) int {
@@ -72,10 +77,7 @@ func (c *ctx) dispatch(argv []string) (int, error) {
 	if len(pos) > 0 {
 		cmd, pos = pos[0], pos[1:]
 	}
-	if cmd == "" && !o.flag("help") {
-		return 0, usagef("missing command")
-	}
-	if cmd == "" || cmd == "help" || o.flag("help") {
+	if cmd == "help" || o.flag("help") {
 		fmt.Fprintln(c.stdout, usage)
 		return 0, nil
 	}
@@ -83,8 +85,14 @@ func (c *ctx) dispatch(argv []string) (int, error) {
 	case "version":
 		fmt.Fprintf(c.stdout, "baton %s\n", Version)
 		return 0, nil
+	case "":
+		return c.cmdUpOrBaton(o, true, false)
 	case "up":
-		return c.cmdUp(o)
+		return c.cmdUpOrBaton(o, false, false)
+	case "attach":
+		return c.cmdUpOrBaton(o, false, true)
+	case "hub":
+		return c.cmdHub(o, pos)
 	}
 	if ph, ok := laterPhase[cmd]; ok {
 		fmt.Fprintf(c.stderr, "baton: %s not available yet (Phase %d)\n", cmd, ph)

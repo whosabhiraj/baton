@@ -2,10 +2,12 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
+	"net/http"
 	"os"
-	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"strconv"
@@ -13,7 +15,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/whosabhiraj/baton/internal/config"
+	"github.com/whosabhiraj/baton/internal/daemon"
+	"github.com/whosabhiraj/baton/internal/gitx"
 	"github.com/whosabhiraj/baton/internal/hub"
+	"github.com/whosabhiraj/baton/internal/logx"
 	"github.com/whosabhiraj/baton/internal/paths"
 )
 
@@ -24,37 +30,49 @@ var (
 	upStopCtx = func() (context.Context, context.CancelFunc) {
 		return signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	}
+	loadConfig = func(repo string) *config.Snapshot {
+		return config.Load(config.GlobalPath(), config.ProjectPath(repo))
+	}
 )
 
-// repoRoot returns the git top-level of dir, or dir itself when not in a repo.
-func repoRoot(dir string) string {
-	cmd := exec.Command("git", "rev-parse", "--show-toplevel")
-	cmd.Dir = dir
-	if out, err := cmd.Output(); err == nil {
-		if s := strings.TrimSpace(string(out)); s != "" {
-			return filepath.FromSlash(s)
+// project resolves the repo (may be "" for --data-dir without a repo) and the data dir.
+// --project P names the repo; --data-dir D overrides the data dir (tests).
+func project(o opts) (repo, dataDir string, err error) {
+	if o.has("project") {
+		repo = o.get("project")
+	} else if cwd, e := os.Getwd(); e == nil {
+		if top, e := gitx.TopLevel(cwd); e == nil {
+			repo = top
+		} else if !o.has("data-dir") {
+			repo = cwd
 		}
 	}
-	return dir
+	if o.has("data-dir") {
+		return repo, o.get("data-dir"), nil
+	}
+	if repo == "" {
+		return "", "", errors.New("cannot determine the project folder")
+	}
+	return repo, paths.ProjectDataDir(repo, paths.BatonHome()), nil
 }
 
-func (c *ctx) cmdUp(o opts) (int, error) {
-	opt := hub.Options{Dev: o.flag("dev"), Port: 7777, PortFallback: true}
+// cmdHubServe runs the hub in the foreground (what the detached daemon executes).
+func (c *ctx) cmdHubServe(o opts) (int, error) {
+	repo, dataDir, err := project(o)
+	if err != nil {
+		return 0, err
+	}
+	cfg := loadConfig(repo).Config
+	opt := hub.Options{Dev: o.flag("dev"), DataDir: dataDir, Port: cfg.Hub.Port, PortFallback: true, Bind: cfg.Hub.Bind}
+	if cfg.Hub.HeartbeatTimeoutS > 0 {
+		opt.HeartbeatTimeout = time.Duration(cfg.Hub.HeartbeatTimeoutS) * time.Second
+	}
 	if o.has("port") {
 		n, err := strconv.Atoi(strings.TrimSpace(o.get("port")))
 		if err != nil || n < 0 || n > 65535 {
 			return 0, usagef("--port must be 0-65535, got %q", o.get("port"))
 		}
 		opt.Port, opt.PortFallback = n, false
-	}
-	if o.has("data-dir") {
-		opt.DataDir = o.get("data-dir")
-	} else {
-		cwd, err := os.Getwd()
-		if err != nil {
-			return 0, err
-		}
-		opt.DataDir = paths.ProjectDataDir(repoRoot(cwd), paths.BatonHome())
 	}
 	// --admin-token-file F: if F exists and is non-empty, use its token; otherwise the hub's
 	// token (persistent per project) is written to F after start.
@@ -66,6 +84,17 @@ func (c *ctx) cmdUp(o opts) (int, error) {
 			}
 		}
 	}
+	level := slog.LevelInfo
+	if opt.Dev {
+		level = slog.LevelDebug
+	}
+	if lg, closer, err := logx.Open(dataDir, level); err == nil {
+		opt.Logger = lg
+		defer closer.Close()
+	} else {
+		fmt.Fprintf(c.stderr, "baton: warning: cannot open log (%s)\n", err.Error())
+	}
+
 	stop, cancel := upStopCtx()
 	defer cancel()
 	h, err := startHub(stop, opt)
@@ -75,6 +104,12 @@ func (c *ctx) cmdUp(o opts) (int, error) {
 		}
 		return 0, err
 	}
+	exe, _ := os.Executable()
+	info := daemon.Info{PID: os.Getpid(), Port: h.Port, URL: h.URL, Instance: healthInstance(h.URL), Version: Version,
+		Exe: exe, StartedAt: time.Now().UTC().Format(time.RFC3339), DataDir: h.DataDir, Project: repo}
+	if err := daemon.WriteInfo(h.DataDir, info); err != nil {
+		fmt.Fprintf(c.stderr, "baton: warning: cannot write %s (%s)\n", daemon.InfoFile, err.Error())
+	}
 	fmt.Fprintf(c.stdout, "baton hub: %s\n", h.URL)
 	fmt.Fprintf(c.stdout, "admin token: %s\n", h.AdminToken)
 	fmt.Fprintf(c.stdout, "data dir: %s\n", h.DataDir)
@@ -83,11 +118,30 @@ func (c *ctx) cmdUp(o opts) (int, error) {
 			fmt.Fprintf(c.stderr, "baton: warning: could not write admin token file (%s)\n", err.Error())
 		}
 	}
-	<-stop.Done()
+	select {
+	case <-stop.Done():
+	case <-h.Done(): // POST /api/hub/shutdown
+	}
 	sctx, scancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer scancel()
-	if err := closeHub(h, sctx); err != nil {
-		return 0, err
-	}
-	return 0, nil
+	err = closeHub(h, sctx)
+	_ = daemon.RemoveInfo(h.DataDir)
+	return 0, err
 }
+
+// healthInstance reads the instance id the hub reports on /api/health ("" on failure).
+func healthInstance(url string) string {
+	cl := &http.Client{Timeout: 3 * time.Second, Transport: &http.Transport{Proxy: nil, DisableKeepAlives: true}}
+	resp, err := cl.Get(strings.TrimRight(url, "/") + "/api/health")
+	if err != nil {
+		return ""
+	}
+	defer resp.Body.Close()
+	var m struct {
+		Instance string `json:"instance"`
+	}
+	_ = json.NewDecoder(resp.Body).Decode(&m)
+	return m.Instance
+}
+
+func adminTokenPath(dataDir string) string { return filepath.Join(dataDir, hub.AdminTokenFile) }

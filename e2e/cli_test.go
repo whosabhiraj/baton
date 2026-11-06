@@ -208,7 +208,6 @@ func TestCLIUsageErrors(t *testing.T) {
 		{"bad plan shape", []string{"plan"}, `{"steps":[]}`},
 		{"unknown command", []string{"frobnicate"}, ""},
 		{"unknown flag", []string{"hello", "--wat"}, ""},
-		{"no command", []string{}, ""},
 	}
 	for _, c := range bad {
 		t.Run(c.name, func(t *testing.T) {

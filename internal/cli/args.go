@@ -14,6 +14,7 @@ var optDefs = map[string]bool{
 	"blocking": true, "timeout": false, "status": false, "followups": false, "fatal": true,
 	"file": false, "confirm": true, "port": false, "dev": true, "help": true,
 	"data-dir": false, "admin-token-file": false,
+	"project": false, "no-browser": true, "yes": true, "keep-agents": true,
 }
 
 // opts holds parsed flags. Presence matters (an empty --note= is "defined").

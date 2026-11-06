@@ -14,16 +14,16 @@ import (
 
 const crashToken = "bt_adm_test_crash"
 
-// hubProc is a separate `baton up` process.
+// hubProc is a separate `baton hub serve` process.
 type hubProc struct {
 	cmd *exec.Cmd
 	URL string
 }
 
-// startUp launches `baton up --dev --port 0` and reads its URL from the first stdout line.
+// startUp launches `baton hub serve --dev --port 0` and reads its URL from the first stdout line.
 func startUp(t *testing.T, dataDir, tokenFile string) *hubProc {
 	t.Helper()
-	cmd := exec.Command(binPath, "up", "--dev", "--port", "0", "--data-dir", dataDir, "--admin-token-file", tokenFile)
+	cmd := exec.Command(binPath, "hub", "serve", "--dev", "--port", "0", "--data-dir", dataDir, "--admin-token-file", tokenFile)
 	cmd.Env = baseEnv()
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -31,7 +31,7 @@ func startUp(t *testing.T, dataDir, tokenFile string) *hubProc {
 	}
 	cmd.Stderr = io.Discard
 	if err := cmd.Start(); err != nil {
-		t.Fatalf("start baton up: %v", err)
+		t.Fatalf("start baton hub serve: %v", err)
 	}
 	hp := &hubProc{cmd: cmd}
 	t.Cleanup(hp.kill)
@@ -52,7 +52,7 @@ func startUp(t *testing.T, dataDir, tokenFile string) *hubProc {
 		}
 		hp.URL = strings.TrimSpace(strings.TrimPrefix(l, "baton hub: "))
 	case <-time.After(20 * time.Second):
-		t.Fatal("timed out waiting for baton up to print its URL")
+		t.Fatal("timed out waiting for hub serve to print its URL")
 	}
 	return hp
 }
