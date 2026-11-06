@@ -3,7 +3,7 @@ import { ENDED, h, renderIf, setKids } from '../util';
 
 const CONN_TEXT = { connecting: 'connecting', live: 'live', down: 'offline, retrying', auth: 'not signed in' } as const;
 
-export function topbar(host: HTMLElement, toggleView: () => void): () => void {
+export function topbar(host: HTMLElement, toggleView: () => void, toggleTimeline: () => void): () => void {
   const status = h('span', { class: 'pill', 'aria-live': 'polite' });
   const stats = h('div', { class: 'stats' });
   const actions = h('div', { class: 'actions' });
@@ -34,7 +34,7 @@ export function topbar(host: HTMLElement, toggleView: () => void): () => void {
     );
 
     const pending = state.approvals.length;
-    renderIf(actions, JSON.stringify([state.configOk, state.configIssues, pending, state.view]), () =>
+    renderIf(actions, JSON.stringify([state.configOk, state.configIssues, pending, state.view, state.timeline]), () =>
       setKids(
         actions,
         !state.configOk &&
@@ -45,6 +45,7 @@ export function topbar(host: HTMLElement, toggleView: () => void): () => void {
           ),
         h('button', { onclick: () => setOverlay('approvals'), class: pending ? 'badge-btn has' : 'badge-btn' }, 'Approvals', h('span', { class: 'count' }, String(pending))),
         h('button', { onclick: () => setOverlay('config') }, 'Config'),
+        h('button', { onclick: toggleTimeline, title: 'Show or hide the timeline (T)', 'aria-pressed': state.timeline }, 'Timeline'),
         h('button', { onclick: toggleView, title: 'Toggle list and scene (L)' }, state.view === 'list' ? 'Scene' : 'List'),
         h('button', { class: 'primary', onclick: () => setOverlay('spawn'), title: 'Spawn an agent (S)' }, 'Spawn'),
       ),

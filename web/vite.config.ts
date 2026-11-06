@@ -4,7 +4,8 @@ import { defineConfig } from 'vite';
 export default defineConfig({
   root: import.meta.dirname,
   base: './',
-  build: { outDir: 'dist', emptyOutDir: true, target: 'es2022' },
+  // three.js is one lazy chunk (~600 kB, loaded only for the scene, served locally): no warning for it.
+  build: { outDir: 'dist', emptyOutDir: true, target: 'es2022', chunkSizeWarningLimit: 800 },
   server: {
     proxy: { '/api': { target: process.env.BATON_HUB_URL ?? 'http://127.0.0.1:7777', changeOrigin: false } },
   },

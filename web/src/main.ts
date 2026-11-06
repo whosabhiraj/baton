@@ -11,6 +11,7 @@ import { accountsRail } from './ui/accounts';
 import { detailPanel } from './ui/detail';
 import { overlayHost } from './ui/overlay';
 import { runsList, visibleRuns } from './ui/runs';
+import { timelinePanel } from './ui/timeline';
 import { topbar } from './ui/topbar';
 import { h, typing } from './util';
 
@@ -43,9 +44,10 @@ function start(): void {
     sceneCtl?.setVisible(want);
     sceneCtl?.update();
   };
+  const timeline = h('section', { id: 'timeline', 'aria-label': 'Timeline', hidden: true });
   const detail = h('aside', { id: 'detail', 'aria-label': 'Selected agent', hidden: true });
   const overlay = h('div', { id: 'overlay', hidden: true });
-  app.append(bar, h('div', { id: 'layout' }, rail, h('main', { id: 'main' }, list, scene), detail), overlay);
+  app.append(bar, h('div', { id: 'layout' }, rail, h('main', { id: 'main' }, list, scene, timeline), detail), overlay);
 
   const toggleView = () => {
     state.view = state.view === 'list' ? 'scene' : 'list';
@@ -53,7 +55,12 @@ function start(): void {
     emit();
   };
   state.view = localStorage.getItem('baton.view') === 'list' ? 'list' : 'scene';
-  const parts = [topbar(bar, toggleView), accountsRail(rail), runsList(list), detailPanel(detail), overlayHost(overlay)];
+  const toggleTimeline = () => {
+    state.timeline = !state.timeline;
+    localStorage.setItem('baton.timeline', state.timeline ? '1' : '0');
+    emit();
+  };
+  const parts = [topbar(bar, toggleView, toggleTimeline), accountsRail(rail), runsList(list), timelinePanel(timeline), detailPanel(detail), overlayHost(overlay)];
   const paint = () => {
     if (state.conn === 'auth') return needLogin('The hub rejected the token. Paste a valid admin token.');
     list.hidden = state.view !== 'list';
@@ -94,6 +101,7 @@ function start(): void {
       e.preventDefault();
       setOverlay('spawn');
     } else if (k === 'l') toggleView();
+    else if (k === 't') toggleTimeline();
     else if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && !state.overlay) {
       const rows = visibleRuns();
       if (!rows.length) return;

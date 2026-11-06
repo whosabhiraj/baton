@@ -27,6 +27,7 @@ export interface State {
   selected: string | null;
   accountFilter: string | null;
   view: 'list' | 'scene';
+  timeline: boolean;
   overlay: Overlay;
   notices: string[];
 }
@@ -46,6 +47,7 @@ export const state: State = {
   selected: null,
   accountFilter: null,
   view: 'list',
+  timeline: localStorage.getItem('baton.timeline') === '1',
   overlay: null,
   notices: [],
 };
@@ -100,10 +102,15 @@ function pushEvent(ev: StoredEvent): void {
   if (r.length > RING) r.splice(0, r.length - RING);
 }
 
+/** Extra listeners for every live event, and for "drop everything" (hub restart / reset). */
+export const eventHooks = new Set<(ev: StoredEvent) => void>();
+export const resetHooks = new Set<() => void>();
+
 /** Called for every `baton` SSE frame. */
 export function onEvent(ev: StoredEvent): void {
   stamps.push(Date.now());
   pushEvent(ev);
+  eventHooks.forEach((f) => f(ev));
   scheduleRefresh();
   emit();
 }
@@ -187,6 +194,7 @@ export async function loadHistory(runId: string, force = false): Promise<void> {
 export async function fullReload(): Promise<void> {
   rings.clear();
   loaded.clear();
+  resetHooks.forEach((f) => f());
   await refresh();
   if (state.selected) await loadHistory(state.selected);
 }
