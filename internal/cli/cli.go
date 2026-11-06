@@ -29,6 +29,7 @@ const usage = `usage: baton <command>
   attach                connect to the running hub (status; conductor chat comes in Phase 6)
   hub status | stop [--yes] [--keep-agents] | rotate-token
   hub serve [--project P] [--port N] [--dev]   (foreground hub; what the background hub runs)
+  mock [--speed N] [--seed N] [--once] [--reset] [--no-browser]   (demo hub with fake agents on a scratch repo)
   all human commands accept --data-dir D to override the project data dir`
 
 type ctx struct {
@@ -43,7 +44,7 @@ var maxPositionals = map[string]int{
 	"hello": 0, "heartbeat": 0, "inbox": 0, "plan": 0, "done": 0, "step": 2, "progress": 2, "artifact": 2, "ask": 1, "error": 1,
 }
 
-var laterPhase = map[string]int{"mock": 3, "login": 5, "gc": 7}
+var laterPhase = map[string]int{"login": 5, "gc": 7}
 
 // Main runs the CLI and returns the process exit code.
 func Main(args []string, stdin io.Reader, stdout, stderr io.Writer, getenv func(string) string) int {
@@ -93,6 +94,8 @@ func (c *ctx) dispatch(argv []string) (int, error) {
 		return c.cmdUpOrBaton(o, false, true)
 	case "hub":
 		return c.cmdHub(o, pos)
+	case "mock":
+		return c.cmdMock(o)
 	}
 	if ph, ok := laterPhase[cmd]; ok {
 		fmt.Fprintf(c.stderr, "baton: %s not available yet (Phase %d)\n", cmd, ph)

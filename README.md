@@ -32,6 +32,10 @@ npm run check    # fmt, vet, all tests
 npm run build    # -> dist/baton
 ```
 
+## try it without agents
+
+`baton mock` starts a hub with a fake conductor and six fake agents on a scratch repo, so you can watch the dashboard do its thing without spending any quota. it uses its own data folder (`~/.baton/mock`, never your project or your real config). ctrl+c stops it. `--once` stops after the opening scenario, `--speed 5` runs it faster, `--seed N` repeats a run, `--reset` starts from a clean folder.
+
 ## docs
 
 - `protocol/PROTOCOL.md`: how agents talk to the hub

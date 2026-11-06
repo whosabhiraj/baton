@@ -22,6 +22,7 @@ Commands that work today (need Go and Node 24+):
 | `npm run build` | builds `dist/baton` (`dist/baton.exe` on Windows), version-stamped |
 | `npm run install:baton` | `go install` → `baton` on PATH (Go's bin folder; open a new terminal) |
 | `baton up --dev` | runs a hub in the foreground (prints URL + admin token; Ctrl+C stops). Phase 2 makes it a background daemon |
+| `baton mock [--speed N] [--seed N] [--once] [--reset]` | foreground demo hub with a fake conductor and fake agents on a scratch repo (`~/.baton/mock`); no real agents, no quota |
 | `baton help` | agent commands (`hello`, `plan`, `step`, `progress`, `ask`, `inbox`, `done`, …) |
 
 Things only you can do:
@@ -78,6 +79,8 @@ internal/spool          outbox.jsonl tailer (offsets, partial lines, CRLF/BOM, U
 internal/bus            SSE fan-out ring buffer
 internal/api            HTTP API (PROTOCOL.md A11 + A12)
 internal/hub            wiring, OS lock, port fallback, admin token, stalled detection
+internal/approvals      approval requests (merge/spawn), approvals.json
+internal/mock           `baton mock`: fake conductor + fake agents driving a real hub over HTTP
 internal/cli            agent commands + `baton up` (foreground) + help/version
 protocol/PROTOCOL.md    BATON/1 (original spec §3 + amendments A1–A12)
 protocol/schema/*.json  JSON Schemas = source of truth; protocol/fixtures/ = shared examples
