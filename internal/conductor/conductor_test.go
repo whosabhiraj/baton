@@ -1,7 +1,6 @@
 package conductor
 
 import (
-	"bufio"
 	"encoding/json"
 	"errors"
 	"os"
@@ -17,61 +16,12 @@ import (
 	"github.com/whosabhiraj/baton/internal/proto"
 )
 
-// TestMain doubles as a fake `claude -p --input-format stream-json --output-format stream-json`.
+// TestMain doubles as the fake `claude` (FakeCLI) when the Manager runs the test binary.
 func TestMain(m *testing.M) {
-	if os.Getenv("BATON_FAKE_CLAUDE") == "1" {
-		os.Exit(fakeClaude())
+	if os.Getenv(FakeEnv) == "1" {
+		os.Exit(FakeCLI(os.Args[1:], os.Stdin, os.Stdout))
 	}
 	os.Exit(m.Run())
-}
-
-func fakeClaude() int {
-	args := os.Args[1:]
-	sid := ""
-	for i, a := range args {
-		if (a == "--session-id" || a == "--resume") && i+1 < len(args) {
-			sid = args[i+1]
-		}
-	}
-	if f := os.Getenv("BATON_FAKE_ARGS"); f != "" {
-		b, _ := json.Marshal(args)
-		fh, _ := os.OpenFile(f, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
-		fh.Write(append(b, '\n'))
-		fh.Close()
-	}
-	out := bufio.NewWriter(os.Stdout)
-	emit := func(v any) { b, _ := json.Marshal(v); out.Write(append(b, '\n')); out.Flush() }
-	sc := bufio.NewScanner(os.Stdin)
-	sc.Buffer(make([]byte, 1<<20), 1<<20)
-	first := true
-	for sc.Scan() {
-		var m struct {
-			Message struct {
-				Content []struct {
-					Text string `json:"text"`
-				} `json:"content"`
-			} `json:"message"`
-		}
-		json.Unmarshal(sc.Bytes(), &m)
-		text := ""
-		if len(m.Message.Content) > 0 {
-			text = m.Message.Content[0].Text
-		}
-		if text == "crash" {
-			return 3
-		}
-		if first {
-			emit(map[string]any{"type": "system", "subtype": "init", "session_id": sid, "model": "fake"})
-			first = false
-		}
-		emit(map[string]any{"type": "assistant", "message": map[string]any{"id": "m1", "content": []any{
-			map[string]any{"type": "tool_use", "name": "mcp__baton__list_agents", "input": map[string]any{}}}}})
-		emit(map[string]any{"type": "assistant", "message": map[string]any{"id": "m2", "content": []any{
-			map[string]any{"type": "text", "text": "echo: " + text}}}})
-		emit(map[string]any{"type": "result", "subtype": "success", "session_id": sid,
-			"usage": map[string]any{"input_tokens": 1, "output_tokens": 1}, "total_cost_usd": 0.001})
-	}
-	return 0
 }
 
 type fixture struct {
@@ -107,7 +57,7 @@ func (f *fixture) manager(o ...func(*Options)) *Manager {
 			defer f.mu.Unlock()
 			f.states = append(f.states, s.State)
 		},
-		ExtraEnv:  map[string]string{"BATON_FAKE_CLAUDE": "1", "BATON_FAKE_ARGS": f.args},
+		ExtraEnv:  map[string]string{FakeEnv: "1", "BATON_FAKE_ARGS": f.args},
 		WakeDelay: 20 * time.Millisecond, Backoff: []time.Duration{10 * time.Millisecond, 10 * time.Millisecond},
 	}
 	if f.bus != nil {

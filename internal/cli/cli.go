@@ -24,9 +24,10 @@ const usage = `usage: baton <command>
   progress <0-100> "note" | artifact <file|diff|commit|url|log> <ref> [--note]
   ask "question" [--options a,b] [--blocking] [--timeout s] | inbox | heartbeat
   done --status success|partial|failed --summary ".." [--followups ".."] | error "msg" [--fatal]
-  (no command)          start the project hub in the background, print the dashboard URL, open it
-  up [--no-browser]     same, without the conductor line
-  attach                connect to the running hub (status; conductor chat comes in Phase 6)
+  (no command) [--no-browser] [--no-chat]   start the hub (background) and the conductor, open the
+                        dashboard and, in a terminal, the conductor chat
+  up [--no-browser]     hub + dashboard only, no conductor
+  attach                status, then the conductor chat (Ctrl+C detaches; everything keeps running)
   hub status | stop [--yes] [--keep-agents] | rotate-token
   hub serve [--project P] [--port N] [--dev]   (foreground hub; what the background hub runs)
   login <account-id> | login --status [<account-id>]   (sign an account in, in its own isolated config dir)

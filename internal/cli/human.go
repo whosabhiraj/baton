@@ -2,16 +2,19 @@ package cli
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"os"
 	"os/exec"
+	"os/signal"
 	"runtime"
 	"strings"
 	"time"
 
+	"github.com/whosabhiraj/baton/internal/chat"
 	"github.com/whosabhiraj/baton/internal/daemon"
 	"github.com/whosabhiraj/baton/internal/gitx"
 	"github.com/whosabhiraj/baton/internal/ids"
@@ -162,7 +165,7 @@ func (c *ctx) cmdUpOrBaton(o opts, conductor, attach bool) (int, error) {
 	if attach {
 		c.printStatusLines(in, dataDir)
 		fmt.Fprintln(c.stdout, "conductor: "+conductorLine(in, dataDir, "GET", "/api/conductor"))
-		return 0, nil
+		return c.runChat(in, dataDir)
 	}
 	if conductor {
 		fmt.Fprintln(c.stdout, "conductor: "+conductorLine(in, dataDir, "POST", "/api/conductor/start"))
@@ -172,6 +175,31 @@ func (c *ctx) cmdUpOrBaton(o opts, conductor, attach bool) (int, error) {
 		if loadConfig(repo).Config.Hub.OpenBrowser {
 			openBrowser(dashboardURL(in.URL, readAdminToken(dataDir)))
 		}
+	}
+	if conductor && !o.flag("no-chat") {
+		if chat.IsTerminal(c.stdin, c.stdout) {
+			return c.runChat(in, dataDir)
+		}
+		fmt.Fprintln(c.stdout, "chat: run `baton attach` in a terminal")
+	}
+	return 0, nil
+}
+
+// runChat attaches the conductor chat (Bubble Tea in a terminal, line mode otherwise).
+func (c *ctx) runChat(in *daemon.Info, dataDir string) (int, error) {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+	err := chat.Run(ctx, chat.Options{URL: in.URL, Token: readAdminToken(dataDir), In: c.stdin, Out: c.stdout})
+	if err != nil {
+		var ae *chat.APIError
+		if errors.As(err, &ae) && ae.Code == "NO_CONDUCTOR" {
+			fmt.Fprintln(c.stdout, "chat: this hub has no conductor")
+			return 0, nil
+		}
+		if errors.As(err, &ae) && ae.Code == "NOT_FOUND" {
+			return 1, errors.New("the running hub is older than this baton: restart it (`baton hub stop`, then `baton`)")
+		}
+		return 1, err
 	}
 	return 0, nil
 }

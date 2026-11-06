@@ -141,6 +141,48 @@ type Manager struct {
 
 	stopWake chan struct{}
 	stateCh  chan proto.ConductorState // SetState calls, in order
+
+	subMu sync.Mutex
+	subs  map[chan Update]struct{}
+}
+
+// Update is what subscribers get: a new history entry or a state change.
+type Update struct {
+	Entry *Entry                `json:"entry,omitempty"`
+	State *proto.ConductorState `json:"state,omitempty"`
+}
+
+// Subscribe returns live updates until cancel is called. A subscriber that falls behind is
+// dropped (its channel is closed); it should reconnect and replay from History.
+func (m *Manager) Subscribe() (<-chan Update, func()) {
+	ch := make(chan Update, 256)
+	m.subMu.Lock()
+	if m.subs == nil {
+		m.subs = map[chan Update]struct{}{}
+	}
+	m.subs[ch] = struct{}{}
+	m.subMu.Unlock()
+	return ch, func() {
+		m.subMu.Lock()
+		if _, ok := m.subs[ch]; ok {
+			delete(m.subs, ch)
+			close(ch)
+		}
+		m.subMu.Unlock()
+	}
+}
+
+func (m *Manager) fanout(u Update) {
+	m.subMu.Lock()
+	defer m.subMu.Unlock()
+	for ch := range m.subs {
+		select {
+		case ch <- u:
+		default:
+			delete(m.subs, ch)
+			close(ch)
+		}
+	}
 }
 
 // New opens the conductor's files. It does not start the process (see Resume / Start).
@@ -229,6 +271,7 @@ func (m *Manager) record(e Entry) {
 		m.log.Warn("conductor history write failed", "err", err)
 	}
 	m.histMu.Unlock()
+	m.fanout(Update{Entry: &e})
 	if m.o.OnEntry != nil {
 		m.o.OnEntry(e)
 	}
@@ -286,6 +329,8 @@ func (m *Manager) setStateLocked(s string) {
 		default: // never block under the lock; the next change brings it up to date
 		}
 	}
+	st := m.state
+	m.fanout(Update{State: &st})
 }
 
 // State returns what the conductor is doing.
@@ -605,7 +650,9 @@ func (m *Manager) Send(text, from string) error {
 	msg := map[string]any{"type": "user", "message": map[string]any{"role": "user",
 		"content": []map[string]any{{"type": "text", "text": text}}}}
 	b, _ := json.Marshal(msg)
+	m.record(Entry{Dir: "in", From: from, Text: text}) // before the write: replies can be instant
 	if _, err := m.stdin.Write(append(b, '\n')); err != nil {
+		m.record(Entry{Dir: "hub", Event: "error", Text: "message not delivered: " + err.Error()})
 		return fmt.Errorf("conductor is not accepting input: %w", err)
 	}
 	m.busy = true
@@ -614,7 +661,6 @@ func (m *Manager) Send(text, from string) error {
 		m.saveSessionLocked()
 	}
 	m.setStateLocked(StateThinking)
-	m.record(Entry{Dir: "in", From: from, Text: text})
 	return nil
 }
 

@@ -129,6 +129,7 @@ func New(d Deps) http.Handler {
 	mux.HandleFunc("/api/conductor/reset", a.route("POST", authAdmin, a.conductorReset))
 	mux.HandleFunc("/api/conductor/send", a.route("POST", authAdmin, a.conductorSend))
 	mux.HandleFunc("/api/conductor/history", a.route("GET", authAdmin, a.conductorHistory))
+	mux.HandleFunc("/api/conductor/stream", a.route("GET", authAdminQuery, a.conductorStream))
 	mux.HandleFunc("/api/dev/runs", a.route("POST", authAdmin, a.devRun))
 	mux.HandleFunc("/api/hub/shutdown", a.route("POST", authAdmin, a.shutdown))
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {

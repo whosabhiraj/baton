@@ -4,8 +4,12 @@ package api
 // dashboard. Admin token only (the conductor never drives itself through these).
 
 import (
+	"bytes"
+	"encoding/json"
+	"io"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/whosabhiraj/baton/internal/conductor"
 	"github.com/whosabhiraj/baton/internal/proto"
@@ -19,6 +23,7 @@ type ConductorCtl interface {
 	Reset()
 	Send(text, from string) error
 	History(after, limit int) ([]conductor.Entry, int, error)
+	Subscribe() (<-chan conductor.Update, func())
 }
 
 func (a *api) noConductor(w http.ResponseWriter) bool {
@@ -109,4 +114,93 @@ func (a *api) conductorHistory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, 200, map[string]any{"ok": true, "entries": es, "last": last})
+}
+
+// conductorStream (GET /api/conductor/stream, SSE; admin via header or ?token=) sends
+// `event: entry` (id = entry n) for history entries after Last-Event-ID / ?after (absent = the
+// last 200), then live entries and `event: state` changes.
+func (a *api) conductorStream(w http.ResponseWriter, r *http.Request) {
+	if a.noConductor(w) {
+		return
+	}
+	after, replay := 0, 200
+	lid := r.Header.Get("Last-Event-ID")
+	if lid == "" {
+		lid = r.URL.Query().Get("after")
+	}
+	if lid != "" {
+		n, err := strconv.Atoi(lid)
+		if err != nil || n < 0 {
+			writeErr(w, proto.NewError(proto.CodeInvalidPayload, "bad after"))
+			return
+		}
+		after, replay = n, 5000
+	}
+	ch, cancel := a.ConductorCtl.Subscribe() // before reading history: nothing falls in between
+	defer cancel()
+	past, _, err := a.ConductorCtl.History(after, replay)
+	if err != nil {
+		writeErr(w, proto.NewError(proto.CodeInternal, "cannot read conductor history"))
+		return
+	}
+	rc := http.NewResponseController(w)
+	h := w.Header()
+	h.Set("Content-Type", "text/event-stream")
+	h.Set("Cache-Control", "no-cache")
+	h.Set("X-Accel-Buffering", "no")
+	w.WriteHeader(http.StatusOK)
+	write := func(s string) bool {
+		_ = rc.SetWriteDeadline(time.Now().Add(a.WriteTimeout))
+		if _, err := io.WriteString(w, s); err != nil {
+			return false
+		}
+		return rc.Flush() == nil
+	}
+	data := func(v any) string {
+		var buf bytes.Buffer
+		enc := json.NewEncoder(&buf)
+		enc.SetEscapeHTML(false)
+		_ = enc.Encode(v)
+		return "data: " + string(bytes.TrimRight(buf.Bytes(), "\n")) + "\n\n"
+	}
+	info := a.ConductorCtl.Info()
+	if !write("retry: 2000\n\nevent: state\n" + data(info.State)) {
+		return
+	}
+	sent := after
+	for _, e := range past {
+		if !write("id: " + strconv.Itoa(e.N) + "\nevent: entry\n" + data(e)) {
+			return
+		}
+		sent = e.N
+	}
+	tick := time.NewTicker(a.KeepAlive)
+	defer tick.Stop()
+	for {
+		select {
+		case u, ok := <-ch:
+			if !ok {
+				return // fell behind: the client reconnects with Last-Event-ID
+			}
+			switch {
+			case u.Entry != nil && u.Entry.N > sent:
+				if !write("id: " + strconv.Itoa(u.Entry.N) + "\nevent: entry\n" + data(u.Entry)) {
+					return
+				}
+				sent = u.Entry.N
+			case u.State != nil:
+				if !write("event: state\n" + data(u.State)) {
+					return
+				}
+			}
+		case <-tick.C:
+			if !write(": ping\n\n") {
+				return
+			}
+		case <-r.Context().Done():
+			return
+		case <-a.Done:
+			return
+		}
+	}
 }

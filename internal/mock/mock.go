@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/whosabhiraj/baton/internal/conductor"
 	"github.com/whosabhiraj/baton/internal/gitx"
 	"github.com/whosabhiraj/baton/internal/hub"
 	"github.com/whosabhiraj/baton/internal/logx"
@@ -44,6 +45,7 @@ hub:
 conductor:
   account: claude-a
   model: opus
+  auto_wake: false   # the mock conductor is a stand-in (no model): don't nudge it
 accounts:
   - id: claude-a
     label: "Claude A (conductor)"
@@ -107,9 +109,12 @@ func Run(ctx context.Context, o Options, ready func(h *hub.Hub, e *Engine)) erro
 		lg = l
 		defer closer.Close()
 	}
+	exe, _ := os.Executable()
 	h, err := hub.Start(ctx, hub.Options{DataDir: dataDir, Repo: repo, GlobalConfig: ConfigPath(), Dev: true, FakeMerges: true,
 		Port: o.Port, PortFallback: true, IdleStop: -1, HeartbeatTimeout: stall, Logger: lg,
-		Launcher: e, OnApproval: e.OnApproval})
+		Launcher: e, OnApproval: e.OnApproval,
+		// the chat works too: the baton binary itself plays the conductor CLI (conductor.FakeCLI)
+		ConductorExe: exe, ConductorCLI: exe, ConductorEnv: map[string]string{conductor.FakeEnv: "1"}})
 	if err != nil {
 		return err
 	}
