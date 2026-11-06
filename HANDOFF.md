@@ -1,6 +1,6 @@
 # HANDOFF — read this first
 
-Last updated: **2026-11-07**, **Phase 4a/4b/4c built** and redesigned (`ade3a1b`), awaiting the user's check. Phase 4 questions answered — see §E.
+Last updated: **2026-11-07**, **Phase 4a/4b/4c built** and redesigned (`20f9bfe`), awaiting the user's check. Phase 4 questions answered — see §E.
 
 Big change since Phase 0: the hub **and** the `baton` CLI are written in **Go** (one binary).
 `docs/GO_HUB_DESIGN.md` is approved and overrides `docs/PLAN.md` §3, §4.7, §5 and §6.
@@ -58,9 +58,9 @@ Things only you can do:
 |---|---|---|
 | 0 Plan + repo init | ✅ done | `2a5a98d` |
 | 1 Protocol + CLI + spool + minimal hub (Go) | ✅ done | up to the "Phase 1 done" commit |
-| 2 Hub core | ✅ done (verified end to end; PowerShell piped-`y` fix `b4e6c60`) | `d014636` … `b4e6c60` |
-| 3 `baton mock` | ✅ done (controls, approvals, kill checked by hand) | `a5f9baf` … this commit |
-| 4 Dashboard | 4a list/panels, 4b 3D map, 4c timeline + replay, redesign; awaiting check | `24bf6c7` … `ade3a1b` |
+| 2 Hub core | ✅ done (verified end to end; PowerShell piped-`y` fix `84b18d2`) | `73491a4` … `84b18d2` |
+| 3 `baton mock` | ✅ done (controls, approvals, kill checked by hand) | `7e40608` … this commit |
+| 4 Dashboard | 4a list/panels, 4b 3D map, 4c timeline + replay, redesign; awaiting check | `4b771b3` … `20f9bfe` |
 | 5 Adapters | pending | — |
 | 6 Conductor | pending | — |
 | 7 Hardening | pending | — |
@@ -103,11 +103,11 @@ Phase 4 answers (2026-11-07, all the recommended options):
 2. 3D: **lean first** (account orbits, agent shapes by kind, status looks, progress arcs, edges,
    click-to-focus, bloom, reduced-motion); pulses/particles/ring bursts/completed shelf only on request.
 3. Login: `baton` / `baton mock` open `http://127.0.0.1:<port>/#token=...`; the page stores it in
-   localStorage and strips it from the address bar; paste box as fallback. (Done in `24bf6c7`.)
+   localStorage and strips it from the address bar; paste box as fallback. (Done in `4b771b3`.)
 4. Approval gates: keep the current defaults — merges need a human click, spawns don't.
 
 State: Phase 4 built. 4a list/panels, 4b lean 3D map (`web/src/scene.ts`, lazy-loaded three.js),
-4c timeline with replay scrub (`web/src/ui/timeline.ts`), then a full redesign (`ade3a1b`). Checked
+4c timeline with replay scrub (`web/src/ui/timeline.ts`), then a full redesign (`20f9bfe`). Checked
 in headless Edge against the mock (no console errors). The design contract lives in a local,
 uncommitted file (`web/DESIGN.local.md`). Dev loop: `baton mock` + `npm run dev:web` (Vite proxies
 `/api` with a rewritten Host; never serves `*.local.*`). Next: user feedback, then ask before Phase 5.
