@@ -28,9 +28,10 @@ hub:
 
 # Which account runs the conductor, and with what model/effort. Optional.
 conductor:
-  account: claude-a
+  account: claude-a          # "" = the first enabled claude account (only claude runs the conductor for now)
   model: opus                # whatever the account's CLI accepts
-  effort: ""                 # CLI-specific effort level, "" = CLI default
+  effort: high               # CLI-specific effort level, "" = CLI default
+  auto_wake: true            # when idle, the hub nudges the conductor if an agent needs it
 
 accounts:
   - id: claude-a             # unique, lower-case: ^[a-z0-9][a-z0-9-]{0,30}$

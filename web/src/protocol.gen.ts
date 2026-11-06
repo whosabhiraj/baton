@@ -488,6 +488,7 @@ export namespace Config {
       account?: string;
       model?: string;
       effort?: string;
+      auto_wake?: boolean;
     };
     accounts?: Account[];
     routing?: StringMap;

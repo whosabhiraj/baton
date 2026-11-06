@@ -22,7 +22,8 @@ type dEnv struct {
 func newDEnv(t *testing.T) *dEnv {
 	t.Helper()
 	requireBin(t)
-	d := &dEnv{t: t, env: map[string]string{"BATON_HOME": t.TempDir()}}
+	// no real claude in tests: the conductor start fails cleanly
+	d := &dEnv{t: t, env: map[string]string{"BATON_HOME": t.TempDir(), "BATON_CONDUCTOR_CLI": "baton-test-no-claude"}}
 	d.repo = t.TempDir()
 	if b, err := exec.Command("git", "-C", d.repo, "init", "-q").CombinedOutput(); err != nil {
 		t.Skipf("git unavailable: %v %s", err, b)
@@ -147,10 +148,10 @@ func TestDaemonLifecycle(t *testing.T) {
 	}
 
 	// bare `baton` and attach
-	if r := d.run(d.repo, "", "--no-browser"); r.Code != 0 || !strings.Contains(r.Out, "conductor: arrives in Phase 6") {
+	if r := d.run(d.repo, "", "--no-browser"); r.Code != 0 || !strings.Contains(r.Out, "conductor: not started (") {
 		t.Fatalf("baton: %+v", r)
 	}
-	if r := d.run(d.repo, "", "attach"); r.Code != 0 || !strings.Contains(r.Out, "conductor chat arrives in Phase 6") {
+	if r := d.run(d.repo, "", "attach"); r.Code != 0 || !strings.Contains(r.Out, "conductor: off (") {
 		t.Fatalf("attach: %+v", r)
 	}
 

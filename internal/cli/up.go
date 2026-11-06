@@ -99,6 +99,8 @@ func (c *ctx) cmdHubServe(o opts) (int, error) {
 	exe, _ := os.Executable()
 	lau := launch.New(launch.Options{Exe: exe, Logger: opt.Logger})
 	opt.Launcher = lau
+	// the conductor runs `baton mcp` from this binary; BATON_CONDUCTOR_CLI overrides the claude command
+	opt.ConductorExe, opt.ConductorCLI = exe, c.getenv("BATON_CONDUCTOR_CLI")
 	stop, cancel := upStopCtx()
 	defer cancel()
 	h, err := startHub(stop, opt)

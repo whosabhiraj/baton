@@ -57,9 +57,10 @@ func Defaults() Config {
 			Worktrees:     Worktrees{Cleanup: CleanupKeep, Days: 14},
 			Approvals:     Approvals{Merge: true, Spawn: false},
 		},
-		Accounts: []Account{},
-		Routing:  map[string]string{},
-		Kinds:    map[string]CustomKind{},
+		Conductor: Conductor{Model: "opus", Effort: "high", AutoWake: true},
+		Accounts:  []Account{},
+		Routing:   map[string]string{},
+		Kinds:     map[string]CustomKind{},
 	}
 }
 

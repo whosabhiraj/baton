@@ -297,3 +297,38 @@ func TestMergeThroughApproval(t *testing.T) {
 		t.Fatal(got)
 	}
 }
+
+func TestConductorRoutes(t *testing.T) {
+	o, _ := p2opts(t)
+	h := start(t, o) // no ConductorExe: no conductor
+	if st, r := call(t, h, "GET", "/api/conductor", "tok", ""); st != 409 || r["code"] != "NO_CONDUCTOR" {
+		t.Fatal(st, r)
+	}
+	h.Close(context.Background())
+
+	o.Repo = filepath.Join(t.TempDir(), "repo")
+	os.MkdirAll(o.Repo, 0o755)
+	if err := gitx.Init(o.Repo); err != nil {
+		t.Fatal(err)
+	}
+	o.ConductorExe, o.ConductorCLI = "baton", "baton-test-no-such-cli"
+	h = start(t, o)
+	st, r := call(t, h, "GET", "/api/conductor", "tok", "")
+	c, _ := r["conductor"].(map[string]any)
+	if st != 200 || c["running"] != false || c["problem"] == nil { // the test config has no claude account
+		t.Fatal(st, r)
+	}
+	if st, r := call(t, h, "POST", "/api/conductor/start", "tok", ""); st != 409 || r["code"] != "NO_CONDUCTOR" {
+		t.Fatal(st, r)
+	}
+	if st, r := call(t, h, "POST", "/api/conductor/send", "tok", `{}`); st != 400 {
+		t.Fatal(st, r)
+	}
+	if st, r := call(t, h, "GET", "/api/conductor/history?after=0", "tok", ""); st != 200 || len(r["entries"].([]any)) != 0 {
+		t.Fatal(st, r)
+	}
+	tok := h.MintConductorToken()
+	if st, _ := call(t, h, "POST", "/api/conductor/send", tok, `{"text":"x"}`); st != 401 {
+		t.Fatal("the conductor token must not drive the conductor routes")
+	}
+}

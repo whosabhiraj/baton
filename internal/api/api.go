@@ -53,6 +53,8 @@ type Deps struct {
 	// CheckConductor reports whether tok is the current conductor session token (A16). nil =
 	// no conductor tokens are accepted.
 	CheckConductor func(tok string) bool
+	// ConductorCtl runs the headless conductor (A17); nil = /api/conductor/* answer NO_CONDUCTOR.
+	ConductorCtl ConductorCtl
 	// FakeMerges marks runs merged without touching git (baton mock).
 	FakeMerges bool
 	// Touch, if set, is called for every authenticated admin request (idle-stop bookkeeping).
@@ -121,6 +123,12 @@ func New(d Deps) http.Handler {
 	mux.HandleFunc("/api/approvals/{id}/approve", a.route("POST", authAdmin, a.decide(true)))
 	mux.HandleFunc("/api/approvals/{id}/reject", a.route("POST", authAdmin, a.decide(false)))
 	mux.HandleFunc("/api/audit", a.route("GET", authAdminOrCond, a.auditList))
+	mux.HandleFunc("/api/conductor", a.route("GET", authAdmin, a.conductorInfo))
+	mux.HandleFunc("/api/conductor/start", a.route("POST", authAdmin, a.conductorStart))
+	mux.HandleFunc("/api/conductor/stop", a.route("POST", authAdmin, a.conductorStop))
+	mux.HandleFunc("/api/conductor/reset", a.route("POST", authAdmin, a.conductorReset))
+	mux.HandleFunc("/api/conductor/send", a.route("POST", authAdmin, a.conductorSend))
+	mux.HandleFunc("/api/conductor/history", a.route("GET", authAdmin, a.conductorHistory))
 	mux.HandleFunc("/api/dev/runs", a.route("POST", authAdmin, a.devRun))
 	mux.HandleFunc("/api/hub/shutdown", a.route("POST", authAdmin, a.shutdown))
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {

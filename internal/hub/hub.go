@@ -24,6 +24,7 @@ import (
 	"github.com/whosabhiraj/baton/internal/approvals"
 	"github.com/whosabhiraj/baton/internal/audit"
 	"github.com/whosabhiraj/baton/internal/bus"
+	"github.com/whosabhiraj/baton/internal/conductor"
 	"github.com/whosabhiraj/baton/internal/config"
 	"github.com/whosabhiraj/baton/internal/ids"
 	"github.com/whosabhiraj/baton/internal/proto"
@@ -63,7 +64,13 @@ type Options struct {
 	Launcher      runs.Launcher            // starts/kills agent processes (nil = spawn only records the run)
 	OnApproval    func(approvals.Approval) // called after a human decision
 	FakeMerges    bool                     // approved merges only mark the run merged (baton mock)
-	IdleStop      time.Duration            // 0 = config hub.idle_stop_min (0 there = never); <0 = disabled; >0 overrides the config
+	// ConductorExe is the baton binary the conductor's MCP config runs (`baton mcp`); "" = this
+	// hub has no conductor (the /api/conductor routes answer NO_CONDUCTOR). Needs Repo.
+	ConductorExe  string
+	ConductorCLI  string            // claude command for the conductor; default "claude" (tests: a fake)
+	ConductorEnv  map[string]string // extra conductor env (tests)
+	ConductorWake time.Duration     // auto-wake debounce; default 2s (tests)
+	IdleStop      time.Duration     // 0 = config hub.idle_stop_min (0 there = never); <0 = disabled; >0 overrides the config
 }
 
 // Hub is a running hub.
@@ -88,6 +95,7 @@ type Hub struct {
 	condMu    sync.Mutex
 	conductor proto.ConductorState
 	condTok   atomic.Pointer[[32]byte] // sha256 of the current conductor session token (A16)
+	cond      *conductor.Manager       // nil = no conductor in this hub
 	lastAdm   atomic.Int64             // unix nanos of the last admin API request
 	stopCh    chan struct{}            // closed first on shutdown: ends SSE streams and background loops
 	detWG     sync.WaitGroup
@@ -229,8 +237,22 @@ func Start(ctx context.Context, o Options) (*Hub, error) {
 			h.runs = nil
 		}
 	}
+	if o.ConductorExe != "" && o.Repo != "" {
+		h.cond, err = conductor.New(conductor.Options{DataDir: dataDir, Repo: o.Repo, Exe: o.ConductorExe, CLI: o.ConductorCLI,
+			HubURL: func() string { return h.URL }, Config: func() config.Config { return h.cfg.Current().Config },
+			Mint: h.MintConductorToken, Revoke: h.RevokeConductorToken, SetState: h.SetConductor, Bus: h.broker,
+			Logger: log, ExtraEnv: o.ConductorEnv, WakeDelay: o.ConductorWake})
+		if err != nil {
+			return fail(fmt.Errorf("hub: conductor: %w", err))
+		}
+	}
+	var condCtl api.ConductorCtl
+	if h.cond != nil {
+		condCtl = h.cond
+	}
 	handler := api.New(api.Deps{
-		Runs: h.runs, Audit: h.audit, Approvals: h.approvals, OnApproval: o.OnApproval, Launcher: o.Launcher,
+		ConductorCtl: condCtl,
+		Runs:         h.runs, Audit: h.audit, Approvals: h.approvals, OnApproval: o.OnApproval, Launcher: o.Launcher,
 		FakeMerges: o.FakeMerges, CheckConductor: h.checkConductor,
 		Conductor: func() proto.ConductorState { h.condMu.Lock(); defer h.condMu.Unlock(); return h.conductor }, Config: h.cfg, Touch: func() { h.lastAdm.Store(time.Now().UnixNano()) },
 		Store: h.store, Bus: h.broker, AdminToken: h.AdminToken, Instance: ids.UUID(), Dev: o.Dev,
@@ -259,6 +281,9 @@ func Start(ctx context.Context, o Options) (*Hub, error) {
 		case <-h.done:
 		}
 	}()
+	if h.cond != nil {
+		go h.cond.Resume() // a conductor that was running before the hub stopped picks up its session
+	}
 	log.Info("hub listening", "url", h.URL, "data_dir", dataDir)
 	return h, nil
 }
@@ -432,6 +457,9 @@ func (h *Hub) watchIdle() {
 func (h *Hub) Close(ctx context.Context) error {
 	h.closeMu.Do(func() {
 		defer close(h.done)
+		if h.cond != nil {
+			h.cond.Close()
+		}
 		close(h.stopCh)
 		h.broker.Close()
 		sctx, cancel := ctx, context.CancelFunc(func() {})
@@ -519,6 +547,9 @@ func dashboard() http.Handler {
 	}
 	return api.StaticDashboard(sub)
 }
+
+// Conductor gives access to the conductor (nil when the hub has none).
+func (h *Hub) Conductor() *conductor.Manager { return h.cond }
 
 // Runs gives access to the runs manager (nil when the hub has no target repo).
 func (h *Hub) Runs() *runs.Manager { return h.runs }

@@ -370,3 +370,41 @@ answer_question, update_plan, pause_agent, resume_agent, stop_agent, kill_agent,
 merge_agent, list_approvals, set_mode, set_account_enabled`. Each is one REST call above; results are
 the hub's JSON as text, hub errors come back as tool errors (`CODE: message`). It keeps the wait
 cursor itself, pinned at its first tool call, so nothing is missed between calls.
+
+### A17. Phase 6b: headless conductor
+
+The hub owns one conductor process per project: `claude -p --input-format stream-json
+--output-format stream-json --verbose --mcp-config <data>/conductor/mcp.json --strict-mcp-config
+--allowedTools mcp__baton,Read,Grep,Glob --permission-prompts none --append-system-prompt-file
+<data>/conductor/prompt.md [--model M] [--effort E] (--session-id S | --resume S)`, run in the project
+folder with the conductor account's env (`CLAUDE_CONFIG_DIR`). `mcp.json` (0600) runs `<baton> mcp
+--url <hub>` with a freshly minted conductor token (A16). Settings: `conductor.account` ("" = first
+enabled claude account; only claude for now), `model` (default opus), `effort` (default high),
+`auto_wake` (default true). An idle conductor whose settings changed is restarted on the next
+message (same account: same session).
+
+Files in `<data>/conductor/`: `history.jsonl` (one entry per line: `{ n, ts, dir: in|out|hub, from?:
+human|hub, text?, event?: started|exited|stopped|error, msg? }`; `out` entries carry the CLI's raw
+stream-json line), `session.json` (`session_id, account, used, wanted`), `stderr.log`. A conductor
+that was running when the hub stopped is resumed (`--resume`) when the hub starts. A crash restarts
+it after 2 s / 10 s / 30 s; a fourth crash within 10 minutes leaves it off (`error` entry).
+
+**Auto-wake**: when the conductor is idle and a run event `question, step_blocked, done, error,
+stalled, rate_limited, exit` or a decided approval arrives, the hub sends (after a 2 s debounce,
+coalesced) the user message `[baton] Agents need your attention. Call wait_for_events ...` with
+`from: hub`. Events during a turn produce one nudge after the turn ends.
+
+State (`/api/state` `conductor`, `conductor` notice): `off | idle | thinking (assistant text) |
+acting (tool use)`.
+
+| Route (admin only; the conductor token is refused) | Body / query | Response |
+|---|---|---|
+| `GET /api/conductor` | — | `{ ok, conductor: { state, running, wanted, session_id?, account?, model?, effort?, last_error?, problem?, history } }` |
+| `POST /api/conductor/start` / `stop` / `reset` | — | same; stop is remembered across hub restarts; reset also forgets the conversation |
+| `POST /api/conductor/send` | `{ text }` | same; starts the conductor if needed |
+| `GET /api/conductor/history` | `?after=N&limit=L` (default 500, newest kept) | `{ ok, entries, last }` |
+
+`409 NO_CONDUCTOR`: the hub has no conductor (no repo, or `baton mock`) or it cannot start (message
+says why: no claude account, account disabled, CLI not found). `BATON_CONDUCTOR_CLI` (hub env)
+overrides the claude command. `baton` (no args) starts the conductor and prints one status line;
+`baton attach` prints it.

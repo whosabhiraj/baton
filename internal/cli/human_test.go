@@ -76,7 +76,7 @@ func TestUpStartsAndOpens(t *testing.T) {
 	}
 	// already running: no second start; --no-browser: no open; bare baton adds conductor line
 	code, out, _ = runMain("", "--no-browser")
-	if code != 0 || len(f.started) != 1 || len(f.opened) != 1 || !strings.Contains(out, "conductor: arrives in Phase 6") {
+	if code != 0 || len(f.started) != 1 || len(f.opened) != 1 || !strings.Contains(out, "\nconductor: ") {
 		t.Fatalf("code %d started %v opened %v out %q", code, f.started, f.opened, out)
 	}
 }

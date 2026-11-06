@@ -61,9 +61,10 @@ type Approvals struct {
 
 // Conductor selects the conductor's account, model and effort (any model; Phase 6).
 type Conductor struct {
-	Account string `yaml:"account" json:"account"`
-	Model   string `yaml:"model" json:"model"`   // e.g. opus, sonnet, gpt-5 — whatever the account's CLI accepts
-	Effort  string `yaml:"effort" json:"effort"` // CLI-specific effort level, "" = CLI default
+	Account  string `yaml:"account" json:"account"`     // "" = the first enabled claude account
+	Model    string `yaml:"model" json:"model"`         // [opus] e.g. opus, sonnet — whatever the account's CLI accepts
+	Effort   string `yaml:"effort" json:"effort"`       // [high] CLI-specific effort level, "" = CLI default
+	AutoWake bool   `yaml:"auto_wake" json:"auto_wake"` // [true] nudge the idle conductor when agents need it
 }
 
 // Account is one CLI login (or API-key provider) agents can run on.

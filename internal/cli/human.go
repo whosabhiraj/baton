@@ -161,11 +161,11 @@ func (c *ctx) cmdUpOrBaton(o opts, conductor, attach bool) (int, error) {
 	c.printHub(in, dataDir)
 	if attach {
 		c.printStatusLines(in, dataDir)
-		fmt.Fprintln(c.stdout, "conductor chat arrives in Phase 6")
+		fmt.Fprintln(c.stdout, "conductor: "+conductorLine(in, dataDir, "GET", "/api/conductor"))
 		return 0, nil
 	}
 	if conductor {
-		fmt.Fprintln(c.stdout, "conductor: arrives in Phase 6")
+		fmt.Fprintln(c.stdout, "conductor: "+conductorLine(in, dataDir, "POST", "/api/conductor/start"))
 	}
 	if !o.flag("no-browser") {
 		repo, _, _ := project(o)
@@ -174,6 +174,51 @@ func (c *ctx) cmdUpOrBaton(o opts, conductor, attach bool) (int, error) {
 		}
 	}
 	return 0, nil
+}
+
+// conductorLine calls a conductor route and describes the result in one line.
+func conductorLine(in *daemon.Info, dataDir, method, path string) string {
+	req, _ := http.NewRequest(method, strings.TrimRight(in.URL, "/")+path, nil)
+	req.Header.Set("Authorization", "Bearer "+readAdminToken(dataDir))
+	cl := &http.Client{Timeout: 15 * time.Second, Transport: &http.Transport{Proxy: nil, DisableKeepAlives: true}}
+	resp, err := cl.Do(req)
+	if err != nil {
+		return "unknown (" + err.Error() + ")"
+	}
+	defer resp.Body.Close()
+	var r struct {
+		Error     string `json:"error"`
+		Conductor struct {
+			State struct {
+				State string `json:"state"`
+			} `json:"state"`
+			Account   string `json:"account"`
+			Model     string `json:"model"`
+			Effort    string `json:"effort"`
+			LastError string `json:"last_error"`
+			Problem   string `json:"problem"`
+		} `json:"conductor"`
+	}
+	_ = json.NewDecoder(resp.Body).Decode(&r)
+	if resp.StatusCode != 200 {
+		if r.Error == "" {
+			r.Error = resp.Status
+		}
+		return "not started (" + r.Error + ")"
+	}
+	cd := r.Conductor
+	if cd.Account == "" {
+		return cd.State.State + " (" + cd.Problem + ")"
+	}
+	line := fmt.Sprintf("%s on %s (%s", cd.State.State, cd.Account, cd.Model)
+	if cd.Effort != "" {
+		line += ", " + cd.Effort
+	}
+	line += ")"
+	if cd.LastError != "" {
+		line += "; last error: " + cd.LastError
+	}
+	return line
 }
 
 // liveRuns counts runs from GET /api/state that have not finished.

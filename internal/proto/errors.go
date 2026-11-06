@@ -40,6 +40,7 @@ const (
 	CodeRunActive       = "RUN_ACTIVE"       // merge while the agent is still working
 	CodeMergeConflict   = "MERGE_CONFLICT"   // branch does not merge cleanly into its base
 	CodeMergeBlocked    = "MERGE_BLOCKED"    // merge refused: dirty checkout, uncommitted agent work, base busy
+	CodeNoConductor     = "NO_CONDUCTOR"     // no conductor here, or it cannot start (detail in the message)
 )
 
 // Error is a protocol error carrying the HTTP status the API should answer with.
@@ -72,7 +73,7 @@ func statusFor(code string) int {
 		return http.StatusGone
 	case CodeUnknownQID, CodeAccountDisabled, CodeRoleNotAllowed, CodeModelNotAllowed,
 		CodeAccountBusy, CodeMaxAgents, CodeNotARepo, CodeCallsignTaken, CodeAlreadyDecided, CodeNotSupported,
-		CodeRunActive, CodeMergeConflict, CodeMergeBlocked:
+		CodeRunActive, CodeMergeConflict, CodeMergeBlocked, CodeNoConductor:
 		return http.StatusConflict
 	case CodeAccountRequired, CodeUnknownAccount, CodeConfigInvalid, CodeConfirmRequired:
 		return http.StatusBadRequest

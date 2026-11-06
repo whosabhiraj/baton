@@ -82,7 +82,8 @@
       "properties": {
         "account": { "type": "string" },
         "model": { "type": "string" },
-        "effort": { "type": "string" }
+        "effort": { "type": "string" },
+        "auto_wake": { "type": "boolean" }
       }
     },
     "accounts": { "type": "array", "items": { "$ref": "#/$defs/account" } },
