@@ -1,6 +1,6 @@
 # HANDOFF — read this first
 
-Last updated: **2026-11-07**, **Phase 4a in progress** (scaffold committed; UI being built). Phase 4 questions answered — see §E.
+Last updated: **2026-11-07**, **Phase 4a built** (`777337d`), awaiting the user's visual check. Phase 4 questions answered — see §E.
 
 Big change since Phase 0: the hub **and** the `baton` CLI are written in **Go** (one binary).
 `docs/GO_HUB_DESIGN.md` is approved and overrides `docs/PLAN.md` §3, §4.7, §5 and §6.
@@ -61,7 +61,7 @@ Things only you can do:
 | 1 Protocol + CLI + spool + minimal hub (Go) | ✅ done | up to the "Phase 1 done" commit |
 | 2 Hub core | ✅ done (verified end to end; PowerShell piped-`y` fix `b4e6c60`) | `d014636` … `b4e6c60` |
 | 3 `baton mock` | ✅ done (controls, approvals, kill checked by hand) | `a5f9baf` … this commit |
-| 4 Dashboard | 4a in progress (scaffold `24bf6c7`) | `24bf6c7` … |
+| 4 Dashboard | 4a built, awaiting check; 4b/4c pending | `24bf6c7` … `777337d` |
 | 5 Adapters | pending | — |
 | 6 Conductor | pending | — |
 | 7 Hardening | pending | — |
@@ -95,7 +95,7 @@ Runtime data: `~/.baton/projects/<repo-name>-<hash8>/` (override with `BATON_HOM
 `admin.token`, `hub.lock`, `hub.port`, `runs/<run_id>/{run.json, events.jsonl, outbox.jsonl,
 outbox.offset, inbox/}`.
 
-## E. Resume here (Phase 4a in progress)
+## E. Resume here (Phase 4a built, awaiting check)
 
 Phase 4 answers (2026-11-07, all the recommended options):
 1. Split: **4a** working dashboard without 3D (list view, agent panel with plan, events, question +
@@ -107,10 +107,10 @@ Phase 4 answers (2026-11-07, all the recommended options):
    localStorage and strips it from the address bar; paste box as fallback. (Done in `24bf6c7`.)
 4. Approval gates: keep the current defaults — merges need a human click, spawns don't.
 
-State: scaffold done in `24bf6c7` (`npm run gen:types` → `web/src/protocol.gen.ts`, check = drift +
-`tsc -p web`, build/install build the dashboard first, hub serves the embedded `web/dist`). The 4a
-UI (vanilla TS in `web/src`) is being written; when it lands: `npm run check`, visual check
-against `baton mock --speed 5`, commit, ask the user to check, then ask before starting 4b.
+State: 4a done in `777337d` (vanilla TS in `web/src`: auth, api, store, stream, ui/*). Verified:
+`npm run check` green, endpoints exercised against the mock, `/` serves the build. Not verified by
+execution: DOM behaviour (no browser in the build session) — the user checks visually. Not built
+(not requested): audit view, plan_update control. Next: user feedback on 4a, then ask before 4b.
 
 API surface for the dashboard (PROTOCOL.md A11–A15):
 - `GET /api/state` (runs with status, plan, step_states, open_questions, usage; accounts with
