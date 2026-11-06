@@ -144,6 +144,7 @@ fieldset { border: 1px solid var(--line); border-radius: 6px; margin: 0 0 10px; 
   #rail { border-right: 0; border-bottom: 1px solid var(--line); }
   #detail { border-left: 0; border-top: 1px solid var(--line); }
   .grid2 { grid-template-columns: 1fr; }
+  .stats { order: 3; flex-basis: 100%; gap: 2px 14px; }
 }
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; scroll-behavior: auto !important; }

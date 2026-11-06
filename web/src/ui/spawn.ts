@@ -98,7 +98,7 @@ export function spawnPanel(): Panel {
     h('fieldset', {}, h('legend', {}, 'Scope (optional)'), field('sp-paths', 'Allowed paths', paths), field('sp-forb', 'Forbidden paths', forbidden), field('sp-ask', 'Ask before touching', askBefore)),
     field('sp-base', 'Base branch', base),
     err,
-    h('div', { class: 'row' }, h('button', { type: 'button', onclick: () => void submit(true) }, 'Dry run: show brief'), h('button', { type: 'submit', class: 'primary' }, 'Spawn')),
+    h('div', { class: 'row' }, h('button', { type: 'button', onclick: () => form.reportValidity() && void submit(true) }, 'Dry run: show brief'), h('button', { type: 'submit', class: 'primary' }, 'Spawn')),
     out,
   );
   return { title: 'Spawn an agent', el: form };
