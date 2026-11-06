@@ -1,6 +1,6 @@
 # HANDOFF — read this first
 
-Last updated: **2026-11-07**, **Phase 4a/4b/4c built** and redesigned (`20f9bfe`), awaiting the user's check. Phase 4 questions answered — see §E.
+Last updated: **2026-11-07**, **Phase 5 code done** (claude verified with one real run; codex waits for `baton login`).
 
 Big change since Phase 0: the hub **and** the `baton` CLI are written in **Go** (one binary).
 `docs/GO_HUB_DESIGN.md` is approved and overrides `docs/PLAN.md` §3, §4.7, §5 and §6.
@@ -61,7 +61,7 @@ Things only you can do:
 | 2 Hub core | ✅ done (verified end to end; PowerShell piped-`y` fix `84b18d2`) | `73491a4` … `84b18d2` |
 | 3 `baton mock` | ✅ done (controls, approvals, kill checked by hand) | `7e40608` … this commit |
 | 4 Dashboard | 4a list/panels, 4b 3D map, 4c timeline + replay, redesign; awaiting check | `4b771b3` … `20f9bfe` |
-| 5 Adapters | pending | — |
+| 5 Adapters | code done: supervisor, env allowlist, claude (real run ok), codex, opencode + refusal, custom kinds, `baton login`; real codex run pending login | `852719b` … `72e99ec` |
 | 6 Conductor | pending | — |
 | 7 Hardening | pending | — |
 | 8 Remote access (future) | not planned yet | — |
@@ -94,23 +94,23 @@ Runtime data: `~/.baton/projects/<repo-name>-<hash8>/` (override with `BATON_HOM
 `admin.token`, `hub.lock`, `hub.port`, `runs/<run_id>/{run.json, events.jsonl, outbox.jsonl,
 outbox.offset, inbox/}`.
 
-## E. Resume here (Phase 4 built, awaiting check)
+## E. Resume here (Phase 5: real codex run pending)
 
-Phase 4 answers (2026-11-07, all the recommended options):
-1. Split: **4a** working dashboard without 3D (list view, agent panel with plan, events, question +
-   answer box, controls, approvals, usage, spawn form, account toggles, config editor) → **4b** 3D
-   scene → **4c** timeline/replay. Conductor chat panel moves to Phase 6. The user checks after each step.
-2. 3D: **lean first** (account orbits, agent shapes by kind, status looks, progress arcs, edges,
-   click-to-focus, bloom, reduced-motion); pulses/particles/ring bursts/completed shelf only on request.
-3. Login: `baton` / `baton mock` open `http://127.0.0.1:<port>/#token=...`; the page stores it in
-   localStorage and strips it from the address bar; paste box as fallback. (Done in `4b771b3`.)
-4. Approval gates: keep the current defaults — merges need a human click, spawns don't.
+Phase 5 answers (2026-11-07): split 5a/5b/5c; worker agents **fully permissive** by default
+(`permissions.mode` empty = permissive); isolated per-account config dirs + `baton login`;
+OpenCode built but disabled.
 
-State: Phase 4 built. 4a list/panels, 4b lean 3D map (`web/src/scene.ts`, lazy-loaded three.js),
-4c timeline with replay scrub (`web/src/ui/timeline.ts`), then a full redesign (`20f9bfe`). Checked
-in headless Edge against the mock (no console errors). The design contract lives in a local,
-uncommitted file (`web/DESIGN.local.md`). Dev loop: `baton mock` + `npm run dev:web` (Vite proxies
-`/api` with a rewritten Host; never serves `*.local.*`). Next: user feedback, then ask before Phase 5.
+Done: `internal/proc` (env allowlist), `internal/supervise` (`baton __supervise`, tree kill,
+survives hub restart), `internal/adapters` (claude, codex, opencode, config-defined kinds incl.
+`generic`), `internal/launch` (real launcher, stdout tail -> activity/usage, exit + diff stat,
+adoption after restart, preflight refusal), `baton login <id>` / `--status`. One real claude run
+verified the claude stream format (fixture is the sanitized capture). Codex and OpenCode
+fixtures are hand-written approximations.
+
+Next: user logs in (`baton login claude-a|claude-b|codex-1`), then one tiny real codex run
+(**quota, ask first**) to capture its `--json` stream and check effort/sandbox flags and cached
+token accounting. OpenCode stays disabled until an API-key provider is chosen. Then Phase 6
+(conductor) — ask its open questions first.
 
 API surface for the dashboard (PROTOCOL.md A11–A15):
 - `GET /api/state` (runs with status, plan, step_states, open_questions, usage; accounts with
