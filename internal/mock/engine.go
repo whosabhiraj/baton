@@ -168,6 +168,8 @@ func (e *Engine) OnApproval(ap approvals.Approval) {
 
 type runView struct {
 	RunID         string `json:"run_id"`
+	AgentID       string `json:"agent_id"`
+	Callsign      string `json:"callsign"`
 	Status        string `json:"status"`
 	OpenQuestions []struct {
 		QID string `json:"qid"`
@@ -283,8 +285,12 @@ func (e *Engine) conduct(ctx context.Context) {
 					e.mu.Unlock()
 					if ok {
 						act("requesting merge approval for %s", r.RunID)
-						_, _ = e.hub.RequestApproval(approvals.KindMerge, r.RunID, "Merge "+r.RunID+" into main",
-							map[string]any{"branch": "baton/" + r.RunID, "summary": "Acceptance checks pass"}, "conductor")
+						base := "main"
+						if run := e.hub.Store().Get(r.RunID); run != nil && run.Record().BaseBranch != "" {
+							base = run.Record().BaseBranch
+						}
+						_, _ = e.hub.RequestApproval(approvals.KindMerge, r.RunID, "Merge "+r.Callsign+" (baton/"+r.AgentID+") into "+base,
+							map[string]any{"branch": "baton/" + r.AgentID, "base_branch": base, "summary": "Acceptance checks pass"}, "conductor")
 					}
 				}
 				continue

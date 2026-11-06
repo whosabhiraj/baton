@@ -1,7 +1,6 @@
 # HANDOFF — read this first
 
-Last updated: **2026-11-06**, **Phase 3 built**, all tests green, waiting for the user's check and approval (§E).
-Next up: user checks Phase 3; then Phase 4 (dashboard).
+Last updated: **2026-11-06**, **Phase 3 approved** (checked end to end); Phase 4 (dashboard) questions next (§E).
 
 Big change since Phase 0: the hub **and** the `baton` CLI are written in **Go** (one binary).
 `docs/GO_HUB_DESIGN.md` is approved and overrides `docs/PLAN.md` §3, §4.7, §5 and §6.
@@ -60,7 +59,7 @@ Things only you can do:
 | 0 Plan + repo init | ✅ done | `2a5a98d` |
 | 1 Protocol + CLI + spool + minimal hub (Go) | ✅ done | up to the "Phase 1 done" commit |
 | 2 Hub core | ✅ done (verified end to end; PowerShell piped-`y` fix `b4e6c60`) | `d014636` … `b4e6c60` |
-| 3 `baton mock` | 🟡 built, all tests green, **awaiting user approval** | `a5f9baf` … `86e65e7` |
+| 3 `baton mock` | ✅ done (controls, approvals, kill checked by hand) | `a5f9baf` … this commit |
 | 4 Dashboard | pending | — |
 | 5 Adapters | pending | — |
 | 6 Conductor | pending | — |
@@ -95,7 +94,7 @@ Runtime data: `~/.baton/projects/<repo-name>-<hash8>/` (override with `BATON_HOM
 `admin.token`, `hub.lock`, `hub.port`, `runs/<run_id>/{run.json, events.jsonl, outbox.jsonl,
 outbox.offset, inbox/}`.
 
-## E. Resume here (Phase 3 sign-off)
+## E. Resume here (Phase 4 start)
 
 Phase 3 is built and pushed: PROTOCOL.md A15 (`usage` event + per-account totals, conductor
 state, approvals, kill route, launcher hook; `a5f9baf`) and `baton mock` (`99ac28c`). Also a
@@ -104,8 +103,8 @@ helper (`86e65e7`). `npm run check` green; mock run live at `--speed 10` (all st
 usage totals, continuous mode keeps 6 live).
 
 Next steps:
-1. User checks Phase 3: `baton mock --speed 5`, then use the API (answer/pause/resume/stop/kill a
-   run, approve/reject in `GET /api/approvals`) and watch `GET /api/state`. Get approval.
+1. Phase 3 approved: pause/resume/message/answer/kill and approve/reject checked by hand against
+   a live mock; merge approval now names the real branch and base branch.
 2. Known small items: multi-field PATCH /api/accounts is not atomic; mock data dir is
    `<BATON_HOME>/mock` (hub data in `mock/data`); kill route answers 409 RUN_ENDED (global 410).
 3. CI file stays untracked until the git token has `workflow` scope.
