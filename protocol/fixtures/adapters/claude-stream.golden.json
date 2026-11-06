@@ -1,0 +1,85 @@
+[
+  {
+    "type": "activity",
+    "payload": {
+      "detail": "src/app.go",
+      "raw_kind": "Read",
+      "tool": "read"
+    }
+  },
+  {
+    "type": "usage",
+    "payload": {
+      "cache_read_tokens": 50,
+      "cache_write_tokens": 10,
+      "input_tokens": 100,
+      "model": "claude-sonnet-4",
+      "output_tokens": 20
+    }
+  },
+  {
+    "type": "activity",
+    "payload": {
+      "detail": "src/app.go",
+      "raw_kind": "Edit",
+      "tool": "edit"
+    }
+  },
+  {
+    "type": "usage",
+    "payload": {
+      "cache_read_tokens": 110,
+      "cache_write_tokens": 10,
+      "input_tokens": 250,
+      "model": "claude-sonnet-4",
+      "output_tokens": 60
+    }
+  },
+  {
+    "type": "activity",
+    "payload": {
+      "detail": "go test ./...",
+      "raw_kind": "Bash",
+      "tool": "shell"
+    }
+  },
+  {
+    "type": "usage",
+    "payload": {
+      "cache_read_tokens": 110,
+      "cache_write_tokens": 10,
+      "input_tokens": 250,
+      "model": "claude-sonnet-4",
+      "output_tokens": 75
+    }
+  },
+  {
+    "type": "activity",
+    "payload": {
+      "detail": "explore",
+      "raw_kind": "Task",
+      "tool": "other"
+    }
+  },
+  {
+    "type": "usage",
+    "payload": {
+      "cache_read_tokens": 110,
+      "cache_write_tokens": 10,
+      "input_tokens": 450,
+      "model": "claude-sonnet-4",
+      "output_tokens": 85
+    }
+  },
+  {
+    "type": "usage",
+    "payload": {
+      "cache_read_tokens": 110,
+      "cache_write_tokens": 10,
+      "cost_usd": 0.0123,
+      "input_tokens": 450,
+      "model": "claude-sonnet-4",
+      "output_tokens": 105
+    }
+  }
+]

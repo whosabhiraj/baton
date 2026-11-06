@@ -492,3 +492,9 @@ func dashboard() http.Handler {
 	}
 	return api.StaticDashboard(sub)
 }
+
+// Runs gives access to the runs manager (nil when the hub has no target repo).
+func (h *Hub) Runs() *runs.Manager { return h.runs }
+
+// Config returns the current effective configuration.
+func (h *Hub) Config() config.Config { return h.cfg.Current().Config }

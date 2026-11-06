@@ -85,9 +85,10 @@ type Account struct {
 	PollIntervalS     float64 `yaml:"poll_interval_s" json:"poll_interval_s"`
 }
 
-// Permissions are opt-in permission settings (default = the CLI's normal mode).
+// Permissions are the worker permission settings. Workers run unattended and cannot answer
+// prompts, so the default is fully permissive; "default" restores the CLI's own prompts.
 type Permissions struct {
-	Mode         string   `yaml:"mode" json:"mode"` // [default] default | acceptEdits | permissive
+	Mode         string   `yaml:"mode" json:"mode"` // [permissive] default | acceptEdits | permissive
 	AllowedTools []string `yaml:"allowed_tools" json:"allowed_tools"`
 	DeniedTools  []string `yaml:"denied_tools" json:"denied_tools"`
 	ExtraArgs    []string `yaml:"extra_args" json:"extra_args"`

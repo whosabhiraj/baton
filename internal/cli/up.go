@@ -19,6 +19,7 @@ import (
 	"github.com/whosabhiraj/baton/internal/daemon"
 	"github.com/whosabhiraj/baton/internal/gitx"
 	"github.com/whosabhiraj/baton/internal/hub"
+	"github.com/whosabhiraj/baton/internal/launch"
 	"github.com/whosabhiraj/baton/internal/logx"
 	"github.com/whosabhiraj/baton/internal/paths"
 )
@@ -95,6 +96,9 @@ func (c *ctx) cmdHubServe(o opts) (int, error) {
 		fmt.Fprintf(c.stderr, "baton: warning: cannot open log (%s)\n", err.Error())
 	}
 
+	exe, _ := os.Executable()
+	lau := launch.New(launch.Options{Exe: exe, Logger: opt.Logger})
+	opt.Launcher = lau
 	stop, cancel := upStopCtx()
 	defer cancel()
 	h, err := startHub(stop, opt)
@@ -104,7 +108,8 @@ func (c *ctx) cmdHubServe(o opts) (int, error) {
 		}
 		return 0, err
 	}
-	exe, _ := os.Executable()
+	lau.Bind(h.Store(), h.Runs(), h.Config)
+	lau.Adopt()
 	info := daemon.Info{PID: os.Getpid(), Port: h.Port, URL: h.URL, Instance: healthInstance(h.URL), Version: Version,
 		Exe: exe, StartedAt: time.Now().UTC().Format(time.RFC3339), DataDir: h.DataDir, Project: repo}
 	if err := daemon.WriteInfo(h.DataDir, info); err != nil {
@@ -122,6 +127,7 @@ func (c *ctx) cmdHubServe(o opts) (int, error) {
 	case <-stop.Done():
 	case <-h.Done(): // POST /api/hub/shutdown
 	}
+	lau.Close() // agents keep running; the next hub re-adopts them
 	sctx, scancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer scancel()
 	err = closeHub(h, sctx)

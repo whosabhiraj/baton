@@ -64,7 +64,7 @@ func Defaults() Config {
 }
 
 func defaultAccount() Account {
-	return Account{MaxConcurrent: 1, Enabled: true, Permissions: Permissions{Mode: "default"}}
+	return Account{MaxConcurrent: 1, Enabled: true, Permissions: Permissions{Mode: "permissive"}}
 }
 
 func defaultKind() CustomKind { return CustomKind{Parser: "none"} }

@@ -43,8 +43,8 @@ accounts:
     roles: [conductor, planner, reviewer]
     max_concurrent: 2        # default 1
     enabled: true            # default true
-    permissions:             # opt-in; default = the CLI's normal mode
-      mode: default          # default | acceptEdits | permissive
+    permissions:             # workers run unattended, so they are fully permissive by default
+      mode: permissive       # permissive (default) | acceptEdits | default (the CLI's own prompts)
       allowed_tools: []
       denied_tools: []
       extra_args: []

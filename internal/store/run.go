@@ -612,3 +612,23 @@ func (r *Run) Close() error {
 	r.saveRecordLocked()
 	return err
 }
+
+// AppendAdapter stores an adapter-derived event (activity, usage) with a stable msg_id, so
+// re-reading the same agent output never duplicates it (dup=true returns the original seq).
+func (r *Run) AppendAdapter(typ string, payload map[string]any, msgID string) (int64, bool, *proto.Error) {
+	payload, perr := proto.ValidateHubPayload(typ, payload)
+	if perr != nil {
+		return 0, false, perr
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if seq, ok := r.seen[msgID]; ok {
+		return seq, true, nil
+	}
+	ev := proto.StoredEvent{V: proto.Version, RunID: r.id, AgentID: r.agentID, TS: nowTS(time.Now()),
+		Type: typ, Payload: payload, MsgID: msgID, Src: proto.SrcAdapter}
+	if perr := r.appendLocked(&ev); perr != nil {
+		return 0, false, perr
+	}
+	return ev.Seq, false, nil
+}

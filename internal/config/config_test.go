@@ -86,7 +86,7 @@ accounts:
 	}
 	a, _ := s.Config.Account("a")
 	b, _ := s.Config.Account("b")
-	if !a.Enabled || a.MaxConcurrent != 1 || a.Permissions.Mode != "default" {
+	if !a.Enabled || a.MaxConcurrent != 1 || a.Permissions.Mode != "permissive" {
 		t.Fatalf("a %+v", a)
 	}
 	if b.Enabled || b.MaxConcurrent != 4 {
