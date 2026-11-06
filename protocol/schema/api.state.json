@@ -91,6 +91,7 @@
         "last_event_ts": { "type": "string" },
         "open_questions": { "type": "array", "items": { "$ref": "#/$defs/open_question" } },
         "usage": { "type": "object", "description": "Latest cumulative hub.usage payload (A15); absent if none." },
+        "merged": { "type": "boolean", "description": "Branch merged into its base (A16); absent = not merged." },
         "step_states": {
           "type": "object",
           "description": "step id -> state",

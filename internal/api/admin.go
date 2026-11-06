@@ -20,6 +20,9 @@ import (
 const ActorHeader = "X-Baton-Actor"
 
 func actorOf(r *http.Request) (string, *proto.Error) {
+	if isConductorReq(r) {
+		return audit.ActorConductor, nil
+	}
 	switch v := strings.ToLower(strings.TrimSpace(r.Header.Get(ActorHeader))); v {
 	case "":
 		return audit.ActorHuman, nil
@@ -136,7 +139,7 @@ func (a *api) spawn(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, proto.NewError(proto.CodeInvalidPayload, msg))
 		return
 	}
-	if req.Actor == "" {
+	if req.Actor == "" || isConductorReq(r) {
 		req.Actor = actor
 	} else {
 		actor = req.Actor
@@ -239,11 +242,16 @@ func changedFile(s *config.Snapshot, before map[string][]byte) string {
 	return ""
 }
 
-func (a *api) patchFields(w http.ResponseWriter, r *http.Request, action, target string,
+// patchFields applies a PATCH body field by field; condAllowed lists what a conductor-token
+// request may change.
+func (a *api) patchFields(w http.ResponseWriter, r *http.Request, action, target string, condAllowed []string,
 	set func(s *config.Snapshot, field string, v any) error) bool {
 	body, perr := readObject(r)
 	if perr != nil {
 		writeErr(w, perr)
+		return false
+	}
+	if !conductorFieldsOK(w, r, body, condAllowed) {
 		return false
 	}
 	if len(body) == 0 {
@@ -285,7 +293,7 @@ func (a *api) patchAccount(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, proto.NewError(proto.CodeNotFound, "no such account"))
 		return
 	}
-	if !a.patchFields(w, r, "config.account", id, func(s *config.Snapshot, f string, v any) error {
+	if !a.patchFields(w, r, "config.account", id, conductorAccountFields, func(s *config.Snapshot, f string, v any) error {
 		return config.SetAccountField(s, id, f, v)
 	}) {
 		return
@@ -303,7 +311,7 @@ func (a *api) patchConfig(w http.ResponseWriter, r *http.Request) {
 	if a.noConfig(w) {
 		return
 	}
-	if !a.patchFields(w, r, "config.hub", "hub", func(s *config.Snapshot, f string, v any) error {
+	if !a.patchFields(w, r, "config.hub", "hub", conductorHubFields, func(s *config.Snapshot, f string, v any) error {
 		return config.SetHubField(s, f, v)
 	}) {
 		return

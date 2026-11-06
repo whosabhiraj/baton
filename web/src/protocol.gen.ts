@@ -411,6 +411,10 @@ export namespace ApiState {
      */
     usage?: {};
     /**
+     * Branch merged into its base (A16); absent = not merged.
+     */
+    merged?: boolean;
+    /**
      * step id -> state
      */
     step_states: {

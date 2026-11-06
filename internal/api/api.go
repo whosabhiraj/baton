@@ -4,6 +4,7 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/json"
@@ -14,6 +15,7 @@ import (
 	"net"
 	"net/http"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -48,6 +50,11 @@ type Deps struct {
 	Conductor  func() proto.ConductorState
 	OnApproval func(approvals.Approval)
 	Launcher   runs.Launcher
+	// CheckConductor reports whether tok is the current conductor session token (A16). nil =
+	// no conductor tokens are accepted.
+	CheckConductor func(tok string) bool
+	// FakeMerges marks runs merged without touching git (baton mock).
+	FakeMerges bool
 	// Touch, if set, is called for every authenticated admin request (idle-stop bookkeeping).
 	Touch func()
 	// Shutdown is called (asynchronously, after the response) by POST /api/hub/shutdown.
@@ -89,25 +96,31 @@ func New(d Deps) http.Handler {
 	}
 	a := &api{Deps: d, adminHash: sha256.Sum256([]byte(d.AdminToken))}
 	mux := http.NewServeMux()
+	// authAdminOrCond routes are the conductor's tools (A16); the rest stay admin-only.
 	mux.HandleFunc("/api/health", a.route("GET", authNone, a.health))
 	mux.HandleFunc("/api/ingest", a.route("POST", authRun, a.ingest))
 	mux.HandleFunc("/api/runs/{id}/inbox", a.route("GET", authRunOrAdmin, a.inbox))
 	mux.HandleFunc("/api/runs/{id}/events", a.route("GET", authRunOrAdmin, a.events))
-	mux.HandleFunc("/api/state", a.route("GET", authAdmin, a.state))
+	mux.HandleFunc("/api/state", a.route("GET", authAdminOrCond, a.state))
 	mux.HandleFunc("/api/stream", a.route("GET", authAdminQuery, a.stream))
 	for _, t := range []string{"message", "answer", "plan_update", "pause", "resume", "stop"} {
-		mux.HandleFunc("/api/runs/{id}/"+t, a.route("POST", authAdmin, a.deliver(t)))
+		mux.HandleFunc("/api/runs/{id}/"+t, a.route("POST", authAdminOrCond, a.deliver(t)))
 	}
-	mux.HandleFunc("/api/spawn", a.route("POST", authAdmin, a.spawn))
-	mux.HandleFunc("/api/accounts", a.route("GET", authAdmin, a.listAccounts))
-	mux.HandleFunc("/api/accounts/{id}", a.route("PATCH", authAdmin, a.patchAccount))
-	mux.HandleFunc("GET /api/config", a.route("GET", authAdmin, a.getConfig))
-	mux.HandleFunc("PATCH /api/config", a.route("PATCH", authAdmin, a.patchConfig))
-	mux.HandleFunc("/api/runs/{id}/kill", a.route("POST", authAdmin, a.kill))
-	mux.HandleFunc("/api/approvals", a.route("GET", authAdmin, a.listApprovals))
+	mux.HandleFunc("/api/runs", a.route("GET", authAdminOrCond, a.listRuns))
+	mux.HandleFunc("/api/runs/{id}", a.route("GET", authAdminOrCond, a.getRun))
+	mux.HandleFunc("/api/runs/{id}/diff", a.route("GET", authAdminOrCond, a.diff))
+	mux.HandleFunc("/api/runs/{id}/merge", a.route("POST", authAdminOrCond, a.merge))
+	mux.HandleFunc("/api/wait", a.route("GET", authAdminOrCond, a.wait))
+	mux.HandleFunc("/api/spawn", a.route("POST", authAdminOrCond, a.spawn))
+	mux.HandleFunc("/api/accounts", a.route("GET", authAdminOrCond, a.listAccounts))
+	mux.HandleFunc("/api/accounts/{id}", a.route("PATCH", authAdminOrCond, a.patchAccount))
+	mux.HandleFunc("GET /api/config", a.route("GET", authAdminOrCond, a.getConfig))
+	mux.HandleFunc("PATCH /api/config", a.route("PATCH", authAdminOrCond, a.patchConfig))
+	mux.HandleFunc("/api/runs/{id}/kill", a.route("POST", authAdminOrCond, a.kill))
+	mux.HandleFunc("/api/approvals", a.route("GET", authAdminOrCond, a.listApprovals))
 	mux.HandleFunc("/api/approvals/{id}/approve", a.route("POST", authAdmin, a.decide(true)))
 	mux.HandleFunc("/api/approvals/{id}/reject", a.route("POST", authAdmin, a.decide(false)))
-	mux.HandleFunc("/api/audit", a.route("GET", authAdmin, a.auditList))
+	mux.HandleFunc("/api/audit", a.route("GET", authAdminOrCond, a.auditList))
 	mux.HandleFunc("/api/dev/runs", a.route("POST", authAdmin, a.devRun))
 	mux.HandleFunc("/api/hub/shutdown", a.route("POST", authAdmin, a.shutdown))
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
@@ -194,8 +207,18 @@ const (
 	authRun
 	authRunOrAdmin
 	authAdmin
-	authAdminQuery // admin via header or ?token= (EventSource)
+	authAdminQuery  // admin via header or ?token= (EventSource)
+	authAdminOrCond // admin, or the conductor token (the request's actor is then forced to "conductor")
 )
+
+type conductorKey struct{}
+
+// isConductorReq reports whether the request was authenticated with the conductor token.
+func isConductorReq(r *http.Request) bool { v, _ := r.Context().Value(conductorKey{}).(bool); return v }
+
+func (a *api) isConductor(tok string) bool {
+	return tok != "" && a.CheckConductor != nil && a.CheckConductor(tok)
+}
 
 func (a *api) route(method string, class authClass, h http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -212,6 +235,19 @@ func (a *api) route(method string, class authClass, h http.HandlerFunc) http.Han
 			}
 			if !a.isAdmin(tok) {
 				writeErr(w, proto.NewError(proto.CodeUnauthorized, "admin token required"))
+				return
+			}
+			if a.Touch != nil {
+				a.Touch()
+			}
+		case authAdminOrCond:
+			tok := bearer(r)
+			switch {
+			case a.isAdmin(tok):
+			case a.isConductor(tok):
+				r = r.WithContext(context.WithValue(r.Context(), conductorKey{}, true))
+			default:
+				writeErr(w, proto.NewError(proto.CodeUnauthorized, "admin or conductor token required"))
 				return
 			}
 			if a.Touch != nil {
@@ -311,8 +347,8 @@ func (a *api) runAccess(w http.ResponseWriter, r *http.Request) *store.Run {
 		writeErr(w, proto.NewError(proto.CodeUnauthorized, "token required"))
 		return nil
 	}
-	if a.isAdmin(tok) {
-		run := a.Store.Get(id)
+	if a.isAdmin(tok) || a.isConductor(tok) {
+		run := a.findRun(id)
 		if run == nil {
 			writeErr(w, proto.NewError(proto.CodeNotFound, "no such run"))
 		}
@@ -371,6 +407,26 @@ func (a *api) events(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, proto.NewError(proto.CodeInternal, "cannot read events"))
 		return
 	}
+	// A16: optional types=a,b filter and limit=N (the newest N after filtering).
+	if types := splitList(r.URL.Query().Get("types")); len(types) > 0 {
+		kept := evs[:0:0]
+		for _, ev := range evs {
+			if slices.Contains(types, ev.Type) {
+				kept = append(kept, ev)
+			}
+		}
+		evs = kept
+	}
+	if v := r.URL.Query().Get("limit"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 0 {
+			writeErr(w, proto.NewError(proto.CodeInvalidPayload, "bad limit"))
+			return
+		}
+		if len(evs) > n {
+			evs = evs[len(evs)-n:]
+		}
+	}
 	writeJSON(w, 200, map[string]any{"ok": true, "events": evs})
 }
 
@@ -386,7 +442,7 @@ func (a *api) state(w http.ResponseWriter, r *http.Request) {
 
 func (a *api) deliver(typ string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		run := a.Store.Get(r.PathValue("id"))
+		run := a.findRun(r.PathValue("id"))
 		if run == nil {
 			writeErr(w, proto.NewError(proto.CodeNotFound, "no such run"))
 			return
@@ -397,8 +453,11 @@ func (a *api) deliver(typ string) http.HandlerFunc {
 			return
 		}
 		if typ == "message" {
-			if _, ok := body["from"]; !ok {
+			if _, ok := body["from"]; !ok || isConductorReq(r) {
 				body["from"] = "human"
+				if isConductorReq(r) {
+					body["from"] = "conductor"
+				}
 			}
 		}
 		n, perr := run.Deliver(typ, body)

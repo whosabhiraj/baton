@@ -77,6 +77,8 @@ type Manager struct {
 	o   Options
 	log *slog.Logger
 	mu  sync.Mutex // serialises Spawn so caps cannot be exceeded by races
+	// mergeMu serialises merges (two approvals of the same run must not both merge).
+	mergeMu sync.Mutex
 }
 
 // New checks that the repo is a git repository.

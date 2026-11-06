@@ -107,6 +107,17 @@ func (a *api) decide(approve bool) http.HandlerFunc {
 			writeErr(w, proto.NewError(proto.CodeNotFound, "no such approval"))
 			return
 		}
+		// A16: approving a merge performs it first; if the merge fails (conflict, dirty
+		// checkout, uncommitted agent work) the approval stays pending and the error is returned.
+		if prev, ok := a.Approvals.Get(r.PathValue("id")); ok && approve && prev.Kind == approvals.KindMerge &&
+			prev.Status == approvals.Pending && (a.Runs != nil || a.FakeMerges) {
+			if run := a.Store.Get(prev.RunID); run != nil && !run.Summary().Merged {
+				if _, perr := a.doMerge(r.Context(), actor, run); perr != nil {
+					writeErr(w, perr)
+					return
+				}
+			}
+		}
 		ap, err := a.Approvals.Decide(r.PathValue("id"), approve, actor, note)
 		switch {
 		case errors.Is(err, approvals.ErrNotFound):
@@ -145,7 +156,7 @@ func (a *api) kill(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, proto.NewError(proto.CodeNotSupported, "no launcher: agents cannot be killed here"))
 		return
 	}
-	run := a.Store.Get(r.PathValue("id"))
+	run := a.findRun(r.PathValue("id"))
 	if run == nil {
 		writeErr(w, proto.NewError(proto.CodeNotFound, "no such run"))
 		return

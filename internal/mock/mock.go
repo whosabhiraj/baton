@@ -107,7 +107,7 @@ func Run(ctx context.Context, o Options, ready func(h *hub.Hub, e *Engine)) erro
 		lg = l
 		defer closer.Close()
 	}
-	h, err := hub.Start(ctx, hub.Options{DataDir: dataDir, Repo: repo, GlobalConfig: ConfigPath(), Dev: true,
+	h, err := hub.Start(ctx, hub.Options{DataDir: dataDir, Repo: repo, GlobalConfig: ConfigPath(), Dev: true, FakeMerges: true,
 		Port: o.Port, PortFallback: true, IdleStop: -1, HeartbeatTimeout: stall, Logger: lg,
 		Launcher: e, OnApproval: e.OnApproval})
 	if err != nil {

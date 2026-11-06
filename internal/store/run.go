@@ -67,7 +67,8 @@ type Summary struct {
 	LastEventTS   string            `json:"last_event_ts,omitempty"`
 	OpenQuestions []Question        `json:"open_questions"`
 	StepStates    map[string]string `json:"step_states"`
-	Usage         map[string]any    `json:"usage,omitempty"` // latest cumulative usage (A15)
+	Usage         map[string]any    `json:"usage,omitempty"`  // latest cumulative usage (A15)
+	Merged        bool              `json:"merged,omitempty"` // branch merged into its base (A16; run.json extra "merged")
 }
 
 // loadRun opens an existing run directory: reads run.json, recovers events.jsonl, rebuilds
@@ -248,6 +249,7 @@ func (r *Run) Summary() Summary {
 		CreatedAt: r.rec.CreatedAt, EndedAt: r.rec.EndedAt, TokenRevoked: r.rec.TokenRevoked,
 		Plan: append([]proto.PlanStep{}, plan...), LastSeq: r.st.LastSeq, LastEventTS: r.st.LastTS,
 		OpenQuestions: append([]Question{}, r.st.Questions...), StepStates: map[string]string{},
+		Merged: string(r.rec.Extra["merged"]) == "true",
 	}
 	for k, v := range r.st.Steps {
 		sum.StepStates[k] = v

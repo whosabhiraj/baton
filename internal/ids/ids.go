@@ -64,6 +64,9 @@ func RunToken() string { return "bt_run_" + base64.RawURLEncoding.EncodeToString
 // AdminToken returns "bt_adm_" + base64url of 32 random bytes.
 func AdminToken() string { return "bt_adm_" + base64.RawURLEncoding.EncodeToString(randBytes(32)) }
 
+// ConductorToken is a conductor session token (A16).
+func ConductorToken() string { return "bt_cond_" + base64.RawURLEncoding.EncodeToString(randBytes(32)) }
+
 // QID returns a question id: "q_" + 6 lowercase base36 characters.
 func QID() string {
 	const alpha = "0123456789abcdefghijklmnopqrstuvwxyz"

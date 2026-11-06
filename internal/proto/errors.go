@@ -33,6 +33,13 @@ const (
 	CodeAlreadyDecided = "ALREADY_DECIDED" // approval already approved/rejected
 	CodeNotSupported   = "NOT_SUPPORTED"   // no launcher (kill)
 	CodeLaunchFailed   = "LAUNCH_FAILED"   // launcher could not start the agent
+
+	// Phase 6 (A16).
+	CodeForbidden       = "FORBIDDEN"        // token may not use this route or field (conductor limits)
+	CodeConfirmRequired = "CONFIRM_REQUIRED" // merge without confirm: true
+	CodeRunActive       = "RUN_ACTIVE"       // merge while the agent is still working
+	CodeMergeConflict   = "MERGE_CONFLICT"   // branch does not merge cleanly into its base
+	CodeMergeBlocked    = "MERGE_BLOCKED"    // merge refused: dirty checkout, uncommitted agent work, base busy
 )
 
 // Error is a protocol error carrying the HTTP status the API should answer with.
@@ -57,16 +64,17 @@ func statusFor(code string) int {
 		return http.StatusBadRequest
 	case CodeUnauthorized:
 		return http.StatusUnauthorized
-	case CodeRunMismatch, CodeAgentMismatch:
+	case CodeRunMismatch, CodeAgentMismatch, CodeForbidden:
 		return http.StatusForbidden
 	case CodeNotFound:
 		return http.StatusNotFound
 	case CodeRunEnded:
 		return http.StatusGone
 	case CodeUnknownQID, CodeAccountDisabled, CodeRoleNotAllowed, CodeModelNotAllowed,
-		CodeAccountBusy, CodeMaxAgents, CodeNotARepo, CodeCallsignTaken, CodeAlreadyDecided, CodeNotSupported:
+		CodeAccountBusy, CodeMaxAgents, CodeNotARepo, CodeCallsignTaken, CodeAlreadyDecided, CodeNotSupported,
+		CodeRunActive, CodeMergeConflict, CodeMergeBlocked:
 		return http.StatusConflict
-	case CodeAccountRequired, CodeUnknownAccount, CodeConfigInvalid:
+	case CodeAccountRequired, CodeUnknownAccount, CodeConfigInvalid, CodeConfirmRequired:
 		return http.StatusBadRequest
 	default:
 		return http.StatusInternalServerError

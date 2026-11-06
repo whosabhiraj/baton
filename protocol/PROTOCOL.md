@@ -312,3 +312,61 @@ run_id }`).
 state changes; `approval` (`approval`) when an approval is requested or decided.
 
 **Audit actions**: `approval.request|approve|reject` (target approval id), `kill` (target run id).
+
+### A16. Phase 6: conductor token, run routes, diff, merge, wait
+
+**Conductor token.** The hub mints one per conductor session (`bt_cond_` + random; held in memory,
+a new session or a hub restart invalidates the old one) and passes it to `baton mcp` as
+`BATON_CONDUCTOR_TOKEN`. It is accepted on the routes marked *C* below and on every existing
+read/control route the conductor's tools use: `GET /api/state`, `/api/accounts`, `/api/config`,
+`/api/approvals`, `/api/audit`, `GET /api/runs/:id/events`, `POST /api/runs/:id/{message,answer,
+plan_update,pause,resume,stop,kill}`, `POST /api/spawn`. It is **refused** (`401`) on approval
+decisions, `/api/stream`, `/api/hub/shutdown`, `/api/dev/runs`, token rotation. With it,
+`PATCH /api/config` may only change `mode` and `PATCH /api/accounts/:id` only `enabled`
+(`403 FORBIDDEN` otherwise). The actor of a conductor request is always `conductor` (audit, spawn
+`actor`, message `from`), whatever the header or body says.
+
+`:id` on run routes may be a run id or an agent id (the agent's newest run).
+
+| Route | Body / query | Response |
+|---|---|---|
+| `GET /api/runs` *C* | `?status=a,b` `?active=true` | `{ ok, runs: RunSummary[] }` |
+| `GET /api/runs/:id` *C* | `?events=N` (default 10, max 500) | `{ ok, run: RunSummary, task, effort, worktree, actor, recent_events (newest N without activity/heartbeat/usage/to_agent), artifacts (artifact payloads), diff_stat, approvals (pending, this run) }` |
+| `GET /api/runs/:id/events` | adds `?types=a,b` and `?limit=N` (newest N after filtering) | as A11 |
+| `GET /api/runs/:id/diff` *C* | `?max_bytes=N` (default 200000) | `{ ok, diff: { run_id, agent_id, branch, base_branch, stat, diff, bytes, truncated, uncommitted[], merged } }`; committed work only (`base...branch`) |
+| `POST /api/runs/:id/merge` *C* | `{ confirm: true, note? }` | see below |
+| `GET /api/wait` *C* | `?cursor=N&instance=I&timeout_s=S&types=a,b` | `{ ok, cursor, instance, items[], timed_out, reset }` |
+
+**Merge.** `400 CONFIRM_REQUIRED` without `confirm:true`; `409 RUN_ACTIVE` unless the run reported
+`done` or ended. A conductor request with `approvals.merge` on opens a merge approval (or returns the
+pending one): `202 { ok, status:"pending", approval }`. A human request, or the gate off, merges now:
+`200 { ok, status:"merged", merge: { run_id, branch, base_branch, commit, already_merged, method } }`;
+already merged: `200 { ok, status:"merged", already_merged:true }`. Approving a merge approval runs the
+merge first; if it fails the approval **stays pending** and the approve call answers the error.
+Merge rules: always a merge commit (`--no-ff`); refused with `409 MERGE_BLOCKED` when the agent's
+worktree has uncommitted changes, the base is not a local branch, the base is checked out in another
+worktree, or the base is checked out in the project folder and that checkout has uncommitted changes
+to tracked files; refused with `409 MERGE_CONFLICT` (files listed, nothing left behind) when it does
+not merge cleanly. A base not checked out anywhere is merged without a checkout (`merge-tree` +
+`commit-tree` + `update-ref`, `method:"ref"`). The run gets `merged: true` (`RunSummary.merged`;
+run.json extras `merged`, `merge_commit`).
+
+**Wait.** Long-poll over the SSE ring (A12 ids). Without `cursor` it starts at "now". It returns as
+soon as at least one matching item is after the cursor (plus a 250 ms burst, at most 50 items), or
+after `timeout_s` (default 60, max 600; 0 = do not block) with `timed_out:true`. `cursor` advances
+past every item looked at, matching or not. Default types: events `question, step_blocked, done,
+error, stalled, rate_limited, exit` and notices `approval` (decided only) and `merged`. Item:
+`{ n, kind: event|notice, type, run_id?, agent_id?, callsign?, seq?, ts?, payload }`. `reset:true`
+(empty items): the cursor is unknown to this hub process (other `instance`, ahead of or older than
+the ring, or the waiter fell behind): re-read the run list.
+
+**SSE notice** `merged` (`run_id, agent_id, commit?`). **Audit action** `merge` (target run id).
+**Error codes**: `FORBIDDEN` 403, `CONFIRM_REQUIRED` 400, `RUN_ACTIVE`, `MERGE_CONFLICT`,
+`MERGE_BLOCKED` 409.
+
+**`baton mcp [--project P] [--url U]`**: MCP stdio server (official Go SDK). Tools: `list_accounts,
+spawn_agent (account required), list_agents, get_agent, read_events, wait_for_events, send_message,
+answer_question, update_plan, pause_agent, resume_agent, stop_agent, kill_agent, review_diff,
+merge_agent, list_approvals, set_mode, set_account_enabled`. Each is one REST call above; results are
+the hub's JSON as text, hub errors come back as tool errors (`CODE: message`). It keeps the wait
+cursor itself, pinned at its first tool call, so nothing is missed between calls.

@@ -134,3 +134,27 @@ func (s *Store) List(status string) []Approval {
 	}
 	return out
 }
+
+// Get returns the approval with the given id.
+func (s *Store) Get(id string) (Approval, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, a := range s.list {
+		if a.ID == id {
+			return a, true
+		}
+	}
+	return Approval{}, false
+}
+
+// Pending returns the oldest pending approval of kind for runID.
+func (s *Store) Pending(kind, runID string) (Approval, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, a := range s.list {
+		if a.Status == Pending && a.Kind == kind && a.RunID == runID {
+			return a, true
+		}
+	}
+	return Approval{}, false
+}

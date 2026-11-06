@@ -31,6 +31,7 @@ const usage = `usage: baton <command>
   hub serve [--project P] [--port N] [--dev]   (foreground hub; what the background hub runs)
   login <account-id> | login --status [<account-id>]   (sign an account in, in its own isolated config dir)
   mock [--speed N] [--seed N] [--once] [--reset] [--no-browser]   (demo hub with fake agents on a scratch repo)
+  mcp [--project P] [--url U]   (the conductor's MCP stdio server; needs BATON_CONDUCTOR_TOKEN, started by the hub)
   all human commands accept --data-dir D to override the project data dir`
 
 type ctx struct {
@@ -102,6 +103,8 @@ func (c *ctx) dispatch(argv []string) (int, error) {
 		return c.cmdSupervise()
 	case "mock":
 		return c.cmdMock(o)
+	case "mcp":
+		return c.cmdMCP(o)
 	}
 	if ph, ok := laterPhase[cmd]; ok {
 		fmt.Fprintf(c.stderr, "baton: %s not available yet (Phase %d)\n", cmd, ph)

@@ -3,6 +3,8 @@ package hub
 
 import (
 	"context"
+	"crypto/sha256"
+	"crypto/subtle"
 	"errors"
 	"fmt"
 	"io"
@@ -60,6 +62,7 @@ type Options struct {
 	ConfigPoll    time.Duration            // config file poll interval; default 2s
 	Launcher      runs.Launcher            // starts/kills agent processes (nil = spawn only records the run)
 	OnApproval    func(approvals.Approval) // called after a human decision
+	FakeMerges    bool                     // approved merges only mark the run merged (baton mock)
 	IdleStop      time.Duration            // 0 = config hub.idle_stop_min (0 there = never); <0 = disabled; >0 overrides the config
 }
 
@@ -84,8 +87,9 @@ type Hub struct {
 	approvals *approvals.Store
 	condMu    sync.Mutex
 	conductor proto.ConductorState
-	lastAdm   atomic.Int64  // unix nanos of the last admin API request
-	stopCh    chan struct{} // closed first on shutdown: ends SSE streams and background loops
+	condTok   atomic.Pointer[[32]byte] // sha256 of the current conductor session token (A16)
+	lastAdm   atomic.Int64             // unix nanos of the last admin API request
+	stopCh    chan struct{}            // closed first on shutdown: ends SSE streams and background loops
 	detWG     sync.WaitGroup
 	serveWG   sync.WaitGroup
 	done      chan struct{}
@@ -227,6 +231,7 @@ func Start(ctx context.Context, o Options) (*Hub, error) {
 	}
 	handler := api.New(api.Deps{
 		Runs: h.runs, Audit: h.audit, Approvals: h.approvals, OnApproval: o.OnApproval, Launcher: o.Launcher,
+		FakeMerges: o.FakeMerges, CheckConductor: h.checkConductor,
 		Conductor: func() proto.ConductorState { h.condMu.Lock(); defer h.condMu.Unlock(); return h.conductor }, Config: h.cfg, Touch: func() { h.lastAdm.Store(time.Now().UnixNano()) },
 		Store: h.store, Bus: h.broker, AdminToken: h.AdminToken, Instance: ids.UUID(), Dev: o.Dev,
 		Port: h.Port, URL: h.URL, Done: h.stopCh, Logger: log,
@@ -468,6 +473,28 @@ func (h *Hub) SetConductor(c proto.ConductorState) {
 	h.conductor = c
 	h.condMu.Unlock()
 	h.broker.PublishNotice("conductor", map[string]any{"state": c.State, "account": c.Account, "model": c.Model, "since": c.Since})
+}
+
+// MintConductorToken starts a conductor session: it returns a new conductor token and
+// invalidates the previous one. The token is held in memory only (a hub restart starts a new
+// conductor session).
+func (h *Hub) MintConductorToken() string {
+	tok := ids.ConductorToken()
+	sum := sha256.Sum256([]byte(tok))
+	h.condTok.Store(&sum)
+	return tok
+}
+
+// RevokeConductorToken ends the conductor session's access.
+func (h *Hub) RevokeConductorToken() { h.condTok.Store(nil) }
+
+func (h *Hub) checkConductor(tok string) bool {
+	want := h.condTok.Load()
+	if want == nil || tok == "" {
+		return false
+	}
+	got := sha256.Sum256([]byte(tok))
+	return subtle.ConstantTimeCompare(got[:], want[:]) == 1
 }
 
 // RequestApproval stores a pending approval, publishes an `approval` notice and audits it.
