@@ -11,25 +11,29 @@ Big change since Phase 0: the hub **and** the `baton` CLI are written in **Go** 
 
 1. Open a terminal in the repo folder and run `claude`.
 2. Paste this as your first message:
-   > Read HANDOFF.md, PROGRESS.local.md (if present) and docs/PLAN.md, then continue. Ask me the open questions
-   > for the next phase before writing code.
+   > Read CLAUDE.md and HANDOFF.md and follow them. Ask me any open questions before writing code.
 
-Commands that work today (need Go and Node 24+):
+Commands that work today (need Go, Node 24+ and git; `npm install` once):
 
 | Command | What it does |
 |---|---|
-| `npm run check` | formatting, vet, every Go test (unit, protocol conformance, end-to-end lifecycle, CLI behaviour, crash recovery), then a build |
-| `npm run build` | builds `dist/baton` (`dist/baton.exe` on Windows), version-stamped |
-| `npm run install:baton` | `go install` → `baton` on PATH (Go's bin folder; open a new terminal) |
-| `baton up --dev` | runs a hub in the foreground (prints URL + admin token; Ctrl+C stops). Phase 2 makes it a background daemon |
-| `baton mock [--speed N] [--seed N] [--once] [--reset]` | foreground demo hub with a fake conductor and fake agents on a scratch repo (`~/.baton/mock`); no real agents, no quota |
-| `baton help` | agent commands (`hello`, `plan`, `step`, `progress`, `ask`, `inbox`, `done`, …) |
+| `npm run check` | gofmt, vet, dashboard types in sync + typecheck, every Go test, then a full build |
+| `npm run build` | dashboard + binary -> `dist/baton` (`.exe` on Windows), version-stamped |
+| `npm run install:baton` | same, installed to Go's bin folder (on PATH in a new terminal) |
+| `baton up` | in a repo: starts (or reuses) the background hub, prints URL + admin token, opens the dashboard |
+| `baton hub status` / `baton hub stop` | hub state / stop it (asks; `--keep-agents`) |
+| `baton login <account>` / `baton login --status` | log an account's CLI in, inside its own config dir |
+| `baton mock [--speed N] [--seed N] [--once] [--reset]` | demo hub with a fake conductor and fake agents (`~/.baton/mock`), no quota |
+| `npm run dev:web` | dashboard dev server with hot reload; set `BATON_HUB_URL` to a running hub (e.g. the mock) and open it with `#token=<admin token>` |
+| `baton help` | agent commands (`hello`, `plan`, `step`, `progress`, `ask`, `inbox`, `done`, ...) |
 
 Things only you can do:
+- Log in each account once: `baton login claude-a`, `baton login claude-b`, `baton login codex-1`
+  (config is `~/.baton/config.yaml`; each account has its own dir under `~/.baton/accounts/`).
 - **CI:** GitHub refused `.github/workflows/ci.yml` because the git token has no `workflow`
-  scope. Either give the token that scope, or add the file through the GitHub web UI. The file
-  exists locally (untracked).
-- Phase 5: log in to each account's CLI (`baton login <account-id>`); decide on OpenCode.
+  scope. Give the token that scope or add the file through the GitHub web UI (it exists
+  locally, untracked).
+- OpenCode: stays disabled until you pick an API-key provider (never a Claude subscription).
 
 ## B. For Claude (fresh session, zero context): how to resume
 
@@ -59,8 +63,8 @@ Things only you can do:
 | 0 Plan + repo init | ✅ done | `2a5a98d` |
 | 1 Protocol + CLI + spool + minimal hub (Go) | ✅ done | up to the "Phase 1 done" commit |
 | 2 Hub core | ✅ done (verified end to end; PowerShell piped-`y` fix `84b18d2`) | `73491a4` … `84b18d2` |
-| 3 `baton mock` | ✅ done (controls, approvals, kill checked by hand) | `7e40608` … this commit |
-| 4 Dashboard | 4a list/panels, 4b 3D map, 4c timeline + replay, redesign; awaiting check | `4b771b3` … `20f9bfe` |
+| 3 `baton mock` | ✅ done (controls, approvals, kill checked by hand) | `7e40608` … |
+| 4 Dashboard | ✅ done: list + panels, 3D rail-yard map, timeline + replay, phone layout; design iterated live with the user | `4b771b3` … `20f9bfe` |
 | 5 Adapters | code done: supervisor, env allowlist, claude (real run ok), codex, opencode + refusal, custom kinds, `baton login`; real codex run pending login | `852719b` … `72e99ec` |
 | 6 Conductor | pending | — |
 | 7 Hardening | pending | — |
@@ -69,30 +73,36 @@ Things only you can do:
 ## D. What exists right now
 
 ```
-cmd/baton/              main → internal/cli.Main
+cmd/baton/              main -> internal/cli.Main
 internal/proto          envelope/payload types, JSON-Schema validation (embedded schemas)
-internal/ids            run ids (ULID), UUIDs, tokens, qids
-internal/paths          ~/.baton/projects/<name>-<h8>/runs/<run_id>/ layout
-internal/redact         secret redaction (+ slog handler)
-internal/store          per-run store: seq, msg_id dedupe, recovery, status, inbox delivery
-internal/spool          outbox.jsonl tailer (offsets, partial lines, CRLF/BOM, UTF-16)
-internal/bus            SSE fan-out ring buffer
-internal/api            HTTP API (PROTOCOL.md A11 + A12)
+internal/store          per-run store: seq, msg_id dedupe, recovery, status, inbox, AppendAdapter
+internal/spool          line tailer with byte offsets (agent outbox.jsonl, adapter stdout.jsonl)
+internal/api            HTTP API (PROTOCOL.md A11-A15) + serves the embedded dashboard
 internal/hub            wiring, OS lock, port fallback, admin token, stalled detection
-internal/approvals      approval requests (merge/spawn), approvals.json
-internal/mock           `baton mock`: fake conductor + fake agents driving a real hub over HTTP
-internal/cli            agent commands + `baton up` (foreground) + help/version
-protocol/PROTOCOL.md    BATON/1 (original spec §3 + amendments A1–A12)
-protocol/schema/*.json  JSON Schemas = source of truth; protocol/fixtures/ = shared examples
-e2e/                    lifecycle, CLI parity (38 cases), crash recovery (hard-killed hub)
-scripts/*.mjs           build / install / test / check (cross-platform)
-web/embed.go            embeds web/dist (dashboard comes in Phase 4)
+internal/daemon         background hub: discovery, start/stop
+internal/runs           spawn rules, worktrees (git CLI), briefs, diff stat
+internal/config         global + project YAML, validation, hot reload, comment-preserving writes
+internal/approvals      merge/spawn approvals;  internal/audit  audit log
+internal/proc           agent env from an allowlist (+ account env, BATON_*)
+internal/supervise      `baton __supervise`: detached per-agent supervisor, tree kill, exit.json
+internal/adapters       claude, codex, opencode, config-defined kinds (generic); stdout parsers
+internal/launch         real Launcher: start, stdout -> activity/usage, exit + diff stat, kill,
+                        adoption after hub restart, preflight (OpenCode/Claude-subscription refusal)
+internal/mock           `baton mock`: fake conductor + agents through the real hub
+internal/cli            agent commands, baton up/hub/login/mock, help
+internal/{ids,paths,redact,gitx,logx,bus,briefing}  helpers
+protocol/               PROTOCOL.md (BATON/1 + A1-A15), schema/*.json (source of truth), fixtures/
+web/                    dashboard: Vite + TS + three.js, no framework; src/protocol.gen.ts is
+                        generated (`npm run gen:types`); built into web/dist and embedded
+e2e/                    lifecycle, CLI parity, crash recovery (hard-killed hub)
+scripts/*.mjs           build / build-web / gen-types / install / test / check
 docs/                   PLAN.md, GO_HUB_DESIGN.md
 ```
 
-Runtime data: `~/.baton/projects/<repo-name>-<hash8>/` (override with `BATON_HOME`), with
-`admin.token`, `hub.lock`, `hub.port`, `runs/<run_id>/{run.json, events.jsonl, outbox.jsonl,
-outbox.offset, inbox/}`.
+Runtime data: `~/.baton/projects/<repo-name>-<hash8>/` (override with `BATON_HOME`): `admin.token`,
+`hub.lock`, `hub.port`, `worktrees/`, `runs/<run_id>/{run.json, events.jsonl, outbox.jsonl, inbox/,
+brief.md, stdout.jsonl, stderr.log, supervisor.json, exit.json}`. Global config:
+`~/.baton/config.yaml`; per project: `<repo>/baton.config.yaml`.
 
 ## E. Resume here (Phase 5: real codex run pending)
 
@@ -125,9 +135,9 @@ API surface for the dashboard (PROTOCOL.md A11–A15):
   (SSE: `?token=`). Dev against `baton mock --speed 5` (no quota; data in `<BATON_HOME>/mock`);
   `npm run dev:web` with `BATON_HUB_URL=<mock url>` for hot reload.
 
-Constraints for Phase 4: keep it lean (no over-engineering); stack per spec = Vite + TypeScript +
-three.js, no React; types generated from `protocol/schema`; served embedded from `web/dist`, Vite
-proxy in dev; list view must reach every action; verify visually against the mock (no quota).
+Dashboard work: the design contract is a local, uncommitted file (`web/DESIGN.local.md`; if it is
+missing, follow the existing tokens in `web/src/style.css`). Verify visually against the mock (no
+quota), e.g. with a headless browser; keep the list view able to reach every action.
 
 Known small items: multi-field PATCH /api/accounts is not atomic; kill route answers 409
 RUN_ENDED (global mapping 410); mock hub data lives in `<BATON_HOME>/mock/data`.
@@ -155,6 +165,14 @@ RUN_ENDED (global mapping 410); mock hub data lives in `<BATON_HOME>/mock/data`.
 - 2026-11-06: **hub + CLI in Go, one binary**; JSON Schema is the protocol master; CI on 3 OSes;
   port 7777 preferred with fallback (2222 rejected: common alt-SSH port); `hub stop` asks,
   `--keep-agents`; module `github.com/whosabhiraj/baton`; A12 approved; persistent admin token.
+
+- 2026-11-07: Phase 4: split 4a/4b/4c; lean 3D; login via `#token=` fragment (stored, stripped,
+  paste fallback); approval gates: merges need a click, spawns don't. Design: black and quiet,
+  muted account colours, amber only for "needs you", plans drawn as route strips, 3D map as a rail
+  yard; Vite dev proxy rewrites Host and never serves `*.local.*`.
+- 2026-11-07: Phase 5: split 5a/5b/5c; worker agents fully permissive by default; isolated
+  per-account config dirs + `baton login`; OpenCode built but disabled; first real claude run
+  verified (stdin prompt, stream-json parsing, usage/cost, exit + diff stat).
 
 ## G. Privacy rule for this repo (public)
 
