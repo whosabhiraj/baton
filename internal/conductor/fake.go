@@ -39,7 +39,7 @@ func FakeCLI(args []string, stdin io.Reader, stdout io.Writer) int {
 	}
 	sc := bufio.NewScanner(stdin)
 	sc.Buffer(make([]byte, 1<<20), 1<<20)
-	first := true
+	first, turns := true, 0
 	for sc.Scan() {
 		var m struct {
 			Message struct {
@@ -71,9 +71,11 @@ func FakeCLI(args []string, stdin io.Reader, stdout io.Writer) int {
 		}
 		emit(map[string]any{"type": "assistant", "message": map[string]any{"id": "m2", "content": []any{
 			map[string]any{"type": "text", "text": reply}}}})
+		turns++ // like claude, modelUsage is a running total for the session; no cost (no quota)
 		emit(map[string]any{"type": "result", "subtype": "success", "session_id": sid, "is_error": false,
 			"duration_ms": time.Since(start).Milliseconds(), "total_cost_usd": 0.0,
-			"usage": map[string]any{"input_tokens": 1, "output_tokens": 1}})
+			"usage":      map[string]any{"input_tokens": 1, "output_tokens": 1},
+			"modelUsage": map[string]any{"fake": map[string]any{"inputTokens": 10 * turns, "outputTokens": 5 * turns}}})
 	}
 	return 0
 }

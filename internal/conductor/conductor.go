@@ -136,6 +136,7 @@ type Manager struct {
 	seenN    uint64 // newest bus id the conductor has read through wait_for_events
 	wakeT    *time.Timer
 	cur      resolved
+	usage    map[string]SessionUsage // session id -> totals (usage.json)
 	sess     session
 	state    proto.ConductorState
 	fails    []time.Time
@@ -220,6 +221,7 @@ func New(o Options) (*Manager, error) {
 	if b, err := os.ReadFile(filepath.Join(m.dir, SessionFile)); err == nil {
 		_ = json.Unmarshal(b, &m.sess)
 	}
+	m.loadUsage()
 	n, err := countLines(filepath.Join(m.dir, HistoryFile))
 	if err != nil {
 		return nil, err
@@ -588,6 +590,7 @@ func (m *Manager) handleOut(line []byte) {
 		}
 		m.setStateLocked(st)
 	case "result":
+		m.noteResultLocked(line)
 		m.busy = false
 		m.setStateLocked(StateIdle)
 		if m.pending {

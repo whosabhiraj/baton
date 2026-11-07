@@ -16,3 +16,6 @@ web/dist/*
 *.test
 *.test.exe
 *.out
+
+# Claude Code local files (agent worktrees, settings)
+.claude/

@@ -45,6 +45,18 @@ func (a *api) accountUsage() map[string]map[string]any {
 			t[k] = f64(t[k]) + f64(sum.Usage[k])
 		}
 	}
+	if a.ConductorCtl != nil { // the conductor is not a run, but it spends its account's quota too
+		for acct, u := range a.ConductorCtl.Usage() {
+			t := out[acct]
+			if t == nil {
+				t = map[string]any{}
+				out[acct] = t
+			}
+			for _, k := range usageKeys {
+				t[k] = f64(t[k]) + f64(u[k])
+			}
+		}
+	}
 	return out
 }
 

@@ -1,10 +1,14 @@
 // npm run check: gofmt (must be clean), go vet, dashboard types in sync + typecheck, then npm test.
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { capture, die, hasWebDeps, requireGo, root, run, runTool } from './_lib.mjs';
 
 requireGo();
-const unformatted = capture('gofmt', ['-l', '.']);
+// Like go's own ./..., skip dot folders (e.g. agent worktrees under .claude/) and node_modules.
+const goDirs = readdirSync(root, { withFileTypes: true })
+  .filter((d) => d.isDirectory() && !d.name.startsWith('.') && d.name !== 'node_modules')
+  .map((d) => d.name);
+const unformatted = capture('gofmt', ['-l', ...goDirs]);
 if (unformatted === null) die('gofmt failed');
 if (unformatted) die(`gofmt needed on:\n${unformatted}`);
 console.log('gofmt: clean');

@@ -352,3 +352,38 @@ func TestResolveProblems(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// TestUsage: the latest result per session is that session's total (claude's running totals),
+// sessions add up per account, and the totals survive a restart of the manager.
+func TestUsage(t *testing.T) {
+	f := newFixture(t)
+	m := f.manager()
+	m.Start()
+	waitFor(t, "running", func() bool { return m.Info().Running })
+	for _, s := range []string{"one", "two"} {
+		if err := m.Send(s, "human"); err != nil {
+			t.Fatal(err)
+		}
+		waitFor(t, "reply "+s, func() bool { return hasOut(m, "echo: "+s) && m.State().State == StateIdle })
+	}
+	waitFor(t, "usage", func() bool { u := m.Usage()["c1"]; return u != nil && u["input_tokens"] == 20.0 })
+	if u := m.Usage()["c1"]; u["output_tokens"] != 10.0 || u["cost_usd"] != 0.0 {
+		t.Fatalf("usage: %v", u)
+	}
+
+	m.mu.Lock() // a second session with real cost, then a later (cumulative) result of it
+	m.noteResultLocked([]byte(`{"type":"result","session_id":"s2","total_cost_usd":0.5,"modelUsage":{"a":{"inputTokens":3,"outputTokens":4,"cacheReadInputTokens":5,"cacheCreationInputTokens":6}}}`))
+	m.noteResultLocked([]byte(`{"type":"result","session_id":"s2","total_cost_usd":0.75,"modelUsage":{"a":{"inputTokens":4,"outputTokens":4},"b":{"inputTokens":1}}}`))
+	m.noteResultLocked([]byte(`{"type":"result","session_id":"s3"}`)) // nothing to record
+	m.mu.Unlock()
+	u := m.Usage()["c1"]
+	if u["input_tokens"] != 25.0 || u["cost_usd"] != 0.75 || len(m.Usage()) != 1 {
+		t.Fatalf("summed: %v", m.Usage())
+	}
+	m.Close()
+
+	m2 := f.manager()
+	if got := m2.Usage()["c1"]; got["input_tokens"] != 25.0 || got["cost_usd"] != 0.75 {
+		t.Fatalf("after restart: %v", got)
+	}
+}
