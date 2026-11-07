@@ -21,6 +21,7 @@ Commands that work today (need Go, Node 24+ and git; `npm install` once):
 | `npm run check` | gofmt, vet, dashboard types in sync + typecheck, every Go test, then a full build |
 | `npm run build` | dashboard + binary -> `dist/baton` (`.exe` on Windows), version-stamped |
 | `npm run install:baton` | same, installed to Go's bin folder (on PATH in a new terminal) |
+| `npm run release` | 6 cross-compiled static binaries + `SHA256SUMS` in `dist/release/<version>/` (plain version on a `v<version>` tag) |
 | `baton` | in a repo: hub (background) + conductor, opens the dashboard and, in a terminal, the conductor chat (`--no-chat`) |
 | `baton up` | in a repo: starts (or reuses) the background hub, prints URL + admin token, opens the dashboard (no conductor) |
 | `baton attach` | status, then the conductor chat (Bubble Tea; plain line mode when not a terminal). Ctrl+C detaches |

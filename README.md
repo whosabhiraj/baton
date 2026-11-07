@@ -54,6 +54,7 @@ needs go (see `go.mod`), node 24+ (for the dashboard build and helper scripts) a
 npm install
 npm run check    # fmt, vet, all tests, dashboard typecheck
 npm run build    # dashboard + binary -> dist/baton
+npm run release  # binaries for windows/macos/linux (amd64 + arm64) + SHA256SUMS -> dist/release/
 npm run install:baton   # puts baton on your PATH (open a new terminal)
 ```
 
