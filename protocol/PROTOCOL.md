@@ -452,3 +452,36 @@ skipped }] }`; `skipped` is "" for an item removed (or, in a dry run, that would
 the reason it was left. Each removal is audited (`gc.worktree`, `gc.run`, actor `human`). The hub
 also applies the worktree policy alone (no run folders, never forced) at start and then hourly,
 actor `hub`.
+
+### A20. Sandboxed agents and access requests
+
+`accounts[].permissions.mode: sandboxed` (the default) runs agents in their CLI's OS sandbox:
+writes only to the worktree, the run dir and the git paths of their own branch; no reads of
+Baton's home (outside their worktree and run dir) or `permissions.deny_read`; no network.
+Sandboxed agents get no `BATON_URL`/`BATON_TOKEN`: `baton` writes the spool and reads the inbox
+from files (A3, A7).
+
+When the sandbox blocks something the agent needs (network, a path outside its area, a command
+outside the sandbox), the agent's driver asks the user through an **access request**, an approval
+of kind `access` (only a human decides; the conductor token cannot):
+
+- `POST /api/runs/:id/access` (that run's token, or admin) body `{ kind, summary, detail? }`:
+  `kind` is `command | file_change | permissions`, `summary` one line (<= 300 chars, redacted),
+  `detail` an object (command, cwd, reason, paths, network host; redacted). Answer
+  `200 { ok, approval }`; the approval has `kind: "access"`, `run_id`, `title` "<callsign>: <summary>",
+  `detail { kind, summary, agent_id, ...detail }`, `status: "pending"`. Run ended: `410 RUN_ENDED`.
+- `GET /api/runs/:id/access/:approval_id?wait=<s>` (same auth) long-polls up to min(wait, 60) s
+  until the status is not `pending`; answer `200 { ok, status, note }`.
+- `POST /api/runs/:id/access/:approval_id/cancel` (same auth): a still-pending request becomes
+  `rejected` with note `expired` (the driver gave up waiting). Answer `200 { ok, status }`.
+- Decisions use the usual `POST /api/approvals/:id/approve|reject` (admin only). Approving has no
+  effect in the hub; the driver hands the answer to the agent.
+- When a run ends, its pending access requests are rejected with note `run ended`.
+- Each request is audited (`approval.request`, actor `agent`) and announced as an `approval` notice.
+
+The codex driver (`baton __codex`, used for sandboxed codex accounts) runs `codex app-server`
+(JSON-RPC over stdio), starts one thread and one turn with the brief, writes the app-server's
+notifications to stdout as JSONL for the codex parser, answers `item/commandExecution/requestApproval`,
+`item/fileChange/requestApproval` and `item/permissions/requestApproval` from the user's decision
+(timeout = the run's ask timeout, then declined), declines every other server request, and exits
+when the turn completes.
