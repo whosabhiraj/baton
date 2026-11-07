@@ -17,6 +17,7 @@ const FIELDS: { key: string; label: string; kind: Kind; hint?: string }[] = [
   { key: 'open_browser', label: 'Open browser on start', kind: 'bool' },
   { key: 'worktrees.cleanup', label: 'Worktree cleanup', kind: { select: ['keep', 'remove_on_merge', 'remove_after_days'] } },
   { key: 'worktrees.days', label: 'Cleanup after days', kind: 'number' },
+  { key: 'runs_keep_days', label: 'Keep run history (days, 0 = forever)', kind: 'number', hint: 'baton gc removes older ended runs' },
 ];
 
 function dig(o: unknown, path: string): unknown {

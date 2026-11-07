@@ -58,6 +58,7 @@
         "ask_timeout_s": { "type": "integer", "minimum": 1, "default": 900 },
         "poll_interval_s": { "type": "number", "exclusiveMinimum": 0, "default": 2 },
         "idle_stop_min": { "type": "integer", "minimum": 0, "default": 30 },
+        "runs_keep_days": { "type": "integer", "minimum": 0, "default": 30, "description": "baton gc removes ended run folders older than this; 0 = never" },
         "open_browser": { "type": "boolean", "default": true },
         "mode": { "enum": ["user", "propose", "auto"], "default": "propose" },
         "max_agents_auto": { "type": "integer", "minimum": 0, "default": 6 },

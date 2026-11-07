@@ -476,6 +476,10 @@ export namespace Config {
       ask_timeout_s?: number;
       poll_interval_s?: number;
       idle_stop_min?: number;
+      /**
+       * baton gc removes ended run folders older than this; 0 = never
+       */
+      runs_keep_days?: number;
       open_browser?: boolean;
       mode?: 'user' | 'propose' | 'auto';
       max_agents_auto?: number;
