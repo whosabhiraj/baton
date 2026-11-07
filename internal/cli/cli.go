@@ -31,6 +31,7 @@ const usage = `usage: baton <command>
   hub status | stop [--yes] [--keep-agents] | rotate-token
   hub serve [--project P] [--port N] [--dev]   (foreground hub; what the background hub runs)
   login <account-id> [--kind claude|codex] | login --status [<account-id>]   (sign an account in, in its own isolated config dir; a new id is added to the config first)
+  gc [--yes] [--force]   remove worktrees the cleanup policy allows and old ended run folders (lists, asks; never live runs or branches)
   mock [--speed N] [--seed N] [--once] [--reset] [--no-browser]   (demo hub with fake agents on a scratch repo)
   mcp [--project P] [--url U]   (the conductor's MCP stdio server; needs BATON_CONDUCTOR_TOKEN, started by the hub)
   all human commands accept --data-dir D to override the project data dir`
@@ -47,7 +48,7 @@ var maxPositionals = map[string]int{
 	"hello": 0, "heartbeat": 0, "inbox": 0, "plan": 0, "done": 0, "step": 2, "progress": 2, "artifact": 2, "ask": 1, "error": 1,
 }
 
-var laterPhase = map[string]int{"gc": 7}
+var laterPhase = map[string]int{} // commands announced but not built yet
 
 // Main runs the CLI and returns the process exit code.
 func Main(args []string, stdin io.Reader, stdout, stderr io.Writer, getenv func(string) string) int {
@@ -102,6 +103,8 @@ func (c *ctx) dispatch(argv []string) (int, error) {
 		return c.cmdHub(o, pos)
 	case "__supervise":
 		return c.cmdSupervise()
+	case "gc":
+		return c.cmdGC(o)
 	case "mock":
 		return c.cmdMock(o)
 	case "mcp":

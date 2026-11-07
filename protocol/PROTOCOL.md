@@ -440,3 +440,15 @@ answers `409 LINEUP_REQUIRED` unless it is a dry run. MCP tools: `propose_lineup
 `get_settings` (`mode, max_agents_auto, approvals, routing`). The terminal chat's `/approvals`
 lists the agents of a lineup; `/approve n` spawns it as proposed, `/reject n <why>` sends it back.
 The dashboard's approvals sheet edits a lineup per agent (include, account, model, effort, task).
+
+### A19. Phase 7b: gc
+
+`POST /api/gc` (admin token only; the conductor token gets `401`) body `{ dry_run?, force? }` (booleans).
+Removes worktrees the `hub.worktrees.cleanup` policy allows and ended run folders whose `ended_at` is
+older than `hub.runs_keep_days` (0 = never; default 30). Live runs are never touched, branches are
+never deleted. A worktree with uncommitted changes is skipped (and so is its run folder) unless
+`force`. Answer `200 { ok, dry_run, items: [{ run_id, agent_id, what: "worktree"|"run", reason,
+skipped }] }`; `skipped` is "" for an item removed (or, in a dry run, that would be) and otherwise
+the reason it was left. Each removal is audited (`gc.worktree`, `gc.run`, actor `human`). The hub
+also applies the worktree policy alone (no run folders, never forced) at start and then hourly,
+actor `hub`.

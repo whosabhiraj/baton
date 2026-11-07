@@ -70,6 +70,7 @@ baton                    # in a repo: hub + conductor, dashboard, and the chat i
 - `baton up` is the same without the conductor, if you'd rather spawn agents yourself from the
   dashboard (or `POST /api/spawn`, see `protocol/PROTOCOL.md`)
 - `baton hub status` / `baton hub stop` do what they say
+- `baton gc` removes worktrees your cleanup policy allows and ended run folders older than `hub.runs_keep_days` (it lists them and asks first; `--yes` skips, `--force` also takes worktrees with uncommitted changes; branches and live runs are never touched)
 - in the chat: `/agents`, `/approvals`, `/approve`, `/reject`, `/mode`, `/stop`, `/help`
 
 the conductor's defaults live under `conductor:` in the config (account, model, effort,

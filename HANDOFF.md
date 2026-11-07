@@ -25,6 +25,7 @@ Commands that work today (need Go, Node 24+ and git; `npm install` once):
 | `baton up` | in a repo: starts (or reuses) the background hub, prints URL + admin token, opens the dashboard (no conductor) |
 | `baton attach` | status, then the conductor chat (Bubble Tea; plain line mode when not a terminal). Ctrl+C detaches |
 | `baton hub status` / `baton hub stop` | hub state / stop it (asks; `--keep-agents`) |
+| `baton gc [--yes] [--force]` | list and (after asking) remove policy-allowed worktrees and ended run folders older than `hub.runs_keep_days`; never live runs or branches |
 | `baton login <account>` / `baton login --status` | log an account's CLI in, inside its own config dir; an unknown id is added to the global config (asks the kind, or `--kind`) |
 | `baton mock [--speed N] [--seed N] [--once] [--reset]` | demo hub with a fake conductor and fake agents (`~/.baton/mock`), no quota; the chat echoes, one lineup is proposed |
 | `npm run dev:web` | dashboard dev server with hot reload; set `BATON_HUB_URL` to a running hub (e.g. the mock) and open it with `#token=<admin token>` |
