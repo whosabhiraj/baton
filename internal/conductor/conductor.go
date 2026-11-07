@@ -130,8 +130,10 @@ type Manager struct {
 	running  bool
 	stopping bool
 	closed   bool
-	busy     bool // a turn is in progress
-	pending  bool // something woke while busy
+	busy     bool   // a turn is in progress
+	pending  bool   // something woke while busy
+	wakeN    uint64 // bus id of the newest item that wants a nudge
+	seenN    uint64 // newest bus id the conductor has read through wait_for_events
 	wakeT    *time.Timer
 	cur      resolved
 	sess     session
@@ -770,6 +772,7 @@ func (m *Manager) wakeLoop() {
 				continue
 			}
 			m.mu.Lock()
+			m.wakeN = max(m.wakeN, it.N)
 			if m.running {
 				if m.busy {
 					m.pending = true
@@ -788,6 +791,14 @@ func (m *Manager) wakeLoop() {
 	}
 }
 
+// Seen records that the conductor read the bus up to cursor (its wait_for_events calls), so
+// events it already handled during a turn do not cause a nudge afterwards.
+func (m *Manager) Seen(cursor uint64) {
+	m.mu.Lock()
+	m.seenN = max(m.seenN, cursor)
+	m.mu.Unlock()
+}
+
 func (m *Manager) armWakeLocked() {
 	if m.wakeT != nil {
 		return // a nudge is already scheduled
@@ -802,6 +813,10 @@ func (m *Manager) armWakeLocked() {
 		if m.busy {
 			m.pending = true
 			m.mu.Unlock()
+			return
+		}
+		if m.seenN >= m.wakeN {
+			m.mu.Unlock() // already read with wait_for_events during the last turn: no nudge
 			return
 		}
 		m.mu.Unlock()

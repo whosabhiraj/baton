@@ -420,6 +420,9 @@ func (a *api) wait(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	if isConductorReq(r) && a.ConductorCtl != nil && !dropped {
+		a.ConductorCtl.Seen(cursor)
+	}
 	writeJSON(w, 200, map[string]any{"ok": true, "cursor": cursor, "instance": a.Instance, "items": items,
 		"timed_out": timedOut, "reset": dropped})
 }

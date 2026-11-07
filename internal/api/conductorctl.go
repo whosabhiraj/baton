@@ -24,6 +24,7 @@ type ConductorCtl interface {
 	Send(text, from string) error
 	History(after, limit int) ([]conductor.Entry, int, error)
 	Subscribe() (<-chan conductor.Update, func())
+	Seen(cursor uint64) // the conductor read the bus up to cursor (GET /api/wait)
 }
 
 func (a *api) noConductor(w http.ResponseWriter) bool {

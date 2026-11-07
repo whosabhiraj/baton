@@ -306,6 +306,18 @@ func TestAutoWake(t *testing.T) {
 	}
 	f.bus.PublishNotice("approval", map[string]any{"approval": approvals.Approval{Status: approvals.Approved}})
 	waitFor(t, "approval nudge", func() bool { return countIn(m, "hub") == 2 })
+	waitFor(t, "idle", func() bool { return m.State().State == StateIdle })
+
+	// already read through wait_for_events (Seen): no nudge; something newer still wakes
+	f.bus.Publish(proto.StoredEvent{Type: "exit"})
+	m.Seen(f.bus.LastID())
+	time.Sleep(150 * time.Millisecond)
+	if countIn(m, "hub") != 2 {
+		t.Fatal("woke for events the conductor already read")
+	}
+	f.bus.Publish(proto.StoredEvent{Type: "done"})
+	waitFor(t, "nudge after newer event", func() bool { return countIn(m, "hub") == 3 })
+	waitFor(t, "idle", func() bool { return m.State().State == StateIdle })
 
 	f.mu.Lock()
 	f.cfg.Conductor.AutoWake = false
@@ -313,7 +325,7 @@ func TestAutoWake(t *testing.T) {
 	waitFor(t, "idle", func() bool { return m.State().State == StateIdle })
 	f.bus.Publish(proto.StoredEvent{Type: "error"})
 	time.Sleep(150 * time.Millisecond)
-	if countIn(m, "hub") != 2 {
+	if countIn(m, "hub") != 3 {
 		t.Fatal("woke with auto_wake off")
 	}
 }
