@@ -162,6 +162,21 @@ func (s *Store) Pending(kind, runID string) (Approval, bool) {
 	return Approval{}, false
 }
 
+// PendingFor describes a pending approval (any kind) for runID, "" if none; gc keeps such runs.
+func (s *Store) PendingFor(runID string) string {
+	if s == nil {
+		return ""
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, a := range s.list {
+		if a.Status == Pending && a.RunID == runID {
+			return "pending " + a.Kind + " approval " + a.ID
+		}
+	}
+	return ""
+}
+
 // SetResult records what approving did (e.g. which agents of a lineup were spawned).
 func (s *Store) SetResult(id string, result map[string]any) (Approval, error) {
 	s.mu.Lock()

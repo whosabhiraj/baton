@@ -35,3 +35,18 @@ func TestRequestDecideReload(t *testing.T) {
 		t.Fatal(all, pend)
 	}
 }
+
+func TestPendingFor(t *testing.T) {
+	s, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, _ := s.Add(KindMerge, "r1", "Merge x", nil, "conductor")
+	if got := s.PendingFor("r1"); got != "pending merge approval "+a.ID || s.PendingFor("r2") != "" {
+		t.Fatalf("%q", got)
+	}
+	s.Decide(a.ID, false, "human", "")
+	if s.PendingFor("r1") != "" || (*Store)(nil).PendingFor("r1") != "" {
+		t.Fatal("decided or nil store still holds")
+	}
+}

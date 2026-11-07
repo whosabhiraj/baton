@@ -447,6 +447,7 @@ The dashboard's approvals sheet edits a lineup per agent (include, account, mode
 Removes worktrees the `hub.worktrees.cleanup` policy allows and ended run folders whose `ended_at` is
 older than `hub.runs_keep_days` (0 = never; default 30). Live runs are never touched, branches are
 never deleted. A worktree with uncommitted changes is skipped (and so is its run folder) unless
+`force`. A run with a pending approval (any kind) keeps its worktree and folder, even with
 `force`. Answer `200 { ok, dry_run, items: [{ run_id, agent_id, what: "worktree"|"run", reason,
 skipped }] }`; `skipped` is "" for an item removed (or, in a dry run, that would be) and otherwise
 the reason it was left. Each removal is audited (`gc.worktree`, `gc.run`, actor `human`). The hub

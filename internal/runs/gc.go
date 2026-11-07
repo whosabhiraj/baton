@@ -17,7 +17,8 @@ type GCOptions struct {
 	PolicyOnly bool // worktree policy only: leave run folders alone (the hub's automatic pass)
 	Force      bool // also remove worktrees with uncommitted changes
 	Actor      string
-	Audit      *audit.Log // nil = no audit entries
+	Audit      *audit.Log                // nil = no audit entries
+	Hold       func(runID string) string // non-empty = keep this run for now (the reason), e.g. a pending approval
 }
 
 // GCItem is one thing GC removes (or, with Skipped set, would have removed).
@@ -63,6 +64,10 @@ func (m *Manager) GC(ctx context.Context, now time.Time, o GCOptions) GCReport {
 				wtGone = false
 			}
 		}
+		hold := ""
+		if o.Hold != nil {
+			hold = o.Hold(rec.RunID)
+		}
 		blocked := ""
 		if !wtGone {
 			it := GCItem{RunID: rec.RunID, AgentID: rec.AgentID, What: "worktree", Reason: m.worktreeReason(cfg)}
@@ -73,6 +78,8 @@ func (m *Manager) GC(ctx context.Context, now time.Time, o GCOptions) GCReport {
 				it.Skipped = "cannot check for uncommitted changes: " + err.Error()
 			} else if len(dirty) > 0 && !o.Force {
 				it.Skipped = "uncommitted changes"
+			} else if hold != "" {
+				it.Skipped = hold
 			}
 			if it.Skipped == "" && !o.DryRun {
 				if err := m.RemoveWorktree(ctx, rec.RunID, false); err != nil {
@@ -88,6 +95,8 @@ func (m *Manager) GC(ctx context.Context, now time.Time, o GCOptions) GCReport {
 			it := GCItem{RunID: rec.RunID, AgentID: rec.AgentID, What: "run", Reason: fmt.Sprintf("ended more than %d days ago", cfg.RunsKeepDays)}
 			if blocked != "" {
 				it.Skipped = "worktree not removed: " + blocked
+			} else if hold != "" {
+				it.Skipped = hold
 			} else if !o.DryRun {
 				if err := m.o.Store.Remove(rec.RunID); err != nil {
 					it.Skipped = "error: " + err.Error()

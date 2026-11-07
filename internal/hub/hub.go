@@ -422,7 +422,7 @@ func (h *Hub) gcLoop() {
 				h.log.Error("worktree cleanup panic", "panic", fmt.Sprint(p))
 			}
 		}()
-		rep := h.runs.GC(ctx, time.Now(), runs.GCOptions{PolicyOnly: true, Actor: audit.ActorHub, Audit: h.audit})
+		rep := h.runs.GC(ctx, time.Now(), runs.GCOptions{PolicyOnly: true, Actor: audit.ActorHub, Audit: h.audit, Hold: h.approvals.PendingFor})
 		for _, it := range rep.Items {
 			if it.Skipped == "" {
 				h.log.Info("removed worktree", "run", it.RunID, "agent", it.AgentID, "reason", it.Reason)

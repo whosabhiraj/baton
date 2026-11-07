@@ -146,3 +146,31 @@ func TestGCRunFolders(t *testing.T) {
 		t.Fatalf("%+v", rep)
 	}
 }
+
+func TestGCHoldsRunsWithPendingApprovals(t *testing.T) {
+	f, a, _ := gcFixture(t)
+	ctx := context.Background()
+	f.cfg.Hub.RunsKeepDays = 30
+	future := time.Now().AddDate(0, 0, 31)
+	hold := func(id string) string {
+		if id == a.RunID {
+			return "pending merge approval ap_1"
+		}
+		return ""
+	}
+	rep := f.m.GC(ctx, future, runs.GCOptions{Force: true, Hold: hold})
+	if len(rep.Items) != 2 || rep.Items[0].Skipped != "pending merge approval ap_1" || rep.Items[1].Skipped == "" {
+		t.Fatalf("%+v", rep)
+	}
+	if f.st.Get(a.RunID) == nil || !exists(a.RunDir) || !exists(a.Worktree) {
+		t.Fatal("held run removed")
+	}
+	// worktree already gone: the run folder is still held
+	if err := f.m.RemoveWorktree(ctx, a.RunID, true); err != nil {
+		t.Fatal(err)
+	}
+	rep = f.m.GC(ctx, future, runs.GCOptions{Force: true, Hold: hold})
+	if len(rep.Items) != 1 || rep.Items[0].What != "run" || rep.Items[0].Skipped != "pending merge approval ap_1" || !exists(a.RunDir) {
+		t.Fatalf("%+v", rep)
+	}
+}

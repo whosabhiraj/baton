@@ -518,7 +518,7 @@ func (a *api) gc(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, proto.NewError(proto.CodeNotARepo, "hub has no git repository"))
 		return
 	}
-	rep := a.Runs.GC(r.Context(), time.Now(), runs.GCOptions{DryRun: dry, Force: force, Actor: audit.ActorHuman, Audit: a.Audit})
+	rep := a.Runs.GC(r.Context(), time.Now(), runs.GCOptions{DryRun: dry, Force: force, Actor: audit.ActorHuman, Audit: a.Audit, Hold: a.Approvals.PendingFor})
 	writeJSON(w, 200, map[string]any{"ok": true, "dry_run": dry, "items": rep.Items})
 }
 
