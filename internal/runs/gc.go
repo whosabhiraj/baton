@@ -13,10 +13,11 @@ import (
 
 // GCOptions controls Manager.GC.
 type GCOptions struct {
-	DryRun bool // report only, change nothing
-	Force  bool // also remove worktrees with uncommitted changes
-	Actor  string
-	Audit  *audit.Log // nil = no audit entries
+	DryRun     bool // report only, change nothing
+	PolicyOnly bool // worktree policy only: leave run folders alone (the hub's automatic pass)
+	Force      bool // also remove worktrees with uncommitted changes
+	Actor      string
+	Audit      *audit.Log // nil = no audit entries
 }
 
 // GCItem is one thing GC removes (or, with Skipped set, would have removed).
@@ -48,7 +49,7 @@ func (m *Manager) GC(ctx context.Context, now time.Time, o GCOptions) GCReport {
 		}
 		rec := r.Record()
 		oldRun := false
-		if cfg.RunsKeepDays > 0 {
+		if cfg.RunsKeepDays > 0 && !o.PolicyOnly {
 			if t, err := time.Parse(time.RFC3339Nano, rec.EndedAt); err == nil {
 				oldRun = !now.Before(t.Add(time.Duration(cfg.RunsKeepDays) * 24 * time.Hour))
 			}

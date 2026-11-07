@@ -133,6 +133,7 @@ func New(d Deps) http.Handler {
 	mux.HandleFunc("/api/conductor/send", a.route("POST", authAdmin, a.conductorSend))
 	mux.HandleFunc("/api/conductor/history", a.route("GET", authAdmin, a.conductorHistory))
 	mux.HandleFunc("/api/conductor/stream", a.route("GET", authAdminQuery, a.conductorStream))
+	mux.HandleFunc("/api/gc", a.route("POST", authAdmin, a.gc))
 	mux.HandleFunc("/api/dev/runs", a.route("POST", authAdmin, a.devRun))
 	mux.HandleFunc("/api/hub/shutdown", a.route("POST", authAdmin, a.shutdown))
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
@@ -488,6 +489,32 @@ func (a *api) shutdown(w http.ResponseWriter, r *http.Request) {
 	if a.Shutdown != nil {
 		go a.Shutdown()
 	}
+}
+
+// gc is POST /api/gc (A19): admin token only, the conductor must not reach it.
+func (a *api) gc(w http.ResponseWriter, r *http.Request) {
+	body, perr := readObject(r)
+	if perr != nil {
+		writeErr(w, perr)
+		return
+	}
+	var dry, force bool
+	for k, dst := range map[string]*bool{"dry_run": &dry, "force": &force} {
+		if v, ok := body[k]; ok {
+			b, isBool := v.(bool)
+			if !isBool {
+				writeErr(w, proto.NewError(proto.CodeInvalidPayload, k+" must be a boolean"))
+				return
+			}
+			*dst = b
+		}
+	}
+	if a.Runs == nil {
+		writeErr(w, proto.NewError(proto.CodeNotARepo, "hub has no git repository"))
+		return
+	}
+	rep := a.Runs.GC(r.Context(), time.Now(), runs.GCOptions{DryRun: dry, Force: force, Actor: audit.ActorHuman, Audit: a.Audit})
+	writeJSON(w, 200, map[string]any{"ok": true, "dry_run": dry, "items": rep.Items})
 }
 
 func (a *api) devRun(w http.ResponseWriter, r *http.Request) {

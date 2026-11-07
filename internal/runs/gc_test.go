@@ -97,6 +97,16 @@ func TestGCRemoveOnMerge(t *testing.T) {
 	}
 }
 
+func TestGCPolicyOnlyLeavesRunFolders(t *testing.T) {
+	f, a, _ := gcFixture(t)
+	f.cfg.Hub.RunsKeepDays = 30
+	f.cfg.Hub.Worktrees = config.Worktrees{Cleanup: config.CleanupRemoveAfter, Days: 1}
+	rep := f.m.GC(context.Background(), time.Now().AddDate(0, 0, 60), runs.GCOptions{PolicyOnly: true})
+	if len(rep.Items) != 1 || rep.Items[0].What != "worktree" || f.st.Get(a.RunID) == nil || !exists(a.RunDir) {
+		t.Fatalf("%+v", rep)
+	}
+}
+
 func TestGCRunFolders(t *testing.T) {
 	f, a, b := gcFixture(t)
 	ctx := context.Background()
