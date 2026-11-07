@@ -19,6 +19,7 @@ hub:
   open_browser: true         # `baton` opens the dashboard
   mode: propose              # user | propose | auto
   max_agents_auto: 6         # global agent cap, auto mode only
+  runs_keep_days: 30         # `baton gc` removes ended run folders older than this (0 = never)
   worktrees:
     cleanup: keep            # keep | remove_on_merge | remove_after_days
     days: 14                 # used by remove_after_days

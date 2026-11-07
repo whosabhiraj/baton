@@ -43,6 +43,7 @@ type Hub struct {
 	OpenBrowser       bool      `yaml:"open_browser" json:"open_browser"`               // [true] `baton` opens the dashboard
 	Mode              string    `yaml:"mode" json:"mode"`                               // [propose] user | propose | auto
 	MaxAgentsAuto     int       `yaml:"max_agents_auto" json:"max_agents_auto"`         // [6] global cap, auto mode only
+	RunsKeepDays      int       `yaml:"runs_keep_days" json:"runs_keep_days"`           // [30] `baton gc` removes ended run folders older than this; 0 = never
 	Worktrees         Worktrees `yaml:"worktrees" json:"worktrees"`
 	Approvals         Approvals `yaml:"approvals" json:"approvals"`
 }
