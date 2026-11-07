@@ -1,6 +1,7 @@
 package runs
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -83,11 +84,23 @@ func (m *Manager) uncommitted(ctx context.Context, worktree string) ([]string, e
 	}
 	out := []string{}
 	for _, l := range strings.Split(st, "\n") {
-		if strings.TrimSpace(l) != "" {
+		if strings.TrimSpace(l) != "" && !batonOwned(worktree, l) {
 			out = append(out, l)
 		}
 	}
 	return out, nil
+}
+
+// batonOwned: an untracked AGENTS.md that is still exactly the brief Baton wrote for codex.
+// It cannot go in info/exclude (shared with the main checkout), so it is skipped here; an
+// agent that edited it still counts as uncommitted work.
+func batonOwned(worktree, porcelain string) bool {
+	if porcelain != "?? AGENTS.md" {
+		return false
+	}
+	a, err1 := os.ReadFile(filepath.Join(worktree, "AGENTS.md"))
+	b, err2 := os.ReadFile(filepath.Join(worktree, "BATON_BRIEF.md"))
+	return err1 == nil && err2 == nil && bytes.Equal(a, b)
 }
 
 func (m *Manager) isAncestor(ctx context.Context, a, b string) (bool, error) {

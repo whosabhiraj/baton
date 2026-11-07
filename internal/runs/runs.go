@@ -548,17 +548,11 @@ func (m *Manager) DiffStat(ctx context.Context, runID string) (string, error) {
 	if stat == "" {
 		stat = "no changes"
 	}
-	st, err := gitx.Run(ctx, rec.Worktree, "status", "--porcelain")
+	unc, err := m.uncommitted(ctx, rec.Worktree)
 	if err != nil {
 		return "", err
 	}
-	n := 0
-	for _, l := range strings.Split(st, "\n") {
-		if strings.TrimSpace(l) != "" {
-			n++
-		}
-	}
-	return fmt.Sprintf("%s; %d uncommitted", stat, n), nil
+	return fmt.Sprintf("%s; %d uncommitted", stat, len(unc)), nil
 }
 
 // RemoveWorktree removes the run's worktree (and optionally its branch).

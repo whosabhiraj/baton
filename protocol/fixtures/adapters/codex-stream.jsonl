@@ -1,14 +1,24 @@
 {"type":"thread.started","thread_id":"0199a213-0000-7000-8000-000000000001"}
 {"type":"turn.started"}
-{"type":"item.completed","item":{"id":"item_0","type":"reasoning","text":"Plan the change"}}
+{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"(message)"}}
+{"type":"item.started","item":{"id":"item_1","type":"command_execution","command":"\"C:\\\\Windows\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command 'baton hello; baton inbox; baton plan --confirm'","aggregated_output":"","exit_code":null,"status":"in_progress"}}
+{"type":"item.completed","item":{"id":"item_1","type":"command_execution","command":"\"C:\\\\Windows\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command 'baton hello; baton inbox; baton plan --confirm'","aggregated_output":"ok #2\ninbox empty\nok #3\n","exit_code":0,"status":"completed"}}
+{"type":"item.started","item":{"id":"item_2","type":"command_execution","command":"\"C:\\\\Windows\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"baton step s1 start; Set-Content -LiteralPath hello.txt -Value 'hi' -NoNewline; Get-Content -LiteralPath hello.txt -Raw; baton step s1 done --summary \\\"Created hello.txt containing exactly hi\\\" --evidence \\\"Get-Content -Raw hello.txt returned hi\\\"\"","aggregated_output":"","exit_code":null,"status":"in_progress"}}
+{"type":"item.completed","item":{"id":"item_2","type":"command_execution","command":"\"C:\\\\Windows\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command \"baton step s1 start; Set-Content -LiteralPath hello.txt -Value 'hi' -NoNewline; Get-Content -LiteralPath hello.txt -Raw; baton step s1 done --summary \\\"Created hello.txt containing exactly hi\\\" --evidence \\\"Get-Content -Raw hello.txt returned hi\\\"\"","aggregated_output":"ok #5\nhi\r\nok #6\n","exit_code":0,"status":"completed"}}
+{"type":"item.started","item":{"id":"item_3","type":"command_execution","command":"\"C:\\\\Windows\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command 'baton inbox; baton step s2 start; git add -- hello.txt; git commit -m \"Add hello.txt\"; git status --short --branch; git log -1 --oneline; baton artifact file hello.txt; baton artifact commit HEAD; baton step s2 done --summary \"Committed hello.txt\" --evidence \"git log -1 --oneline\"'","aggregated_output":"","exit_code":null,"status":"in_progress"}}
+{"type":"item.completed","item":{"id":"item_3","type":"command_execution","command":"\"C:\\\\Windows\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command 'baton inbox; baton step s2 start; git add -- hello.txt; git commit -m \"Add hello.txt\"; git status --short --branch; git log -1 --oneline; baton artifact file hello.txt; baton artifact commit HEAD; baton step s2 done --summary \"Committed hello.txt\" --evidence \"git log -1 --oneline\"'","aggregated_output":"inbox empty\nok #8\n[baton/cx-1-0001 7d854","exit_code":0,"status":"completed"}}
+{"type":"item.started","item":{"id":"item_4","type":"command_execution","command":"\"C:\\\\Windows\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command 'baton done --status success --summary \"Created hello.txt containing exactly hi and committed it as 7d85454\"'","aggregated_output":"","exit_code":null,"status":"in_progress"}}
+{"type":"item.completed","item":{"id":"item_4","type":"command_execution","command":"\"C:\\\\Windows\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\" -Command 'baton done --status success --summary \"Created hello.txt containing exactly hi and committed it as 7d85454\"'","aggregated_output":"ok #13\n","exit_code":0,"status":"completed"}}
+{"type":"item.completed","item":{"id":"item_5","type":"agent_message","text":"(message)"}}
+{"type":"turn.completed","usage":{"input_tokens":99209,"cached_input_tokens":58752,"cache_write_input_tokens":0,"output_tokens":533,"reasoning_output_tokens":0}}
+{"type":"turn.started"}
 {"type":"item.started","item":{"id":"item_1","type":"command_execution","command":"bash -lc ls","status":"in_progress"}}
 {"type":"item.completed","item":{"id":"item_1","type":"command_execution","command":"bash -lc ls","aggregated_output":"a.txt\n","exit_code":0,"status":"completed"}}
 {"type":"item.started","item":{"id":"item_2","type":"web_search","query":"go json lines"}}
 {"type":"item.started","item":{"id":"item_3","type":"mcp_tool_call","server":"docs","tool":"search","status":"in_progress"}}
 {"type":"item.completed","item":{"id":"item_4","type":"file_change","changes":[{"path":"a.txt","kind":"update"},{"path":"b.txt","kind":"add"}],"status":"completed"}}
 {"type":"item.completed","item":{"id":"item_5","type":"agent_message","text":"Done."}}
-{"type":"turn.completed","usage":{"input_tokens":1200,"cached_input_tokens":800,"output_tokens":150}}
 {"type":"turn.started"}
 {"type":"some.future.event","x":1}
 not json
-{"type":"turn.completed","usage":{"input_tokens":300,"cached_input_tokens":100,"output_tokens":50}}
+{"type":"turn.completed","usage":{"input_tokens":300,"cached_input_tokens":100,"cache_write_input_tokens":20,"output_tokens":50,"reasoning_output_tokens":10}}

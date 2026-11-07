@@ -2,7 +2,48 @@
   {
     "type": "activity",
     "payload": {
-      "detail": "bash -lc ls",
+      "detail": "baton hello; baton inbox; baton plan --confirm",
+      "raw_kind": "command_execution",
+      "tool": "shell"
+    }
+  },
+  {
+    "type": "activity",
+    "payload": {
+      "detail": "baton step s1 start; Set-Content -LiteralPath hello.txt -Value 'hi' -NoNewline; Get-Content -LiteralPath hello.txt -Raw; baton step s1 done --summary \\\"Created hello.txt containing exactly hi\\\" --evi…",
+      "raw_kind": "command_execution",
+      "tool": "shell"
+    }
+  },
+  {
+    "type": "activity",
+    "payload": {
+      "detail": "baton inbox; baton step s2 start; git add -- hello.txt; git commit -m \"Add hello.txt\"; git status --short --branch; git log -1 --oneline; baton artifact file hello.txt; baton artifact commit HEAD; ba…",
+      "raw_kind": "command_execution",
+      "tool": "shell"
+    }
+  },
+  {
+    "type": "activity",
+    "payload": {
+      "detail": "baton done --status success --summary \"Created hello.txt containing exactly hi and committed it as 7d85454\"",
+      "raw_kind": "command_execution",
+      "tool": "shell"
+    }
+  },
+  {
+    "type": "usage",
+    "payload": {
+      "cache_read_tokens": 58752,
+      "cache_write_tokens": 0,
+      "input_tokens": 40457,
+      "output_tokens": 533
+    }
+  },
+  {
+    "type": "activity",
+    "payload": {
+      "detail": "ls",
       "raw_kind": "command_execution",
       "tool": "shell"
     }
@@ -34,19 +75,10 @@
   {
     "type": "usage",
     "payload": {
-      "cache_read_tokens": 800,
-      "cache_write_tokens": 0,
-      "input_tokens": 1200,
-      "output_tokens": 150
-    }
-  },
-  {
-    "type": "usage",
-    "payload": {
-      "cache_read_tokens": 900,
-      "cache_write_tokens": 0,
-      "input_tokens": 1500,
-      "output_tokens": 200
+      "cache_read_tokens": 58852,
+      "cache_write_tokens": 20,
+      "input_tokens": 40657,
+      "output_tokens": 583
     }
   }
 ]

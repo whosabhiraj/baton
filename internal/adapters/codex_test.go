@@ -95,3 +95,20 @@ func TestCodexParserGolden(t *testing.T) {
 		t.Error("garbage emitted")
 	}
 }
+
+func TestUnwrapShell(t *testing.T) {
+	cases := map[string]string{
+		`"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe" -Command 'baton hello; ls'`: "baton hello; ls",
+		`"C:\Program Files\PowerShell\7\pwsh.exe" -NoProfile -Command "git status"`:              "git status",
+		`/bin/bash -lc 'go test ./...'`: "go test ./...",
+		`bash -lc ls`:                   "ls",
+		`cmd /c dir`:                    "dir",
+		`git status`:                    "git status",
+		`python -c 'print(1)'`:          `python -c 'print(1)'`,
+	}
+	for in, want := range cases {
+		if got := unwrapShell(in); got != want {
+			t.Errorf("unwrapShell(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

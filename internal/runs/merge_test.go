@@ -172,3 +172,26 @@ func TestMergeConflictWithoutCheckout(t *testing.T) {
 		t.Fatal(e.Msg)
 	}
 }
+
+// TestMergeIgnoresBatonAgentsMD: the untracked AGENTS.md Baton writes for codex (a copy of
+// the brief) is not agent work; once the agent edits it, it is.
+func TestMergeIgnoresBatonAgentsMD(t *testing.T) {
+	gitIdentity(t)
+	f := newFixture(t, baseCfg())
+	res := agentCommit(t, f, "b.txt", "b\n")
+	brief, err := os.ReadFile(filepath.Join(res.Worktree, "BATON_BRIEF.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	agents := filepath.Join(res.Worktree, "AGENTS.md")
+	os.WriteFile(agents, append(brief, "edited\n"...), 0o644)
+	_, e := f.m.Merge(context.Background(), res.RunID)
+	wantCode(t, e, "MERGE_BLOCKED")
+	os.WriteFile(agents, brief, 0o644)
+	if stat, err := f.m.DiffStat(context.Background(), res.RunID); err != nil || !strings.HasSuffix(stat, "; 0 uncommitted") {
+		t.Fatalf("diff stat: %q %v", stat, err)
+	}
+	if _, e := f.m.Merge(context.Background(), res.RunID); e != nil {
+		t.Fatalf("merge with baton's AGENTS.md: %v", e)
+	}
+}
