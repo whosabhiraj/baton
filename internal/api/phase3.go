@@ -193,7 +193,7 @@ func (a *api) kill(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if run.Ended() {
-		writeErr(w, &proto.Error{Status: http.StatusConflict, Code: proto.CodeRunEnded, Msg: "run has ended"})
+		writeErr(w, proto.NewError(proto.CodeRunEnded, "run has ended"))
 		return
 	}
 	if err := a.Launcher.Kill(run.ID()); err != nil {

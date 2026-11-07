@@ -174,7 +174,7 @@ func TestKillRoute(t *testing.T) {
 		t.Fatal(st, r)
 	}
 	h.Store().Get(rid).AppendHub("killed", map[string]any{"detail": "x"})
-	if st, r := call(t, h, "POST", "/api/runs/"+rid+"/kill", "tok", ""); st != 409 || r["code"] != "RUN_ENDED" {
+	if st, r := call(t, h, "POST", "/api/runs/"+rid+"/kill", "tok", ""); st != 410 || r["code"] != "RUN_ENDED" {
 		t.Fatal(st, r)
 	}
 }

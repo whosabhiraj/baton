@@ -298,7 +298,7 @@ since }` (default `{state:"off"}`), and `approvals` = the pending approvals.
 |---|---|---|
 | `GET /api/approvals` | `?status=pending\|approved\|rejected` (default all) | bare array of approvals, oldest first |
 | `POST /api/approvals/:id/approve` and `/reject` | `{ note? }` | `200` the approval; `404 NOT_FOUND`; `409 ALREADY_DECIDED` |
-| `POST /api/runs/:id/kill` | — | `200 { ok:true }`; `409 NOT_SUPPORTED` (no launcher); `404 NOT_FOUND`; `409 RUN_ENDED` (note: 409, not 410, on this route) |
+| `POST /api/runs/:id/kill` | — | `200 { ok:true }`; `409 NOT_SUPPORTED` (no launcher); `404 NOT_FOUND`; `410 RUN_ENDED` |
 
 Approval: `{ id ("ap_"+short id), kind: merge|spawn, run_id?, title, detail?, requested_by, status:
 pending|approved|rejected, created_at, decided_at?, decided_by?, note? }`, stored in
