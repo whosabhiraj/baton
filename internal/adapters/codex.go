@@ -113,7 +113,8 @@ func (p *codexParser) Parse(line []byte) []Event {
 		p.sum.out += m.Usage.Out
 		p.sum.cacheR += m.Usage.CacheR
 		p.sum.cacheW += m.Usage.CacheW
-		return []Event{{Type: "usage", Payload: usagePayload(p.sum, p.model)}}
+		// codex exec runs one turn: this is the end (codex can hang here under the Windows sandbox)
+		return []Event{{Type: "usage", Payload: usagePayload(p.sum, p.model)}, {Type: Finished}}
 	}
 	return nil
 }

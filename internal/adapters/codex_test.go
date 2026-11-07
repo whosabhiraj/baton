@@ -70,6 +70,10 @@ func TestCodexParserGolden(t *testing.T) {
 	sc := bufio.NewScanner(f)
 	for sc.Scan() {
 		for _, e := range p.Parse(sc.Bytes()) {
+			if e.Type == Finished { // launcher-only signal, never stored
+				got = append(got, goldenEvent{e.Type, e.Payload})
+				continue
+			}
 			if _, perr := proto.ValidateHubPayload(e.Type, e.Payload); perr != nil {
 				t.Fatalf("%s payload invalid: %v (%v)", e.Type, perr, e.Payload)
 			}

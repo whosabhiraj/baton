@@ -55,5 +55,9 @@
       "model": "claude-sonnet-5-5",
       "output_tokens": 422
     }
+  },
+  {
+    "type": "finished",
+    "payload": null
   }
 ]

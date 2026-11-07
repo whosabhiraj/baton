@@ -44,6 +44,9 @@ func fakeAgent(mode string) {
 		out(`{"type":"result","total_cost_usd":0.5,"usage":{"input_tokens":30,"output_tokens":11}}`)
 		_ = os.WriteFile("x.txt", []byte("hi\n"), 0o644)
 		os.Exit(3)
+	case "hang": // finishes its work, then never exits (codex under the Windows sandbox)
+		out(`{"type":"result","total_cost_usd":0.1,"usage":{"input_tokens":1,"output_tokens":1}}`)
+		time.Sleep(60 * time.Second)
 	case "slow":
 		out(`{"type":"one"}`)
 		time.Sleep(3 * time.Second)
@@ -91,13 +94,14 @@ func newFx(t *testing.T) *fx {
 	f.cfg = config.Config{
 		Hub: config.Hub{Mode: config.ModePropose, MaxAgentsAuto: 2, AskTimeoutS: 900, PollIntervalS: 2, HeartbeatTimeoutS: 120},
 		Kinds: map[string]config.CustomKind{
-			"f-stream": kind("stream-json", "stream"), "f-slow": kind("jsonl", "slow"), "f-sleep": kind("jsonl", "sleep"),
+			"f-stream": kind("stream-json", "stream"), "f-slow": kind("jsonl", "slow"), "f-sleep": kind("jsonl", "sleep"), "f-hang": kind("stream-json", "hang"),
 		},
 		Accounts: []config.Account{
 			{ID: "s", Kind: "f-stream", Enabled: true, MaxConcurrent: 3, Roles: []string{"impl"}},
 			{ID: "w", Kind: "f-slow", Enabled: true, MaxConcurrent: 3, Roles: []string{"impl"}},
 			{ID: "z", Kind: "f-sleep", Enabled: true, MaxConcurrent: 3, Roles: []string{"impl"}},
 			{ID: "n", Kind: "generic", Enabled: true, MaxConcurrent: 3, Roles: []string{"impl"}},
+			{ID: "h", Kind: "f-hang", Enabled: true, MaxConcurrent: 3, Roles: []string{"impl"}},
 		},
 		Routing: map[string]string{},
 	}
@@ -116,7 +120,7 @@ func (f *fx) open() {
 	if err != nil {
 		f.t.Fatal(err)
 	}
-	f.launch = launch.New(launch.Options{Exe: f.exe, Poll: 50 * time.Millisecond})
+	f.launch = launch.New(launch.Options{Exe: f.exe, Poll: 50 * time.Millisecond, FinishGrace: 300 * time.Millisecond})
 	f.launch.Bind(st, f.rm, func() config.Config { return f.cfg })
 	f.t.Cleanup(func() { f.launch.Close(); st.Close() })
 }
@@ -306,5 +310,26 @@ func TestStartErrors(t *testing.T) {
 	err := f.launch.Start(*res)
 	if err == nil || !strings.Contains(err.Error(), "kinds.generic") {
 		t.Fatalf("got %v", err)
+	}
+}
+
+// TestHungAfterFinish: a CLI that prints its final line and then hangs is ended by Baton, and
+// the exit is recorded as a normal one (code 0), not as a kill.
+func TestHungAfterFinish(t *testing.T) {
+	f := newFx(t)
+	res := f.spawn("h")
+	if err := f.launch.Start(*res); err != nil {
+		t.Fatal(err)
+	}
+	f.wait("exit", func() bool { return len(f.of(res.RunID, "exit")) == 1 })
+	ex := f.of(res.RunID, "exit")[0].Payload
+	if num(ex["code"]) != 0 || ex["killed"] != nil || !strings.Contains(fmt.Sprint(ex["detail"]), "did not exit") {
+		t.Fatalf("exit: %v", ex)
+	}
+	if len(f.of(res.RunID, "killed")) != 0 {
+		t.Fatal("a reaped CLI must not show as killed")
+	}
+	if len(f.of(res.RunID, "finished")) != 0 {
+		t.Fatal("finished is never stored")
 	}
 }

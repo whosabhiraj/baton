@@ -41,6 +41,10 @@
     }
   },
   {
+    "type": "finished",
+    "payload": null
+  },
+  {
     "type": "activity",
     "payload": {
       "detail": "ls",
@@ -80,5 +84,9 @@
       "input_tokens": 40657,
       "output_tokens": 583
     }
+  },
+  {
+    "type": "finished",
+    "payload": null
   }
 ]

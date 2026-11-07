@@ -42,6 +42,7 @@ const (
 	killWait   = 15 * time.Second
 	killGraceS = 5
 	lostDetail = "lost after hub restart"
+	hungDetail = "ended by Baton: the CLI finished its work but did not exit"
 )
 
 // Options configures a Launcher. Store and Runs may be set later with Bind (the hub that owns
@@ -53,6 +54,9 @@ type Options struct {
 	Exe    string // the baton binary (os.Executable); runs `__supervise` and is put on the agent's PATH
 	Logger *slog.Logger
 	Poll   time.Duration // tail/exit poll interval; default 250ms
+	// FinishGrace: how long a CLI may keep running after its final output line before Baton
+	// ends it (exit recorded as 0). Default 20s.
+	FinishGrace time.Duration
 }
 
 // Launcher implements runs.Launcher.
@@ -332,6 +336,9 @@ type watcher struct {
 	parser adapters.Parser
 	tail   *spool.Tailer
 	mu     sync.Mutex // held while recording exit/killed
+
+	finishedAt time.Time // the parser saw the CLI's final line
+	reaped     bool      // Baton ended a CLI that hung after finishing
 }
 
 func (w *watcher) init() {
@@ -362,7 +369,11 @@ func (w *watcher) warm() {
 	scratch := &spool.Tailer{Path: filepath.Join(w.dir, stdoutFile)}
 	scratch.Handle = func(line []byte, o int64) error {
 		if o < n {
-			w.parser.Parse(line)
+			for _, ev := range w.parser.Parse(line) {
+				if ev.Type == adapters.Finished {
+					w.finishedAt = time.Now() // finished before a hub restart: the grace starts over
+				}
+			}
 		}
 		return nil
 	}
@@ -374,6 +385,12 @@ func (w *watcher) handle(line []byte, off int64) error {
 		return nil
 	}
 	for i, ev := range w.parser.Parse(line) {
+		if ev.Type == adapters.Finished {
+			if w.finishedAt.IsZero() {
+				w.finishedAt = time.Now()
+			}
+			continue
+		}
 		id := fmt.Sprintf("adapter@%d", off)
 		if i > 0 {
 			id += fmt.Sprintf("#%d", i)
@@ -410,6 +427,7 @@ func (w *watcher) loop() {
 			}
 		default:
 			gone = 0
+			w.reapIfHung()
 		}
 		select {
 		case <-w.l.ctx.Done():
@@ -417,6 +435,23 @@ func (w *watcher) loop() {
 		case <-tick.C:
 		}
 	}
+}
+
+// reapIfHung ends a CLI that printed its final line FinishGrace ago and is still running.
+func (w *watcher) reapIfHung() {
+	if w.finishedAt.IsZero() || w.reaped {
+		return
+	}
+	grace := w.l.o.FinishGrace
+	if grace <= 0 {
+		grace = 20 * time.Second
+	}
+	if time.Since(w.finishedAt) < grace {
+		return
+	}
+	w.reaped = true
+	w.l.log.Info("ending a CLI that finished but did not exit", "run", w.run.ID())
+	go func() { _ = supervise.RequestKill(w.dir, 15*time.Second) }()
 }
 
 // finish records `exit` once (ex == nil: the supervisor vanished without a verdict).
@@ -428,7 +463,10 @@ func (w *watcher) finish(ex *supervise.Exit) {
 		p["detail"] = lostDetail
 	} else {
 		p["code"], p["signal"], p["duration_s"] = ex.Code, ex.Signal, ex.DurationS
-		if ex.Killed {
+		switch {
+		case ex.Killed && w.reaped: // its work was done; the kill only cleaned up a hung process
+			p["code"], p["signal"], p["detail"] = 0, nil, hungDetail
+		case ex.Killed:
 			p["killed"] = true
 		}
 	}

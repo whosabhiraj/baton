@@ -9,7 +9,11 @@ import (
 	"github.com/whosabhiraj/baton/internal/config"
 )
 
-// Event is one hub event derived from agent output: Type is "activity" or "usage".
+// Finished is a pseudo event (never stored): the CLI's final output line arrived, so the
+// process should exit now. The launcher ends it after a grace period if it hangs.
+const Finished = "finished"
+
+// Event is one hub event derived from agent output: Type is "activity", "usage" or Finished.
 type Event struct {
 	Type    string
 	Payload map[string]any

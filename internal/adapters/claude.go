@@ -81,7 +81,7 @@ func (p *claudeParser) Parse(line []byte) []Event {
 		if m.TotalCostUSD != nil && *m.TotalCostUSD >= 0 {
 			pl["cost_usd"] = *m.TotalCostUSD
 		}
-		return []Event{{Type: "usage", Payload: pl}}
+		return []Event{{Type: "usage", Payload: pl}, {Type: Finished}} // claude -p ends after its result
 	}
 	return nil
 }
