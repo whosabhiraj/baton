@@ -139,6 +139,9 @@ var shellWrap = regexp.MustCompile(`(?is)^(?:"[^"]*?\b` + shells + `"|\S*?\b` + 
 
 const shells = `(?:powershell|pwsh|bash|zsh|sh|cmd)(?:\.exe)?`
 
+// UnwrapShell is unwrapShell for other packages (the codex driver's access requests).
+func UnwrapShell(cmd string) string { return unwrapShell(cmd) }
+
 func unwrapShell(cmd string) string {
 	m := shellWrap.FindStringSubmatch(strings.TrimSpace(cmd))
 	if m == nil {

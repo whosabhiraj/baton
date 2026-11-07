@@ -20,6 +20,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/whosabhiraj/baton/internal/adapters"
 )
 
 // Env names the launcher sets for the driver only (the codex process never gets them).
@@ -310,7 +312,7 @@ func (d *driver) serve(m rpcMsg) {
 	str := func(k string) string { s, _ := p[k].(string); return s }
 	switch m.Method {
 	case "item/commandExecution/requestApproval":
-		detail := map[string]any{"command": str("command"), "cwd": str("cwd"), "reason": str("reason")}
+		detail := map[string]any{"command": adapters.UnwrapShell(str("command")), "cwd": str("cwd")}
 		if nc, ok := p["networkApprovalContext"].(map[string]any); ok {
 			for _, k := range []string{"host", "url", "domain"} {
 				if s, ok := nc[k].(string); ok && s != "" {
@@ -372,6 +374,9 @@ func (d *driver) serve(m rpcMsg) {
 // approval (rejected, timed out, hub unreachable) is a no.
 func (d *driver) ask(kind, summary string, detail map[string]any) bool {
 	summary = trunc(summary, 300)
+	if r, _ := detail["reason"].(string); r == "" || r == summary {
+		delete(detail, "reason") // the summary already says it
+	}
 	note := func(status string) {
 		b, _ := json.Marshal(map[string]any{"method": "baton/access", "params": map[string]any{"kind": kind, "summary": summary, "status": status}})
 		d.emit(b)

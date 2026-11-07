@@ -138,7 +138,7 @@ func TestDriverApproved(t *testing.T) {
 		hub.auth != "Bearer bt_run_secret" {
 		t.Fatalf("hub saw %+v auth %q", hub.created, hub.auth)
 	}
-	if d, _ := hub.created[0]["detail"].(map[string]any); d["command"] != "curl https://example.com" {
+	if d, _ := hub.created[0]["detail"].(map[string]any); d["command"] != "curl https://example.com" || d["reason"] != nil {
 		t.Fatalf("detail %+v", hub.created[0]["detail"])
 	}
 }
