@@ -54,6 +54,7 @@ type claudeParser struct {
 	byMsg map[string]usage
 	n     int
 	model string
+	last  string // last usage total sent: a repeated message with the same usage sends nothing
 }
 
 func newClaudeParser() *claudeParser { return &claudeParser{byMsg: map[string]usage{}} }
@@ -123,7 +124,10 @@ func (p *claudeParser) assistant(raw json.RawMessage) []Event {
 			sum.cacheR += u.cacheR
 			sum.cacheW += u.cacheW
 		}
-		evs = append(evs, Event{Type: "usage", Payload: usagePayload(sum, p.model)})
+		if key := fmt.Sprint(sum, p.model); key != p.last {
+			p.last = key
+			evs = append(evs, Event{Type: "usage", Payload: usagePayload(sum, p.model)})
+		}
 	}
 	return evs
 }

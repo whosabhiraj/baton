@@ -140,3 +140,20 @@ func TestClaudeParserGolden(t *testing.T) {
 		t.Fatalf("golden mismatch\n got %s\nwant %s", b, want)
 	}
 }
+
+func TestClaudeParserNoDuplicateUsage(t *testing.T) {
+	p := newClaudeParser()
+	line := []byte(`{"type":"assistant","message":{"id":"m1","model":"x","content":[{"type":"text"}],"usage":{"input_tokens":5,"output_tokens":2}}}`)
+	more := []byte(`{"type":"assistant","message":{"id":"m1","model":"x","content":[{"type":"text"}],"usage":{"input_tokens":5,"output_tokens":9}}}`)
+	count := func(evs []Event) (n int) {
+		for _, e := range evs {
+			if e.Type == "usage" {
+				n++
+			}
+		}
+		return n
+	}
+	if a, b, c := count(p.Parse(line)), count(p.Parse(line)), count(p.Parse(more)); a != 1 || b != 0 || c != 1 {
+		t.Fatalf("usage events per line: %d %d %d, want 1 0 1", a, b, c)
+	}
+}
