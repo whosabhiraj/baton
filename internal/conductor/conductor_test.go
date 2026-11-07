@@ -144,11 +144,11 @@ func TestStartSendHistoryResume(t *testing.T) {
 	if !in.Running || !in.Wanted || in.Account != "c1" || in.Model != "opus" || in.Effort != "high" || in.SessionID == "" {
 		t.Fatalf("%+v", in)
 	}
-	f.mu.Lock()
-	states := strings.Join(f.states, ",")
-	f.mu.Unlock()
-	if !strings.Contains(states, "idle,thinking") || !strings.Contains(states, "acting") || !strings.HasSuffix(states, "idle") {
-		t.Fatal(states)
+	states := func() string { f.mu.Lock(); defer f.mu.Unlock(); return strings.Join(f.states, ",") }
+	// the state callback can trail m.State() by a moment (slow CI machines)
+	waitFor(t, "final idle state", func() bool { return strings.HasSuffix(states(), "idle") })
+	if s := states(); !strings.Contains(s, "idle,thinking") || !strings.Contains(s, "acting") {
+		t.Fatal(s)
 	}
 
 	a := f.argLines()

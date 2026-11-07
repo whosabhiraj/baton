@@ -29,14 +29,15 @@ type agent struct {
 	done    chan struct{}
 	started time.Time
 
-	steps   []proto.PlanStep
-	after   int             // last inbox n seen
-	answers map[string]bool // answered qids
-	gotMsg  bool
-	paused  bool
-	stop    bool
-	pct     int
-	use     map[string]float64 // cumulative usage
+	steps    []proto.PlanStep
+	after    int             // last inbox n seen
+	answers  map[string]bool // answered qids
+	gotMsg   bool
+	paused   bool
+	gotPause bool // a pause request arrived at least once
+	stop     bool
+	pct      int
+	use      map[string]float64 // cumulative usage
 }
 
 var tools = map[string][]string{
@@ -101,6 +102,13 @@ func (a *agent) run() {
 			break
 		}
 		a.send("step_done", map[string]any{"step_id": st.ID, "summary": st.Title + " - done"})
+		if i == 0 && a.traits["pause"] {
+			// The conductor pauses this agent once a step is done; on a slow machine at high speed
+			// the agent could otherwise finish before the conductor looks again.
+			for t0 := time.Now(); !a.gotPause && a.alive() && time.Since(t0) < a.e.d(60); {
+				a.idle(1)
+			}
+		}
 	}
 	if a.ctx.Err() != nil {
 		return // killed: the launcher appends the end events
@@ -233,7 +241,7 @@ func (a *agent) poll() {
 			a.send("progress", map[string]any{"percent": a.pct, "note": "Noted message: " + trunc(text, 60)})
 		case "pause":
 			a.e.appendHub(a.res.RunID, "paused", map[string]any{"reason": "pause requested"})
-			a.paused = true
+			a.paused, a.gotPause = true, true
 		case "resume":
 			if a.paused {
 				a.e.appendHub(a.res.RunID, "resumed", map[string]any{})
