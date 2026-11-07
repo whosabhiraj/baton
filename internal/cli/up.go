@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
@@ -118,7 +119,9 @@ func (c *ctx) cmdHubServe(o opts) (int, error) {
 		fmt.Fprintf(c.stderr, "baton: warning: cannot write %s (%s)\n", daemon.InfoFile, err.Error())
 	}
 	fmt.Fprintf(c.stdout, "baton hub: %s\n", h.URL)
-	fmt.Fprintf(c.stdout, "admin token: %s\n", h.AdminToken)
+	if isTerminal(c.stdout) { // never into a log file: hub.out may outlive the session
+		fmt.Fprintf(c.stdout, "admin token: %s\n", h.AdminToken)
+	}
 	fmt.Fprintf(c.stdout, "data dir: %s\n", h.DataDir)
 	if f := o.get("admin-token-file"); o.has("admin-token-file") && !tokenFromFile {
 		if err := os.WriteFile(f, []byte(h.AdminToken), 0o600); err != nil {
@@ -153,3 +156,13 @@ func healthInstance(url string) string {
 }
 
 func adminTokenPath(dataDir string) string { return filepath.Join(dataDir, hub.AdminTokenFile) }
+
+// isTerminal reports whether w is a character device (a console). Replaced in tests.
+var isTerminal = func(w io.Writer) bool {
+	f, ok := w.(*os.File)
+	if !ok {
+		return false
+	}
+	st, err := f.Stat()
+	return err == nil && st.Mode()&os.ModeCharDevice != 0
+}

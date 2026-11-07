@@ -116,3 +116,24 @@ func ParseInboxFileName(name string) (int, bool) {
 	}
 	return n, true
 }
+
+// EnsurePrivateDir creates dir (0700) and chmods an existing one down to 0700 (no-op on Windows).
+func EnsurePrivateDir(dir string) error {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return err
+	}
+	return Chmod(dir, 0o700)
+}
+
+// EnsureDataDir makes a project data dir private, along with <home>/projects and <home> when
+// dataDir sits at <home>/projects/<name>.
+func EnsureDataDir(dataDir string) error {
+	if err := EnsurePrivateDir(dataDir); err != nil {
+		return err
+	}
+	if parent := filepath.Dir(dataDir); filepath.Base(parent) == "projects" {
+		_ = Chmod(parent, 0o700)
+		_ = Chmod(filepath.Dir(parent), 0o700)
+	}
+	return nil
+}

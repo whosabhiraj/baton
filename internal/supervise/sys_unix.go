@@ -29,10 +29,10 @@ func (t *tree) kill(done <-chan struct{}, grace time.Duration) {
 		syscall.Kill(-t.pgid, syscall.SIGTERM)
 		select {
 		case <-done:
-			return
 		case <-time.After(grace):
 		}
 	}
+	// always finish the group: members that trap SIGTERM outlive the leader otherwise (ESRCH ignored)
 	syscall.Kill(-t.pgid, syscall.SIGKILL)
 }
 

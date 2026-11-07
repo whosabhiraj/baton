@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/whosabhiraj/baton/internal/hub"
+	"github.com/whosabhiraj/baton/internal/paths"
 	"github.com/whosabhiraj/baton/internal/store"
 )
 
@@ -152,7 +153,7 @@ func WaitRunning(dataDir string, timeout time.Duration) (*Info, error) {
 
 // LockHeld reports whether some process holds hub.lock (it takes and releases the lock to find out).
 func LockHeld(dataDir string) (bool, error) {
-	if err := os.MkdirAll(dataDir, 0o755); err != nil {
+	if err := paths.EnsureDataDir(dataDir); err != nil {
 		return false, err
 	}
 	l, ok, err := tryLock(filepath.Join(dataDir, hub.LockFile))
@@ -169,13 +170,17 @@ func LockHeld(dataDir string) (bool, error) {
 // stdout/stderr going to logs/hub.out, then waits (up to 10 s) until a hub is Running.
 func StartDetached(exe string, args []string, dataDir string) error {
 	logDir := filepath.Join(dataDir, "logs")
-	if err := os.MkdirAll(logDir, 0o755); err != nil {
+	if err := paths.EnsureDataDir(dataDir); err != nil {
 		return err
 	}
-	out, err := os.OpenFile(filepath.Join(logDir, "hub.out"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	if err := paths.EnsurePrivateDir(logDir); err != nil {
+		return err
+	}
+	out, err := os.OpenFile(filepath.Join(logDir, "hub.out"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 	if err != nil {
 		return err
 	}
+	_ = paths.Chmod(out.Name(), 0o600)
 	defer out.Close()
 
 	var cmd *exec.Cmd

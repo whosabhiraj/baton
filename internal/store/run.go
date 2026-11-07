@@ -358,6 +358,29 @@ func (r *Run) appendHubLocked(typ string, payload map[string]any, ts string) *pr
 	return perr
 }
 
+// redactExtra redacts the values of unknown envelope fields (they are stored and published verbatim otherwise).
+func redactExtra(in map[string]json.RawMessage) map[string]json.RawMessage {
+	if len(in) == 0 {
+		return in
+	}
+	out := make(map[string]json.RawMessage, len(in))
+	for k, raw := range in {
+		var v any
+		dec := json.NewDecoder(bytes.NewReader(raw))
+		dec.UseNumber()
+		if dec.Decode(&v) != nil {
+			out[k] = json.RawMessage(`"[REDACTED]"`)
+			continue
+		}
+		b, err := json.Marshal(redact.Value(v))
+		if err != nil {
+			b = []byte(`"[REDACTED]"`)
+		}
+		out[k] = b
+	}
+	return out
+}
+
 // appendLocked is the only path into events.jsonl: it assigns seq, redacts, writes one line,
 // updates derived state and publishes. The caller holds r.mu.
 func (r *Run) appendLocked(evp *proto.StoredEvent) *proto.Error {
@@ -369,6 +392,7 @@ func (r *Run) appendLocked(evp *proto.StoredEvent) *proto.Error {
 	if red, ok := redact.Value(ev.Payload).(map[string]any); ok {
 		ev.Payload = red
 	}
+	ev.Extra = redactExtra(ev.Extra)
 	line := proto.MarshalLine(ev)
 	if line == nil {
 		return proto.NewError(proto.CodeInternal, "cannot encode event")
@@ -560,7 +584,7 @@ func (r *Run) Deliver(typ string, payload map[string]any) (int, *proto.Error) {
 	n := r.nextInbox + 1
 	ts := nowTS(time.Now())
 	msg := proto.InboxMessage{V: proto.Version, N: n, TS: ts, Type: typ, Payload: payload}
-	if err := os.MkdirAll(r.inboxDir(), 0o755); err != nil {
+	if err := os.MkdirAll(r.inboxDir(), 0o700); err != nil {
 		return 0, proto.NewError(proto.CodeInternal, "cannot create inbox")
 	}
 	if err := WriteFileAtomic(filepath.Join(r.inboxDir(), paths.InboxFileName(n)), proto.MarshalLine(msg), 0o644); err != nil {

@@ -565,7 +565,10 @@ func TestHubServe(t *testing.T) {
 	stop()
 	<-done
 	lines := strings.Split(strings.TrimSpace(out.String()), "\n")
-	if lines[0] != "baton hub: http://127.0.0.1:7777" || lines[1] != "admin token: bt_adm_t" || lines[2] != "data dir: "+dd {
+	if strings.Contains(out.String(), "bt_adm_") {
+		t.Fatal("admin token printed to a non-terminal stdout")
+	}
+	if lines[0] != "baton hub: http://127.0.0.1:7777" || lines[1] != "data dir: "+dd {
 		t.Fatal(lines)
 	}
 	if !got.Dev || got.Port != 7777 || !got.PortFallback || got.DataDir != dd || !closed {

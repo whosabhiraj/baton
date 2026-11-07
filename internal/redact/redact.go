@@ -19,6 +19,7 @@ type rule struct {
 var rules = []rule{
 	{regexp.MustCompile(`-----BEGIN [A-Z ]{0,30}PRIVATE KEY-----[\s\S]*?(?:-----END [A-Z ]{0,30}PRIVATE KEY-----|$)`), "-----PRIVATE KEY " + r + "-----"},
 	{regexp.MustCompile(`\bbt_run_[A-Za-z0-9_-]{8,}`), "bt_run_" + r},
+	{regexp.MustCompile(`\bbt_cond_[A-Za-z0-9_-]{8,}`), "bt_cond_" + r},
 	{regexp.MustCompile(`\bbt_adm_[A-Za-z0-9_-]{8,}`), "bt_adm_" + r},
 	{regexp.MustCompile(`\bsk-ant-[A-Za-z0-9_-]{8,}`), "sk-ant-" + r},
 	{regexp.MustCompile(`\bsk-(?:proj-)?[A-Za-z0-9_-]{20,}`), "sk-" + r},
