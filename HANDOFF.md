@@ -2,7 +2,9 @@
 
 Last updated: **2026-11-07**, **Phase 7 code done** (hardening + release): `baton gc`, conductor usage in
 account totals, error-path tests, `npm run release`, one full code review with its findings fixed.
-Waiting on the user: Windows CI log, and one design question (§E).
+Since then: sandboxed agents (parts 1 and 4 done and verified), the known small issues fixed, CI green
+on all 3 OSes. Agents reading the admin token: answered by sandboxed mode (token unreadable, verified).
+Still open: sandbox parts 2 and 3 (Claude), see §E.
 
 Big change since Phase 0: the hub **and** the `baton` CLI are written in **Go** (one binary).
 `docs/GO_HUB_DESIGN.md` is approved and overrides `docs/PLAN.md` §3, §4.7, §5 and §6.
@@ -156,9 +158,10 @@ Open (ask the user):
   (3) `runtime: wsl` for Claude on Windows (not started). (4) DONE + verified (network grant, see top of §E): `baton __codex` driver over the app-server
   (`codex app-server generate-json-schema`: CommandExecutionRequestApproval, FileChange...,
   network policy amendments). The user's Claude accounts are set to permissive for now.
-- Windows CI: two timing flakes found from the job log and fixed (`d476bf2`).
-- Known small items: multi-field PATCH /api/accounts not atomic; kill answers 409 RUN_ENDED; claude
-  adapter may emit two identical `usage` events; gc removes an old run even with a pending approval.
+- CI: green on Windows, macOS and Linux (Windows timing flakes fixed in `d476bf2`).
+- Small items FIXED (2026-11-07): PATCH accounts/config all or nothing (`9947060`); kill on an ended
+  run answers 410 like other routes (`3ef468f`); no repeated claude `usage` events (`7b2be57`); gc
+  keeps runs with a pending approval (`34312fe`).
 
 ## F. Decisions log (details in PLAN.md §4 and GO_HUB_DESIGN.md §0)
 
