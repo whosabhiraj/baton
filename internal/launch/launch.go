@@ -59,6 +59,8 @@ type Launcher struct {
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
 
+	started time.Time // runs created after this are this process's own, never orphans
+
 	mu      sync.Mutex
 	watched map[string]*watcher
 }
@@ -73,7 +75,7 @@ func New(o Options) *Launcher {
 		lg = slog.New(slog.NewTextHandler(io.Discard, nil))
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	return &Launcher{o: o, log: lg, ctx: ctx, cancel: cancel, watched: map[string]*watcher{}}
+	return &Launcher{o: o, log: lg, ctx: ctx, cancel: cancel, watched: map[string]*watcher{}, started: time.Now()}
 }
 
 // Bind supplies the store, runs manager and live config once the hub exists.
@@ -192,6 +194,7 @@ func (l *Launcher) Adopt() {
 	for _, run := range st.List() {
 		dir := run.Dir()
 		if _, err := os.Stat(filepath.Join(dir, supervisorFn)); err != nil {
+			l.endNeverStarted(run)
 			continue
 		}
 		if _, err := os.Stat(filepath.Join(dir, reportedFile)); err == nil {
@@ -205,6 +208,30 @@ func (l *Launcher) Adopt() {
 		l.log.Info("adopting run", "run", run.ID(), "alive", supervise.Alive(dir))
 		l.watch(run, ad)
 	}
+}
+
+// endNeverStarted records `exit` for a live run this launcher would have started but whose
+// supervisor never wrote supervisor.json (the hub stopped during spawn). Dev/mock runs have no
+// worktree branch or run-dir brief and are left alone, as are runs created since this process
+// started (a spawn in progress).
+func (l *Launcher) endNeverStarted(run *store.Run) {
+	rec := run.Record()
+	if run.Ended() || rec.Branch == "" || rec.Worktree == "" {
+		return
+	}
+	if _, err := os.Stat(filepath.Join(run.Dir(), "BATON_BRIEF.md")); err != nil {
+		return
+	}
+	if t, err := time.Parse(proto.TSFormat, rec.CreatedAt); err != nil || t.After(l.started) {
+		return
+	}
+	p := map[string]any{"code": -1, "signal": nil, "diff_stat": nil, "duration_s": 0.0,
+		"detail": "never started (hub stopped during spawn)"}
+	if _, _, perr := run.AppendAdapter("exit", p, "adapter-exit"); perr != nil {
+		l.log.Error("cannot record exit of never-started run", "run", run.ID(), "err", perr.Error())
+		return
+	}
+	l.log.Warn("run never started; marked exited", "run", run.ID())
 }
 
 func (l *Launcher) watch(run *store.Run, ad adapters.Adapter) {
