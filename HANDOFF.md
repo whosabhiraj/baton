@@ -25,14 +25,14 @@ Commands that work today (need Go, Node 24+ and git; `npm install` once):
 | `baton up` | in a repo: starts (or reuses) the background hub, prints URL + admin token, opens the dashboard (no conductor) |
 | `baton attach` | status, then the conductor chat (Bubble Tea; plain line mode when not a terminal). Ctrl+C detaches |
 | `baton hub status` / `baton hub stop` | hub state / stop it (asks; `--keep-agents`) |
-| `baton login <account>` / `baton login --status` | log an account's CLI in, inside its own config dir |
+| `baton login <account>` / `baton login --status` | log an account's CLI in, inside its own config dir; an unknown id is added to the global config (asks the kind, or `--kind`) |
 | `baton mock [--speed N] [--seed N] [--once] [--reset]` | demo hub with a fake conductor and fake agents (`~/.baton/mock`), no quota; the chat echoes, one lineup is proposed |
 | `npm run dev:web` | dashboard dev server with hot reload; set `BATON_HUB_URL` to a running hub (e.g. the mock) and open it with `#token=<admin token>` |
 | `baton mcp` | conductor MCP stdio server (started by the hub in 6b; needs `BATON_CONDUCTOR_TOKEN`) |
 | `baton help` | agent commands (`hello`, `plan`, `step`, `progress`, `ask`, `inbox`, `done`, ...) |
 
 Things only you can do:
-- Log in each account once: `baton login claude-a`, `baton login claude-b`, `baton login codex-1`
+- Log in each account once: `baton login <account-id>` (ids are whatever the config says; a new id gets added)
   (config is `~/.baton/config.yaml`; each account has its own dir under `~/.baton/accounts/`).
 - **CI:** GitHub refused `.github/workflows/ci.yml` because the git token has no `workflow`
   scope. Give the token that scope or add the file through the GitHub web UI (it exists

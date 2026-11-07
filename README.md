@@ -32,7 +32,8 @@ phases 1-6 of 8 written, real runs of codex and the conductor still to do:
   timeline you can scrub back through. works on a phone too
 - agents: claude code, codex and custom kinds from the config, each with a small supervisor
   process, so it survives a hub restart and kill takes its whole process tree with it.
-  `baton login <account>` logs an account in with its own config folder. opencode is built but
+  `baton login <account>` logs an account in with its own config folder (a name that isn't in
+  the config yet gets added, it asks claude or codex). opencode is built but
   stays off until it has an api-key provider (it never uses a claude subscription)
 - the conductor: a headless claude code session the hub owns. it talks to the hub through
   `baton mcp` (spawn, read events, answer, review diffs, merge), keeps its conversation across
@@ -59,7 +60,7 @@ npm run install:baton   # puts baton on your PATH (open a new terminal)
 ## using it
 
 ```
-baton login claude-a     # once per account (see baton.config.example.yaml)
+baton login my-claude    # once per account; new names get added to ~/.baton/config.yaml
 baton                    # in a repo: hub + conductor, dashboard, and the chat in your terminal
 ```
 

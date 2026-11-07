@@ -275,3 +275,49 @@ func writeAtomic(path string, data []byte, isGlobal bool) error {
 	}
 	return store.WriteFileAtomic(path, data, mode)
 }
+
+// NewAccount is what AddAccount writes for a fresh account (e.g. from `baton login <new id>`).
+type NewAccount struct {
+	ID            string            `yaml:"id"`
+	Label         string            `yaml:"label"`
+	Kind          string            `yaml:"kind"`
+	Env           map[string]string `yaml:"env,flow"`
+	Models        []string          `yaml:"models,flow,omitempty"`
+	MaxConcurrent int               `yaml:"max_concurrent"`
+}
+
+// AddAccount appends an account to the global config file (creating the file if needed),
+// keeping comments. Refused if the id already exists anywhere or the result is invalid.
+func AddAccount(snap *Snapshot, a NewAccount) error {
+	if snap == nil {
+		return errors.New("config: nil snapshot")
+	}
+	if _, ok := snap.Config.Account(a.ID); ok {
+		return fmt.Errorf("config: account %q already exists", a.ID)
+	}
+	writeMu.Lock()
+	defer writeMu.Unlock()
+	gp, _ := effectivePaths(snap)
+	doc, _, err := readDoc(gp)
+	if err != nil {
+		return err
+	}
+	var vn yaml.Node
+	if err := vn.Encode(a); err != nil {
+		return fmt.Errorf("config: encode account: %w", err)
+	}
+	root := rootMap(doc)
+	accts := lookupExact(root, "accounts")
+	switch {
+	case accts == nil:
+		accts = &yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq"}
+		root.Content = append(root.Content, scalarKey("accounts"), accts)
+	case isNull(accts):
+		*accts = yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq", LineComment: accts.LineComment}
+	case accts.Kind != yaml.SequenceNode:
+		return fmt.Errorf("config: %s: accounts is not a list", gp)
+	}
+	accts.Style &^= yaml.FlowStyle
+	accts.Content = append(accts.Content, &vn)
+	return commit(snap, gp, doc)
+}

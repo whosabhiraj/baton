@@ -1,14 +1,17 @@
 package cli
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/whosabhiraj/baton/internal/config"
+	"github.com/whosabhiraj/baton/internal/paths"
 	"github.com/whosabhiraj/baton/internal/proc"
 )
 
@@ -35,7 +38,8 @@ var loginKinds = map[string]struct {
 	"opencode": {"XDG_DATA_HOME", []string{"opencode", "auth", "login"}, []string{"opencode", "auth", "list"}},
 }
 
-// cmdLogin: baton login <account-id> | baton login --status [<account-id>].
+// cmdLogin: baton login <account-id> [--kind K] | baton login --status [<account-id>].
+// An unknown id (without --status) is added to the global config first.
 // --status takes no value here (unlike `done --status`), so it is pulled out before parsing.
 func (c *ctx) cmdLogin(argv []string) (int, error) {
 	status := false
@@ -58,7 +62,11 @@ func (c *ctx) cmdLogin(argv []string) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	cfg := loadConfig(repo).Config
+	snap := loadConfig(repo)
+	cfg := snap.Config
+	if o.has("kind") && (status || len(pos) == 0) {
+		return 0, usagef("--kind only works when adding a new account")
+	}
 	if len(pos) == 0 {
 		if !status {
 			return 0, usagef("missing account id")
@@ -78,10 +86,69 @@ func (c *ctx) cmdLogin(argv []string) (int, error) {
 		return worst, nil
 	}
 	a, ok := cfg.Account(pos[0])
-	if !ok {
+	if !ok && status {
 		return 0, fmt.Errorf("unknown account %q", pos[0])
 	}
+	if !ok {
+		added, err := c.addAccount(snap, repo, pos[0], o.get("kind"))
+		if err != nil || added == nil {
+			return 2, err
+		}
+		a = added
+	} else if o.has("kind") {
+		return 0, usagef("account %q already exists (kind %s); --kind only works when adding a new account", a.ID, a.Kind)
+	}
 	return c.loginOne(*a, status)
+}
+
+// addAccount adds a new account to the global config (asking for the kind unless --kind is
+// given), with its own login folder under ~/.baton/accounts/<id>. nil, nil = cancelled.
+func (c *ctx) addAccount(snap *config.Snapshot, repo, id, kind string) (*config.Account, error) {
+	gp := snap.GlobalPath
+	if gp == "" {
+		gp = config.GlobalPath()
+	}
+	kind = strings.ToLower(strings.TrimSpace(kind))
+	if kind == "" {
+		fmt.Fprintf(c.stderr, "account %q is not in %s. Add it? Kind [claude/codex], empty = cancel: ", id, gp)
+		line, _ := bufio.NewReader(c.stdin).ReadString('\n')
+		kind = strings.ToLower(strings.TrimSpace(strings.TrimPrefix(line, string(rune(0xFEFF)))))
+		if kind == "" {
+			fmt.Fprintln(c.stderr, "cancelled")
+			return nil, nil
+		}
+	}
+	na := config.NewAccount{ID: id, Label: id, Kind: kind, MaxConcurrent: 2}
+	switch kind {
+	case "claude":
+		na.Models = []string{"sonnet", "opus", "haiku"}
+	case "codex":
+		na.Models = []string{"default"}
+	default:
+		return nil, fmt.Errorf("kind must be claude or codex (add other kinds by editing %s)", gp)
+	}
+	na.Env = map[string]string{loginKinds[kind].isoVar: accountDir(id)}
+	if err := config.AddAccount(snap, na); err != nil {
+		return nil, err
+	}
+	fmt.Fprintf(c.stdout, "added account %s (%s) to %s; edit it there for label, colour, models, roles\n", id, kind, gp)
+	a, ok := loadConfig(repo).Config.Account(id)
+	if !ok {
+		return nil, fmt.Errorf("account %q was written to %s but did not load back", id, gp)
+	}
+	return a, nil
+}
+
+// accountDir is the login folder for a new account, written with ~ when it sits under the
+// default ~/.baton so the config stays portable.
+func accountDir(id string) string {
+	dir := filepath.Join(paths.BatonHome(), "accounts", id)
+	if home, err := os.UserHomeDir(); err == nil {
+		if rel, err := filepath.Rel(home, dir); err == nil && rel == filepath.Join(".baton", "accounts", id) {
+			return "~/.baton/accounts/" + id
+		}
+	}
+	return dir
 }
 
 func (c *ctx) loginOne(a config.Account, status bool) (int, error) {

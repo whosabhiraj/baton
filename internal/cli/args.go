@@ -16,6 +16,7 @@ var optDefs = map[string]bool{
 	"data-dir": false, "admin-token-file": false,
 	"speed": false, "seed": false, "once": true, "reset": true,
 	"project": false, "no-browser": true, "yes": true, "keep-agents": true, "url": false, "no-chat": true,
+	"kind": false,
 }
 
 // opts holds parsed flags. Presence matters (an empty --note= is "defined").

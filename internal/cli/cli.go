@@ -30,7 +30,7 @@ const usage = `usage: baton <command>
   attach                status, then the conductor chat (Ctrl+C detaches; everything keeps running)
   hub status | stop [--yes] [--keep-agents] | rotate-token
   hub serve [--project P] [--port N] [--dev]   (foreground hub; what the background hub runs)
-  login <account-id> | login --status [<account-id>]   (sign an account in, in its own isolated config dir)
+  login <account-id> [--kind claude|codex] | login --status [<account-id>]   (sign an account in, in its own isolated config dir; a new id is added to the config first)
   mock [--speed N] [--seed N] [--once] [--reset] [--no-browser]   (demo hub with fake agents on a scratch repo)
   mcp [--project P] [--url U]   (the conductor's MCP stdio server; needs BATON_CONDUCTOR_TOKEN, started by the hub)
   all human commands accept --data-dir D to override the project data dir`
