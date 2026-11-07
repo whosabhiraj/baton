@@ -63,7 +63,10 @@ func Open(dataDir string, o Options) (*Store, error) {
 	if s.log == nil {
 		s.log = slog.New(slog.NewTextHandler(io.Discard, nil))
 	}
-	if err := os.MkdirAll(paths.RunsDir(dataDir), 0o755); err != nil {
+	if err := paths.EnsureDataDir(dataDir); err != nil {
+		return nil, err
+	}
+	if err := os.MkdirAll(paths.RunsDir(dataDir), 0o700); err != nil {
 		return nil, err
 	}
 	entries, err := os.ReadDir(paths.RunsDir(dataDir))
@@ -174,7 +177,7 @@ func (s *Store) Create(c CreateOpts) (*Run, string, error) {
 	}
 	s.mu.Unlock()
 	dir := paths.RunDir(s.dir, c.RunID)
-	if err := os.MkdirAll(filepath.Join(dir, paths.InboxDir), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(dir, paths.InboxDir), 0o700); err != nil {
 		return nil, "", err
 	}
 	rec := proto.RunRecord{
