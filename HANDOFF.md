@@ -121,7 +121,15 @@ stream-json input, `--resume` after a hub restart, `--append-system-prompt-file`
 `--permission-prompts none`, that the conductor sees the `mcp__baton__*` tools (the `mcp__baton`
 entry in `--allowedTools` may need the per-tool form), and token/cost lines; (3) Phase 6
 acceptance (split a small task across two accounts: lineup approved, question answered, diff
-reviewed, merge approved). Fix what they show, then Phase 7 (hardening) — ask its open questions.
+reviewed, merge approved). Fix what they show, then Phase 7 (hardening) once the user says go.
+
+Phase 7 decisions (2026-11-07, answered ahead of time): `baton gc` removes worktrees the cleanup
+policy allows plus ended run folders older than N days (a setting); it lists what it would remove
+and asks (`--yes` skips), never touches live runs or unmerged branches without `--force`. Release:
+`npm run release` cross-compiles 6 targets with checksums into `dist/release`; a GitHub Releases
+workflow comes later (needs the token's `workflow` scope). Scope: make sure every error code and
+the redaction / OpenCode refusal / stalled paths have tests, then one code review of the whole
+codebase, fix the real bugs it finds.
 
 Phase 6 decisions (2026-11-07): conductor = Claude Code only, extensible; default `claude-a` /
 opus / high (config); Bubble Tea chat; REST + SSE (no WebSockets); merges = `--no-ff` merge commits,
