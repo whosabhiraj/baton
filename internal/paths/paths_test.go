@@ -35,7 +35,8 @@ func TestWindowsLowercaseHash(t *testing.T) {
 	if a[strings.LastIndex(a, "-"):] != b[strings.LastIndex(b, "-"):] {
 		t.Errorf("windows hash should be case-insensitive: %s vs %s", a, b)
 	}
-	if !strings.HasPrefix(a, "Proj-") {
+	// The base name needs Windows path splitting (filepath.Base), so only check it there.
+	if runtime.GOOS == "windows" && !strings.HasPrefix(a, "Proj-") {
 		t.Errorf("name keeps case: %s", a)
 	}
 }
