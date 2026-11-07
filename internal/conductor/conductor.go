@@ -56,6 +56,10 @@ const (
 // Everything else is denied without a prompt (nobody could answer one).
 var AllowedTools = []string{"mcp__baton", "Read", "Grep", "Glob"}
 
+// BuiltinTools is the only built-in tool set the conductor gets (--tools); Bash, Edit, Write
+// and the rest are not offered at all. ToolSearch stays: claude loads MCP tools through it.
+var BuiltinTools = []string{"Read", "Grep", "Glob", "ToolSearch"}
+
 // WakeTypes are the run events that wake an idle conductor (plus decided approvals).
 var WakeTypes = []string{"question", "step_blocked", "done", "error", "stalled", "rate_limited", "exit"}
 
@@ -416,7 +420,7 @@ func (m *Manager) resolve() (resolved, error) {
 // would not survive a .cmd shim on Windows.
 func commandLine(cli string, r resolved, mcpFile, promptFile, sessionID string, resume bool) []string {
 	argv := []string{cli, "-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose",
-		"--mcp-config", mcpFile, "--strict-mcp-config",
+		"--mcp-config", mcpFile, "--strict-mcp-config", "--tools", strings.Join(BuiltinTools, ","),
 		"--allowedTools", strings.Join(AllowedTools, ","), "--permission-prompts", "none",
 		"--append-system-prompt-file", promptFile}
 	if r.model != "" && r.model != "default" {

@@ -157,7 +157,7 @@ func TestStartSendHistoryResume(t *testing.T) {
 	}
 	args := a[0]
 	for _, want := range [][2]string{{"--input-format", "stream-json"}, {"--output-format", "stream-json"}, {"--model", "opus"},
-		{"--effort", "high"}, {"--permission-prompts", "none"}, {"--allowedTools", "mcp__baton,Read,Grep,Glob"},
+		{"--effort", "high"}, {"--permission-prompts", "none"}, {"--allowedTools", "mcp__baton,Read,Grep,Glob"}, {"--tools", "Read,Grep,Glob,ToolSearch"},
 		{"--session-id", in.SessionID}} {
 		if flag(args, want[0]) != want[1] {
 			t.Fatalf("%s: got %q in %v", want[0], flag(args, want[0]), args)
