@@ -118,11 +118,15 @@ func TestCodexSandboxArgv(t *testing.T) {
 			!strings.Contains(line, `approval_policy="never"`) || !strings.Contains(line, `model_reasoning_effort="medium"`) {
 			t.Fatalf("%s: %s", goos, line)
 		}
+		if strings.Contains(line, "'"+sb.BatonHome+"'=") || strings.Contains(line, "'"+sb.Worktree+"'=") {
+			t.Fatalf("%s: the worktree's parents must not be denied: %s", goos, line)
+		}
 		if mxc := strings.Contains(line, `windows.sandbox="mxc"`); mxc != (goos == "windows") {
 			t.Fatalf("%s mxc=%v", goos, mxc)
 		}
 		for _, want := range []string{`":root"="read"`, `":workspace_roots"="write"`, "'" + sb.RunDir + `'="write"`,
-			"'" + sb.GitWrite[0] + `'="write"`, "'" + sb.BatonHome + `'="deny"`, "'" + sb.DenyRead[0] + `'="deny"`} {
+			"'" + sb.GitWrite[0] + `'="write"`, "'" + filepath.Join(sb.BatonHome, "projects", "p-1", "admin.token") + `'="deny"`,
+			"'" + filepath.Join(sb.BatonHome, "accounts") + `'="deny"`, "'" + sb.DenyRead[0] + `'="deny"`} {
 			if !strings.Contains(line, want) {
 				t.Fatalf("%s: lacks %s in %s", goos, want, line)
 			}

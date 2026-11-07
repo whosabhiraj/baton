@@ -102,7 +102,10 @@ func (codex) SandboxArgv(acct config.Account, model, effort string, sb Sandbox) 
 			return nil, nil, err
 		}
 	}
-	for _, d := range sb.denied() {
+	// Deny the siblings on the way down to the worktree and run dir rather than Baton's whole
+	// home: under codex exec's shell a command cannot start inside a denied parent (it ends up
+	// in C:\ on Windows).
+	for _, d := range append(DenyAround(sb.BatonHome, []string{sb.Worktree, sb.RunDir}), sb.DenyRead...) {
 		if err := add(d, "deny"); err != nil {
 			return nil, nil, err
 		}
