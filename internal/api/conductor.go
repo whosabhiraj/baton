@@ -236,6 +236,9 @@ func (a *api) merge(w http.ResponseWriter, r *http.Request) {
 			if s, err := a.Runs.DiffStat(r.Context(), run.ID()); err == nil {
 				detail["diff_stat"] = s
 			}
+			if h, perr := a.Runs.BranchHead(r.Context(), run.ID()); perr == nil {
+				detail["head"] = h // approving merges exactly this commit
+			}
 		}
 		ap, err := a.Approvals.Add(approvals.KindMerge, run.ID(), title, detail, actor)
 		if err != nil {

@@ -43,6 +43,30 @@ type MergeResult struct {
 	Method        string `json:"method"`         // "checkout" (merged in the project checkout) | "ref" (base not checked out)
 }
 
+type headKey struct{}
+
+// WithHead binds a merge to the branch tip that was reviewed: Merge refuses (MERGE_BLOCKED) if
+// the branch has moved since, and otherwise merges exactly that commit.
+func WithHead(ctx context.Context, sha string) context.Context {
+	if sha == "" {
+		return ctx
+	}
+	return context.WithValue(ctx, headKey{}, sha)
+}
+
+// BranchHead returns the current tip of the run's agent branch.
+func (m *Manager) BranchHead(ctx context.Context, runID string) (string, *proto.Error) {
+	rec, perr := m.runBranches(runID)
+	if perr != nil {
+		return "", perr
+	}
+	sha, err := gitx.Run(ctx, m.o.Repo, "rev-parse", "--verify", "--quiet", "refs/heads/"+rec.Branch)
+	if err != nil {
+		return "", proto.NewError(proto.CodeMergeBlocked, fmt.Sprintf("agent branch %q does not exist", rec.Branch))
+	}
+	return strings.TrimSpace(sha), nil
+}
+
 func exitCode(err error) int {
 	var ee *exec.ExitError
 	if errors.As(err, &ee) {
@@ -238,8 +262,13 @@ func (m *Manager) Merge(ctx context.Context, runID string) (*MergeResult, *proto
 	if _, err := gitx.Run(ctx, m.o.Repo, "rev-parse", "--verify", "--quiet", "refs/heads/"+rec.BaseBranch); err != nil {
 		return nil, proto.NewError(proto.CodeMergeBlocked, fmt.Sprintf("base %q is not a local branch", rec.BaseBranch))
 	}
-	if _, err := gitx.Run(ctx, m.o.Repo, "rev-parse", "--verify", "--quiet", "refs/heads/"+rec.Branch); err != nil {
+	tip, err := gitx.Run(ctx, m.o.Repo, "rev-parse", "--verify", "--quiet", "refs/heads/"+rec.Branch)
+	if err != nil {
 		return nil, proto.NewError(proto.CodeMergeBlocked, fmt.Sprintf("agent branch %q does not exist", rec.Branch))
+	}
+	tip = strings.TrimSpace(tip)
+	if want, _ := ctx.Value(headKey{}).(string); want != "" && want != tip {
+		return nil, proto.NewError(proto.CodeMergeBlocked, "branch moved since review; request the merge again")
 	}
 	unc, err := m.uncommitted(ctx, rec.Worktree)
 	if err != nil {
@@ -249,7 +278,7 @@ func (m *Manager) Merge(ctx context.Context, runID string) (*MergeResult, *proto
 		return nil, proto.NewError(proto.CodeMergeBlocked, fmt.Sprintf(
 			"the agent's worktree has %d uncommitted change(s); ask the agent to commit them first", len(unc)))
 	}
-	merged, err := m.isAncestor(ctx, rec.Branch, rec.BaseBranch)
+	merged, err := m.isAncestor(ctx, tip, rec.BaseBranch)
 	if err != nil {
 		return nil, gitErr(err)
 	}
@@ -266,7 +295,7 @@ func (m *Manager) Merge(ctx context.Context, runID string) (*MergeResult, *proto
 	switch {
 	case at == "":
 		res.Method = "ref"
-		return m.mergeRef(ctx, rec, msg, res)
+		return m.mergeRef(ctx, rec, tip, msg, res)
 	case !samePath(at, m.o.Repo):
 		return nil, proto.NewError(proto.CodeMergeBlocked, fmt.Sprintf("base %q is checked out in another worktree (%s)", rec.BaseBranch, at))
 	}
@@ -279,7 +308,7 @@ func (m *Manager) Merge(ctx context.Context, runID string) (*MergeResult, *proto
 		return nil, proto.NewError(proto.CodeMergeBlocked, fmt.Sprintf(
 			"your checkout of %q has uncommitted changes; commit or stash them, then approve the merge again", rec.BaseBranch))
 	}
-	args := append(m.identity(ctx), "merge", "--no-ff", "--no-edit", "-m", msg, rec.Branch)
+	args := append(m.identity(ctx), "merge", "--no-ff", "--no-edit", "-m", msg, tip)
 	if _, err := gitx.Run(ctx, m.o.Repo, args...); err != nil {
 		files, _ := gitx.Run(ctx, m.o.Repo, "diff", "--name-only", "--diff-filter=U")
 		_, _ = gitx.Run(ctx, m.o.Repo, "merge", "--abort")
@@ -300,12 +329,12 @@ func (m *Manager) Merge(ctx context.Context, runID string) (*MergeResult, *proto
 
 // mergeRef merges without a checkout: merge-tree computes the tree, commit-tree records the
 // merge commit, update-ref moves the base (only if it did not move meanwhile).
-func (m *Manager) mergeRef(ctx context.Context, rec proto.RunRecord, msg string, res *MergeResult) (*MergeResult, *proto.Error) {
+func (m *Manager) mergeRef(ctx context.Context, rec proto.RunRecord, tip, msg string, res *MergeResult) (*MergeResult, *proto.Error) {
 	old, err := gitx.Run(ctx, m.o.Repo, "rev-parse", "refs/heads/"+rec.BaseBranch)
 	if err != nil {
 		return nil, proto.NewError(proto.CodeGit, err.Error())
 	}
-	out, err := gitx.Run(ctx, m.o.Repo, "merge-tree", "--write-tree", "--name-only", "--no-messages", old, "refs/heads/"+rec.Branch)
+	out, err := gitx.Run(ctx, m.o.Repo, "merge-tree", "--write-tree", "--name-only", "--no-messages", old, tip)
 	if err != nil {
 		if exitCode(err) == 1 {
 			lines := strings.Split(strings.TrimSpace(gitOutput(err)), "\n")
@@ -320,7 +349,7 @@ func (m *Manager) mergeRef(ctx context.Context, rec proto.RunRecord, msg string,
 		return nil, proto.NewError(proto.CodeGit, err.Error())
 	}
 	tree, _, _ := strings.Cut(out, "\n")
-	args := append(m.identity(ctx), "commit-tree", strings.TrimSpace(tree), "-p", old, "-p", "refs/heads/"+rec.Branch, "-m", msg)
+	args := append(m.identity(ctx), "commit-tree", strings.TrimSpace(tree), "-p", old, "-p", tip, "-m", msg)
 	commit, err := gitx.Run(ctx, m.o.Repo, args...)
 	if err != nil {
 		return nil, proto.NewError(proto.CodeGit, err.Error())
