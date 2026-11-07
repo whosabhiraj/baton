@@ -90,7 +90,9 @@ worker agents run with `permissions.mode: sandboxed` unless you change it:
 - they can't read `~/.baton` (account logins, the admin token, other runs) or anything you list
   in `permissions.deny_read`, and they have no network. `baton` still works: it reports through
   files in the run folder
-- codex uses its own sandbox (on windows the `mxc` one, no admin setup). claude uses claude
+- codex uses its own sandbox (on windows the `mxc` one, no admin setup). codex sometimes
+  hangs after finishing under that sandbox; baton ends it 20s after its last turn and records a
+  normal exit. claude uses claude
   code's sandbox, which only exists on macos, linux and wsl2: on native windows a sandboxed
   claude account refuses to start and tells you so
 

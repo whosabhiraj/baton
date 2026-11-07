@@ -1,13 +1,23 @@
 // npm run install:baton: build the dashboard, go install, then say where it landed and how to put it on PATH.
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync, renameSync, rmSync } from 'node:fs';
 import { delimiter, join } from 'node:path';
 import { buildWeb, capture, exe, ldflags, requireGo, run } from './_lib.mjs';
 
 requireGo();
 buildWeb();
-run('go', ['install', '-ldflags', ldflags(), './cmd/baton']);
 const bin = capture('go', ['env', 'GOBIN']) || join(capture('go', ['env', 'GOPATH']).split(delimiter)[0], 'bin');
 const target = join(bin, `baton${exe}`);
+if (process.platform === 'win32' && existsSync(target)) {
+  // Windows locks a running exe (agent supervisors run baton.exe) but lets it be renamed, so
+  // move it aside; leftovers from earlier installs are removed once nothing uses them.
+  for (const f of readdirSync(bin)) {
+    if (f.startsWith('baton.exe.old-')) {
+      try { rmSync(join(bin, f)); } catch { /* still in use */ }
+    }
+  }
+  try { renameSync(target, `${target}.old-${Date.now()}`); } catch { /* not running: go install overwrites it */ }
+}
+run('go', ['install', '-ldflags', ldflags(), './cmd/baton']);
 console.log(`installed ${target}${existsSync(target) ? '' : ' (not found?)'}`);
 const norm = (p) => {
   const t = p.trim().replace(/[\\/]+$/, "");

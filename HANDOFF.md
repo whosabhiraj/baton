@@ -129,16 +129,20 @@ SIGKILLs the group; runs orphaned by a crash mid-spawn get an exit; history fano
 stdout read to EOF before Wait. Verified on Windows and Linux (WSL).
 
 Open (ask the user):
-- Security (documented in README "security"): agents run permissive as the user, so they can read
-  `admin.token` (and do anything else the user can: edit the main checkout, push, read other
-  accounts' logins). Protecting the token alone fixes nothing; the fix is sandboxed agents.
-  Facts checked 2026-11-07: Claude Code's Bash sandbox (`--settings` sandbox.filesystem.denyRead /
-  allowWrite, `failIfUnavailable`, `allowUnsandboxedCommands: false`, plus Read/Edit deny rules)
-  runs on macOS, Linux and WSL2 only; on native Windows claude commands run unsandboxed. Codex
-  `--sandbox workspace-write` limits writes (+ `sandbox_workspace_write.writable_roots`), network
-  off by default; deny-read needs permission profiles and, on Windows, the `mxc`/`elevated`
-  sandbox. Agents can work without network: `baton` spools to the run dir and reads the inbox
-  from files. Waiting on the user's choice of approach.
+- Sandboxed agents (2026-11-07), plan parts 1-4: (1) DONE `permissions.mode: sandboxed` default
+  (`eab4bbf`, `0494005`, `ad2c4fb`). Codex: `-c default_permissions="baton"` + inline
+  `permissions.baton.filesystem` (`:root` read, worktree + run dir + own-branch git paths write,
+  siblings of the worktree path inside Baton's home + `deny_read` denied, never the worktree's
+  parents: codex exec cannot start commands under a denied parent), `windows.sandbox="mxc"` on
+  Windows (unelevated cannot deny reads), `approval_policy="never"`, no network. Verified with
+  real runs: token unreadable, commit on own branch ok, main can't move, network off. Codex under
+  mxc hangs after `turn.completed`: the launcher ends a CLI 20s after its final line (exit 0,
+  detail). Claude: `--settings` sandbox file (macOS/Linux/WSL2; refuses on native Windows, config
+  note). Agents get no hub URL/token (spool). (2) Claude access approvals via
+  `--permission-prompts host --permission-prompt-tool` (an agent MCP tool -> Baton approval).
+  (3) `runtime: wsl` for Claude on Windows. (4) Codex approvals via the experimental app-server
+  (`codex app-server generate-json-schema`: CommandExecutionRequestApproval, FileChange...,
+  network policy amendments). The user's Claude accounts are set to permissive for now.
 - Windows CI: two timing flakes found from the job log and fixed (`d476bf2`).
 - Known small items: multi-field PATCH /api/accounts not atomic; kill answers 409 RUN_ENDED; claude
   adapter may emit two identical `usage` events; gc removes an old run even with a pending approval.
