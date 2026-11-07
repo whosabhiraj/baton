@@ -1,7 +1,7 @@
 # HANDOFF — read this first
 
-Last updated: **2026-11-07**, **Phase 6 code done** (6a-6d). Waiting on the user for logins, then three
-small real runs (quota): codex check (Phase 5), first real conductor, Phase 6 acceptance.
+Last updated: **2026-11-07**, **Phases 5 and 6 done**, verified with real runs (codex check, first real
+conductor, two-account acceptance). Next: Phase 7 (hardening + release), decisions already in §E.
 
 Big change since Phase 0: the hub **and** the `baton` CLI are written in **Go** (one binary).
 `docs/GO_HUB_DESIGN.md` is approved and overrides `docs/PLAN.md` §3, §4.7, §5 and §6.
@@ -34,9 +34,8 @@ Commands that work today (need Go, Node 24+ and git; `npm install` once):
 Things only you can do:
 - Log in each account once: `baton login <account-id>` (ids are whatever the config says; a new id gets added)
   (config is `~/.baton/config.yaml`; each account has its own dir under `~/.baton/accounts/`).
-- **CI:** GitHub refused `.github/workflows/ci.yml` because the git token has no `workflow`
-  scope. Give the token that scope or add the file through the GitHub web UI (it exists
-  locally, untracked).
+- **CI** (`.github/workflows/ci.yml`, 3 OSes) is in the repo. Changing it needs a token with the
+  `workflow` scope (or the GitHub web UI). Job logs need a signed-in GitHub user to read.
 - OpenCode: stays disabled until you pick an API-key provider (never a Claude subscription).
 
 ## B. For Claude (fresh session, zero context): how to resume
@@ -69,8 +68,8 @@ Things only you can do:
 | 2 Hub core | ✅ done (verified end to end; PowerShell piped-`y` fix `84b18d2`) | `73491a4` … `84b18d2` |
 | 3 `baton mock` | ✅ done (controls, approvals, kill checked by hand) | `7e40608` … |
 | 4 Dashboard | ✅ done: list + panels, 3D rail-yard map, timeline + replay, phone layout; design iterated live with the user | `4b771b3` … `20f9bfe` |
-| 5 Adapters | code done: supervisor, env allowlist, claude (real run ok), codex, opencode + refusal, custom kinds, `baton login`; real codex run pending login | `852719b` … `72e99ec` |
-| 6 Conductor | code done: 6a conductor token, run/diff/merge/wait routes, real merges, `baton mcp`; 6b headless conductor (history, resume, auto-wake); 6c chat (Bubble Tea + dashboard sheet); 6d lineups. Real runs pending login | `12da74f` … `5bfb69e` |
+| 5 Adapters | ✅ done: supervisor, env allowlist, claude + codex (real runs ok), opencode + refusal, custom kinds, `baton login` (adds unknown ids) | `852719b` … `72e99ec` |
+| 6 Conductor | ✅ done: 6a conductor token, run/diff/merge/wait routes, real merges, `baton mcp`; 6b headless conductor (history, resume, auto-wake); 6c chat (Bubble Tea + dashboard sheet); 6d lineups. Acceptance passed on real accounts | `12da74f` … `b9cb6fe` |
 | 7 Hardening | pending | — |
 | 8 Remote access (future) | not planned yet | — |
 
@@ -112,16 +111,21 @@ Runtime data: `~/.baton/projects/<repo-name>-<hash8>/` (override with `BATON_HOM
 brief.md, stdout.jsonl, stderr.log, supervisor.json, exit.json}`. Global config:
 `~/.baton/config.yaml`; per project: `<repo>/baton.config.yaml`.
 
-## E. Resume here (Phase 6 code done; real runs wait for the user)
+## E. Resume here (Phases 5-6 done; Phase 7 next, start when the user says go)
 
-The user works through `TODO.local.md` (logins, CI file). After the logins, with the user and
-**asking before each (quota)**: (1) one tiny codex run to check the codex adapter against its real
-`--json` output; (2) first real conductor: `baton` in a small test project, one message: verify
-stream-json input, `--resume` after a hub restart, `--append-system-prompt-file`,
-`--permission-prompts none`, that the conductor sees the `mcp__baton__*` tools (the `mcp__baton`
-entry in `--allowedTools` may need the per-tool form), and token/cost lines; (3) Phase 6
-acceptance (split a small task across two accounts: lineup approved, question answered, diff
-reviewed, merge approved). Fix what they show, then Phase 7 (hardening) once the user says go.
+Real runs (2026-11-07, throwaway repo): (1) codex: one task, steps/artifacts/done reported, usage
+parsed; (2) conductor: MCP tools visible (loaded through ToolSearch), `get_settings` etc. work,
+`--resume` after a hub restart keeps the conversation; (3) acceptance: lineup proposed and approved,
+claude + codex agents ran, a blocking question answered by the conductor, both diffs reviewed,
+two `--no-ff` merges approved, merged tests pass. Total ~$1.15 conductor + agents.
+Fixes from those runs: codex `input_tokens` includes cached tokens (now subtracted), cache writes
+parsed, shell wrapper stripped from activity, Baton's untracked AGENTS.md no longer blocks merges,
+conductor gets only Read/Grep/Glob/ToolSearch built-ins (`--tools`), no auto-wake for events the
+conductor already read (seen cursor from `/api/wait`), Linux/macOS CI path test fixed.
+
+Open small items: the conductor's own usage is not added to its account's usage totals; the claude
+adapter sometimes emits two identical `usage` events (harmless, latest wins); a Windows CI run
+failed once in `go test` (passes locally 3x; log needs a signed-in user).
 
 Phase 7 decisions (2026-11-07, answered ahead of time): `baton gc` removes worktrees the cleanup
 policy allows plus ended run folders older than N days (a setting); it lists what it would remove
