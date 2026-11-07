@@ -24,6 +24,7 @@ const (
 	ActorHuman     = "human"
 	ActorConductor = "conductor"
 	ActorHub       = "hub"
+	ActorAgent     = "agent"
 )
 
 // Entry is one audit record.

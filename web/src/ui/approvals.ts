@@ -115,6 +115,31 @@ export function approvalsPanel(): Panel {
         ),
       );
     }
+    if (a.kind === 'access') {
+      // detail { kind, summary, agent_id, command, cwd, reason, paths, host ... }: show every string (and string list), skip objects
+      const rows: HTMLElement[] = [];
+      for (const [k, v] of Object.entries(d)) {
+        if (k === 'summary' || k === 'agent_id') continue;
+        const val = typeof v === 'string' ? v : Array.isArray(v) && v.every((x) => typeof x === 'string') ? v.join('\n') : null;
+        if (!val) continue;
+        rows.push(h('dt', {}, k.replace(/_/g, ' ')), h('dd', {}, val));
+      }
+      return h(
+        'section',
+        { class: 'approval access' },
+        h('div', { class: 'row between' }, h('strong', { class: 'access-label' }, 'Agent asks for access'), h('span', { class: 'badge' }, a.kind)),
+        h('div', {}, typeof d.summary === 'string' && d.summary ? d.summary : a.title),
+        h('div', { class: 'sub muted' }, `${a.title}, ${ago(a.created_at)} ago` + (a.run_id ? `, run ${a.run_id}` : '')),
+        rows.length > 0 && h('dl', { class: 'access-detail' }, ...rows),
+        h(
+          'div',
+          { class: 'row' },
+          note,
+          h('button', { class: 'primary', onclick: () => void decide(a, 'approve', note.value) }, 'Approve'),
+          h('button', { class: 'danger', onclick: () => void decide(a, 'reject', note.value) }, 'Reject'),
+        ),
+      );
+    }
     const detail = Object.keys(d).length ? JSON.stringify(d, null, 1) : '';
     return h(
       'section',

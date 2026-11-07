@@ -444,7 +444,7 @@ export namespace ApiState {
   }
   export interface Approval {
     id: string;
-    kind: 'merge' | 'spawn' | 'lineup';
+    kind: 'merge' | 'spawn' | 'lineup' | 'access';
     run_id?: string;
     title: string;
     detail?: {};
