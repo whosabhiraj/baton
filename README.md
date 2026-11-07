@@ -78,10 +78,29 @@ the conductor's defaults live under `conductor:` in the config (account, model, 
 `auto_wake`), and `hub.mode` picks whether its lineups wait for your ok (`user`, `propose`) or
 it just spawns (`auto`).
 
-> NOTE: worker agents run with permission checks off by default (they only touch their own
-> worktree, but they can run any command). set `permissions.mode` per account in the config
-> (`default`, `acceptEdits` or `permissive`) if you want them on a shorter leash. the conductor
-> itself can only read the project and use baton's tools.
+> NOTE: worker agents run with permission checks off by default. read the security section
+> below before you point baton at anything you care about.
+
+## security
+
+be clear about what baton does and doesn't protect against right now:
+
+- worker agents run as you, with permission checks off (`permissions.mode: permissive`). each
+  one is told to stay in its own worktree, but nothing enforces that. an agent can run any
+  command you could: edit your main checkout, push with your git credentials, read your files,
+  read the other accounts' logins under `~/.baton/accounts/`
+- that includes baton's own admin token (`~/.baton/projects/<repo>/admin.token`). with it an
+  agent can do anything the dashboard can, including approving its own merge or turning
+  approvals off. so merge approvals stop a careless conductor, not a hostile agent
+- the conductor is restricted for real: it can only read the project and call baton's tools,
+  its token can't approve anything, and it never sees the agents' tokens
+- the hub only listens on 127.0.0.1, and its data folders are private to your user
+
+so for now: only run agents on repos and tasks you'd trust a script with, and keep secrets you
+care about out of reach of your user account. `permissions.mode: default` or `acceptEdits` per
+account makes agents ask for permission instead, but nobody can answer those prompts in a
+headless run, so they mostly just get stuck. sandboxed agents (claude code's sandbox on
+macos/linux/wsl2, codex's `workspace-write` sandbox) are the planned fix.
 
 ## try it without agents
 

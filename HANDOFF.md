@@ -129,11 +129,17 @@ SIGKILLs the group; runs orphaned by a crash mid-spawn get an exit; history fano
 stdout read to EOF before Wait. Verified on Windows and Linux (WSL).
 
 Open (ask the user):
-- Design: agents run permissive as the same OS user, so an agent can read `admin.token` (two
-  folders up from its run dir) and approve its own merge. Options: accept (document it), or keep
-  the admin token outside the data dir agents can reach / require a fresh human step for approvals.
-- Windows CI job fails in `go test` on recent pushes (Linux, macOS and local Windows pass); job
-  logs need a signed-in GitHub user.
+- Security (documented in README "security"): agents run permissive as the user, so they can read
+  `admin.token` (and do anything else the user can: edit the main checkout, push, read other
+  accounts' logins). Protecting the token alone fixes nothing; the fix is sandboxed agents.
+  Facts checked 2026-11-07: Claude Code's Bash sandbox (`--settings` sandbox.filesystem.denyRead /
+  allowWrite, `failIfUnavailable`, `allowUnsandboxedCommands: false`, plus Read/Edit deny rules)
+  runs on macOS, Linux and WSL2 only; on native Windows claude commands run unsandboxed. Codex
+  `--sandbox workspace-write` limits writes (+ `sandbox_workspace_write.writable_roots`), network
+  off by default; deny-read needs permission profiles and, on Windows, the `mxc`/`elevated`
+  sandbox. Agents can work without network: `baton` spools to the run dir and reads the inbox
+  from files. Waiting on the user's choice of approach.
+- Windows CI: two timing flakes found from the job log and fixed (`d476bf2`).
 - Known small items: multi-field PATCH /api/accounts not atomic; kill answers 409 RUN_ENDED; claude
   adapter may emit two identical `usage` events; gc removes an old run even with a pending approval.
 
