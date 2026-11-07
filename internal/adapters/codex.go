@@ -35,14 +35,21 @@ func codexBase(model, effort string) []string {
 	if model != "" && model != "default" {
 		argv = append(argv, "-m", model)
 	}
-	switch effort {
-	case "":
-	case "xhigh", "max":
-		argv = append(argv, "-c", `model_reasoning_effort="high"`)
-	default:
-		argv = append(argv, "-c", `model_reasoning_effort="`+effort+`"`)
+	if e := codexEffort(effort); e != "" {
+		argv = append(argv, "-c", `model_reasoning_effort="`+e+`"`)
 	}
 	return argv
+}
+
+// codexEffort maps Baton's effort to codex's model_reasoning_effort ("" = leave it).
+func codexEffort(effort string) string {
+	switch effort {
+	case "":
+		return ""
+	case "xhigh", "max":
+		return "high"
+	}
+	return effort
 }
 
 func (codex) Parser() Parser { return &codexParser{} }
@@ -55,6 +62,13 @@ type codexParser struct {
 }
 
 func (p *codexParser) Parse(line []byte) []Event {
+	var probe struct {
+		Method string          `json:"method"`
+		Params json.RawMessage `json:"params"`
+	}
+	if json.Unmarshal(line, &probe) == nil && probe.Method != "" {
+		return p.parseApp(probe.Method, probe.Params) // `baton __codex`: app-server notifications
+	}
 	var m struct {
 		Type  string `json:"type"`
 		Model string `json:"model"`
@@ -135,4 +149,71 @@ func unwrapShell(cmd string) string {
 		inner = inner[1 : n-1]
 	}
 	return inner
+}
+
+// parseApp reads the app-server notifications `baton __codex` writes (plus its own
+// baton/access lines). Token usage arrives as running totals for the thread.
+func (p *codexParser) parseApp(method string, params json.RawMessage) []Event {
+	act := func(tool, detail, raw string) []Event {
+		if detail == "" {
+			detail = raw
+		}
+		return []Event{{Type: "activity", Payload: map[string]any{"tool": tool, "detail": trunc(detail, 200), "raw_kind": raw}}}
+	}
+	var m struct {
+		Item struct {
+			Type    string `json:"type"`
+			Command string `json:"command"`
+			Query   string `json:"query"`
+			Server  string `json:"server"`
+			Tool    string `json:"tool"`
+			Changes []struct {
+				Path string `json:"path"`
+			} `json:"changes"`
+		} `json:"item"`
+		TokenUsage struct {
+			Total struct {
+				In     int64 `json:"inputTokens"`
+				CacheR int64 `json:"cachedInputTokens"`
+				CacheW int64 `json:"cacheWriteInputTokens"`
+				Out    int64 `json:"outputTokens"`
+			} `json:"total"`
+		} `json:"tokenUsage"`
+		Kind    string `json:"kind"`
+		Summary string `json:"summary"`
+		Status  string `json:"status"`
+	}
+	if json.Unmarshal(params, &m) != nil {
+		return nil
+	}
+	switch method {
+	case "item/started":
+		switch m.Item.Type {
+		case "commandExecution":
+			return act("shell", unwrapShell(m.Item.Command), "command_execution")
+		case "webSearch":
+			return act("web", m.Item.Query, "web_search")
+		case "mcpToolCall":
+			return act("other", strings.Trim(m.Item.Server+"."+m.Item.Tool, "."), "mcp_tool_call")
+		}
+	case "item/completed":
+		if m.Item.Type == "fileChange" {
+			var paths []string
+			for _, c := range m.Item.Changes {
+				if c.Path != "" {
+					paths = append(paths, c.Path)
+				}
+			}
+			return act("edit", strings.Join(paths, ", "), "file_change")
+		}
+	case "thread/tokenUsage/updated":
+		t := m.TokenUsage.Total
+		p.sum = usage{in: max(0, t.In-t.CacheR), out: t.Out, cacheR: t.CacheR, cacheW: t.CacheW}
+		return []Event{{Type: "usage", Payload: usagePayload(p.sum, p.model)}}
+	case "turn/completed":
+		return []Event{{Type: Finished}}
+	case "baton/access":
+		return act("other", "access request ("+m.Kind+", "+m.Status+"): "+m.Summary, "access_request")
+	}
+	return nil
 }

@@ -73,7 +73,7 @@ const ModeSandboxed = "sandboxed"
 var hostOS = runtime.GOOS
 
 func defaultAccount() Account {
-	return Account{MaxConcurrent: 1, Enabled: true, Permissions: Permissions{Mode: ModeSandboxed}}
+	return Account{MaxConcurrent: 1, Enabled: true, Permissions: Permissions{Mode: ModeSandboxed, Ask: true}}
 }
 
 func defaultKind() CustomKind { return CustomKind{Parser: "none"} }

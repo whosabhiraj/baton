@@ -26,6 +26,7 @@
           "properties": {
             "mode": { "enum": ["sandboxed", "permissive", "acceptEdits", "default"], "default": "sandboxed" },
             "deny_read": { "$ref": "#/$defs/stringList", "description": "sandboxed: extra paths agents may not read" },
+            "ask": { "type": "boolean", "default": true, "description": "sandboxed codex: ask the user when the sandbox blocks something (false = just refuse)" },
             "allowed_tools": { "$ref": "#/$defs/stringList" },
             "denied_tools": { "$ref": "#/$defs/stringList" },
             "extra_args": { "$ref": "#/$defs/stringList" }

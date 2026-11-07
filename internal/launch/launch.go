@@ -133,8 +133,9 @@ func (l *Launcher) Start(res runs.SpawnResult) error {
 	}
 	sandboxed := acct.Permissions.Mode == config.ModeSandboxed
 	var argv []string
+	var driverEnv map[string]string
 	if sandboxed {
-		argv, err = l.sandboxArgv(ad, *acct, res, run.Record().Effort, runDir)
+		argv, driverEnv, err = l.sandboxArgv(ad, *acct, res, run.Record().Effort, runDir)
 	} else {
 		argv, err = ad.Argv(*acct, res.Model, run.Record().Effort)
 	}
@@ -159,6 +160,9 @@ func (l *Launcher) Start(res runs.SpawnResult) error {
 		// from files, so the agent needs neither the hub's URL nor a token.
 		delete(batonEnv, "BATON_URL")
 		delete(batonEnv, "BATON_TOKEN")
+		for k, v := range driverEnv { // a driver (baton __codex) strips these before starting the CLI
+			batonEnv[k] = v
+		}
 	}
 	env := proc.PrependPath(proc.BuildEnv(nil, acctEnv, batonEnv), filepath.Dir(l.o.Exe))
 
@@ -176,30 +180,31 @@ func (l *Launcher) Start(res runs.SpawnResult) error {
 
 // sandboxArgv builds a sandboxed command line (permissions.mode: sandboxed) and writes the
 // files it needs into the run dir.
-func (l *Launcher) sandboxArgv(ad adapters.Adapter, acct config.Account, res runs.SpawnResult, effort, runDir string) ([]string, error) {
+func (l *Launcher) sandboxArgv(ad adapters.Adapter, acct config.Account, res runs.SpawnResult, effort, runDir string) ([]string, map[string]string, error) {
 	sbx, ok := ad.(adapters.Sandboxer)
 	if !ok {
-		return nil, fmt.Errorf("%s agents cannot be sandboxed; set permissions.mode: permissive on account %s to run them unsandboxed", res.Kind, acct.ID)
+		return nil, nil, fmt.Errorf("%s agents cannot be sandboxed; set permissions.mode: permissive on account %s to run them unsandboxed", res.Kind, acct.ID)
 	}
 	wt, err := filepath.Abs(res.Worktree)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	gitWrite, err := gitWritePaths(wt, res.Branch)
 	if err != nil {
-		return nil, fmt.Errorf("sandbox: %w", err)
+		return nil, nil, fmt.Errorf("sandbox: %w", err)
 	}
-	argv, files, err := sbx.SandboxArgv(acct, res.Model, effort, adapters.Sandbox{Worktree: wt, RunDir: runDir,
-		GitWrite: gitWrite, BatonHome: paths.BatonHome(), DenyRead: acct.Permissions.DenyRead, GOOS: runtime.GOOS})
+	plan, err := sbx.SandboxArgv(acct, res.Model, effort, adapters.Sandbox{Worktree: wt, RunDir: runDir,
+		GitWrite: gitWrite, BatonHome: paths.BatonHome(), DenyRead: acct.Permissions.DenyRead, GOOS: runtime.GOOS,
+		Driver: l.o.Exe, HubURL: res.Env["BATON_URL"], HubToken: res.Env["BATON_TOKEN"]})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	for name, b := range files {
+	for name, b := range plan.Files {
 		if err := os.WriteFile(filepath.Join(runDir, name), b, 0o600); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
-	return argv, nil
+	return plan.Argv, plan.Env, nil
 }
 
 // gitWritePaths are the parts of the main repo's .git a commit on the agent's own branch

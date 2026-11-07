@@ -522,6 +522,10 @@ export namespace Config {
     permissions?: {
       mode?: 'sandboxed' | 'permissive' | 'acceptEdits' | 'default';
       deny_read?: StringList1;
+      /**
+       * sandboxed codex: ask the user when the sandbox blocks something (false = just refuse)
+       */
+      ask?: boolean;
       allowed_tools?: StringList;
       denied_tools?: StringList;
       extra_args?: StringList;

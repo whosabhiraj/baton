@@ -3,6 +3,7 @@ package adapters
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -50,13 +51,17 @@ func TestClaudeSandboxArgv(t *testing.T) {
 	sb := sbFixture(t)
 	acct := config.Account{ID: "c1", Permissions: config.Permissions{Mode: config.ModeSandboxed, DeniedTools: []string{"WebFetch"}, ExtraArgs: []string{"--x"}}}
 	sb.GOOS = "windows"
-	if _, _, err := (claude{}).SandboxArgv(acct, "", "", sb); !errors.Is(err, ErrNoSandbox) || !strings.Contains(err.Error(), "permissive") {
+	if _, err := (claude{}).SandboxArgv(acct, "", "", sb); !errors.Is(err, ErrNoSandbox) || !strings.Contains(err.Error(), "permissive") {
 		t.Fatalf("native windows: %v", err)
 	}
 	sb.GOOS = "linux"
-	argv, files, err := (claude{}).SandboxArgv(acct, "sonnet", "low", sb)
+	plan, err := (claude{}).SandboxArgv(acct, "sonnet", "low", sb)
 	if err != nil {
 		t.Fatal(err)
+	}
+	argv, files := plan.Argv, plan.Files
+	if len(plan.Env) != 0 {
+		t.Fatalf("claude gets no driver env: %v", plan.Env)
 	}
 	line := strings.Join(argv, " ")
 	for _, want := range []string{"--model sonnet", "--effort low", "--permission-mode acceptEdits", "--permission-prompts none",
@@ -109,10 +114,11 @@ func TestCodexSandboxArgv(t *testing.T) {
 	acct := config.Account{ID: "x1", Permissions: config.Permissions{Mode: config.ModeSandboxed}}
 	for _, goos := range []string{"windows", "linux"} {
 		sb.GOOS = goos
-		argv, files, err := (codex{}).SandboxArgv(acct, "", "medium", sb)
-		if err != nil || files != nil {
-			t.Fatal(err, files)
+		plan, err := (codex{}).SandboxArgv(acct, "", "medium", sb)
+		if err != nil || plan.Files != nil || plan.Env != nil {
+			t.Fatal(err, plan)
 		}
+		argv := plan.Argv
 		line := strings.Join(argv, " ")
 		if argv[len(argv)-1] != "-" || strings.Contains(line, "dangerously") || !strings.Contains(line, `default_permissions="baton"`) ||
 			!strings.Contains(line, `approval_policy="never"`) || !strings.Contains(line, `model_reasoning_effort="medium"`) {
@@ -133,10 +139,59 @@ func TestCodexSandboxArgv(t *testing.T) {
 		}
 	}
 	sb.DenyRead = []string{"/tmp/it's"}
-	if _, _, err := (codex{}).SandboxArgv(acct, "", "", sb); err == nil {
+	if _, err := (codex{}).SandboxArgv(acct, "", "", sb); err == nil {
 		t.Fatal("a quote in a path must be refused")
 	}
 	if _, err := (codex{}).Argv(acct, "", ""); err == nil {
 		t.Fatal("Argv must refuse sandboxed mode")
+	}
+}
+
+// TestCodexDriverArgv: with permissions.ask the agent is `baton __codex` (app-server driver),
+// which alone gets the hub URL and token; the sandbox overrides are the same.
+func TestCodexDriverArgv(t *testing.T) {
+	sb := sbFixture(t)
+	sb.GOOS, sb.Driver, sb.HubURL, sb.HubToken = "windows", "/bin/baton", "http://127.0.0.1:7777", "bt_run_x"
+	acct := config.Account{ID: "x1", Permissions: config.Permissions{Mode: config.ModeSandboxed, Ask: true, ExtraArgs: []string{"--e"}}}
+	plan, err := (codex{}).SandboxArgv(acct, "gpt-x", "xhigh", sb)
+	if err != nil {
+		t.Fatal(err)
+	}
+	line := strings.Join(plan.Argv, " ")
+	if plan.Argv[0] != "/bin/baton" || plan.Argv[1] != "__codex" || plan.Argv[len(plan.Argv)-1] != "--e" ||
+		!strings.Contains(line, `model="gpt-x"`) || !strings.Contains(line, `model_reasoning_effort="high"`) ||
+		!strings.Contains(line, `windows.sandbox="mxc"`) || !strings.Contains(line, `default_permissions="baton"`) ||
+		strings.Contains(line, "approval_policy") || strings.Contains(line, " exec ") || strings.Contains(line, " - ") {
+		t.Fatalf("driver argv: %s", line)
+	}
+	if plan.Env["BATON_DRIVER_URL"] != sb.HubURL || plan.Env["BATON_DRIVER_TOKEN"] != sb.HubToken {
+		t.Fatalf("driver env: %v", plan.Env)
+	}
+	sb.Driver = "" // no driver known: plain exec
+	if plan, _ := (codex{}).SandboxArgv(acct, "", "", sb); plan.Argv[0] != "codex" {
+		t.Fatalf("fallback: %v", plan.Argv)
+	}
+}
+
+func TestCodexAppParser(t *testing.T) {
+	p := codex{}.Parser()
+	lines := []string{
+		`{"method":"item/started","params":{"item":{"type":"commandExecution","command":"/bin/bash -lc 'go test ./...'"}}}`,
+		`{"method":"item/completed","params":{"item":{"type":"fileChange","changes":[{"path":"a.go"},{"path":"b.go"}]}}}`,
+		`{"method":"thread/tokenUsage/updated","params":{"tokenUsage":{"total":{"inputTokens":100,"cachedInputTokens":60,"cacheWriteInputTokens":5,"outputTokens":7},"last":{}}}}`,
+		`{"method":"baton/access","params":{"kind":"command","summary":"needs network","status":"approved"}}`,
+		`{"method":"item/agentMessage/delta","params":{"delta":"x"}}`,
+		`{"method":"turn/completed","params":{"turn":{"id":"t","status":"completed"}}}`,
+	}
+	var got []string
+	for _, l := range lines {
+		for _, e := range p.Parse([]byte(l)) {
+			got = append(got, e.Type+":"+fmt.Sprint(e.Payload["detail"], e.Payload["input_tokens"]))
+		}
+	}
+	want := []string{"activity:go test ./...<nil>", "activity:a.go, b.go<nil>", "usage:<nil> 40",
+		"activity:access request (command, approved): needs network<nil>", "finished:<nil> <nil>"}
+	if !slices.Equal(got, want) {
+		t.Fatalf("got %q", got)
 	}
 }

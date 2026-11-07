@@ -94,6 +94,7 @@ type Account struct {
 type Permissions struct {
 	Mode         string   `yaml:"mode" json:"mode"`           // [sandboxed] sandboxed | permissive | acceptEdits | default
 	DenyRead     []string `yaml:"deny_read" json:"deny_read"` // sandboxed: extra paths agents may not read (~ expanded); Baton's home is always denied
+	Ask          bool     `yaml:"ask" json:"ask"`             // [true] sandboxed codex: ask the user (dashboard) when the sandbox blocks something; false = just refuse
 	AllowedTools []string `yaml:"allowed_tools" json:"allowed_tools"`
 	DeniedTools  []string `yaml:"denied_tools" json:"denied_tools"`
 	ExtraArgs    []string `yaml:"extra_args" json:"extra_args"`

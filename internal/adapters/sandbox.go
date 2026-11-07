@@ -22,6 +22,18 @@ type Sandbox struct {
 	BatonHome string
 	DenyRead  []string
 	GOOS      string
+	Driver    string // the baton binary (runs `baton __codex`)
+	HubURL    string // for drivers that file access requests (never put in the agent's own env)
+	HubToken  string
+}
+
+// SandboxPlan is how to start a sandboxed agent: argv, files to write into the run dir, and
+// extra environment for the process Baton starts (a driver; never forwarded to the agent's
+// commands).
+type SandboxPlan struct {
+	Argv  []string
+	Files map[string][]byte
+	Env   map[string]string
 }
 
 // ErrNoSandbox: this kind cannot be sandboxed on this platform.
@@ -30,7 +42,7 @@ var ErrNoSandbox = errors.New("cannot be sandboxed here")
 // Sandboxer is implemented by adapters that can run their agent inside the CLI's OS sandbox
 // (permissions.mode: sandboxed). Files are written into RunDir before the agent starts.
 type Sandboxer interface {
-	SandboxArgv(acct config.Account, model, effort string, sb Sandbox) (argv []string, files map[string][]byte, err error)
+	SandboxArgv(acct config.Account, model, effort string, sb Sandbox) (SandboxPlan, error)
 }
 
 func (sb Sandbox) denied() []string {
@@ -42,9 +54,9 @@ func (sb Sandbox) denied() []string {
 // ClaudeSandboxFile is the --settings file Baton writes into the run dir.
 const ClaudeSandboxFile = "claude-sandbox.json"
 
-func (c claude) SandboxArgv(acct config.Account, model, effort string, sb Sandbox) ([]string, map[string][]byte, error) {
+func (c claude) SandboxArgv(acct config.Account, model, effort string, sb Sandbox) (SandboxPlan, error) {
 	if sb.GOOS == "windows" {
-		return nil, nil, fmt.Errorf("claude %w: Claude Code's sandbox needs macOS, Linux or WSL2; set permissions.mode: permissive on account %s to run it unsandboxed", ErrNoSandbox, acct.ID)
+		return SandboxPlan{}, fmt.Errorf("claude %w: Claude Code's sandbox needs macOS, Linux or WSL2; set permissions.mode: permissive on account %s to run it unsandboxed", ErrNoSandbox, acct.ID)
 	}
 	write := append([]string{sb.Worktree, sb.RunDir}, sb.GitWrite...)
 	// Permission rules cannot re-allow inside a deny (deny always wins), and the worktree lives
@@ -70,13 +82,13 @@ func (c claude) SandboxArgv(acct config.Account, model, effort string, sb Sandbo
 	}
 	b, err := json.MarshalIndent(settings, "", "  ")
 	if err != nil {
-		return nil, nil, err
+		return SandboxPlan{}, err
 	}
 	argv := claudeBase(model, effort)
 	argv = append(argv, "--permission-mode", "acceptEdits", "--permission-prompts", "none",
 		"--settings", filepath.Join(sb.RunDir, ClaudeSandboxFile))
 	argv = append(argv, claudeToolFlags(acct.Permissions)...)
-	return append(argv, acct.Permissions.ExtraArgs...), map[string][]byte{ClaudeSandboxFile: b}, nil
+	return SandboxPlan{Argv: append(argv, acct.Permissions.ExtraArgs...), Files: map[string][]byte{ClaudeSandboxFile: b}}, nil
 }
 
 // ---- codex ----
@@ -84,10 +96,10 @@ func (c claude) SandboxArgv(acct config.Account, model, effort string, sb Sandbo
 // SandboxArgv runs codex with a named permissions profile: read everything but Baton's home
 // (and deny_read), write the worktree, the run dir and the git paths, no network, never ask
 // (a blocked action fails). On Windows it uses the mxc sandbox (deny-read needs it).
-func (codex) SandboxArgv(acct config.Account, model, effort string, sb Sandbox) ([]string, map[string][]byte, error) {
+func (codex) SandboxArgv(acct config.Account, model, effort string, sb Sandbox) (SandboxPlan, error) {
 	p := acct.Permissions
 	if len(p.AllowedTools) > 0 || len(p.DeniedTools) > 0 {
-		return nil, nil, errors.New("allowed_tools/denied_tools are claude-only")
+		return SandboxPlan{}, errors.New("allowed_tools/denied_tools are claude-only")
 	}
 	entries := []string{`":root"="read"`, `":workspace_roots"="write"`}
 	add := func(path, access string) error {
@@ -99,7 +111,7 @@ func (codex) SandboxArgv(acct config.Account, model, effort string, sb Sandbox) 
 	}
 	for _, w := range append([]string{sb.RunDir}, sb.GitWrite...) {
 		if err := add(w, "write"); err != nil {
-			return nil, nil, err
+			return SandboxPlan{}, err
 		}
 	}
 	// Deny the siblings on the way down to the worktree and run dir rather than Baton's whole
@@ -107,19 +119,35 @@ func (codex) SandboxArgv(acct config.Account, model, effort string, sb Sandbox) 
 	// in C:\ on Windows).
 	for _, d := range append(DenyAround(sb.BatonHome, []string{sb.Worktree, sb.RunDir}), sb.DenyRead...) {
 		if err := add(d, "deny"); err != nil {
-			return nil, nil, err
+			return SandboxPlan{}, err
 		}
 	}
-	argv := codexBase(model, effort)
+	var cfg []string // -c overrides, the same for exec and the app-server driver
 	if sb.GOOS == "windows" {
-		argv = append(argv, "-c", `windows.sandbox="mxc"`)
+		cfg = append(cfg, "-c", `windows.sandbox="mxc"`)
 	}
-	argv = append(argv, "-c", `default_permissions="baton"`,
-		"-c", "permissions.baton.filesystem={"+strings.Join(entries, ", ")+"}",
-		"-c", `approval_policy="never"`)
+	cfg = append(cfg, "-c", `default_permissions="baton"`,
+		"-c", "permissions.baton.filesystem={"+strings.Join(entries, ", ")+"}")
+	if p.Ask && sb.Driver != "" {
+		// baton __codex runs codex app-server and turns its approval requests into access
+		// requests the user decides in the dashboard (A20).
+		argv := []string{sb.Driver, "__codex"}
+		if model != "" && model != "default" {
+			argv = append(argv, "-c", "model="+tomlString(model))
+		}
+		if e := codexEffort(effort); e != "" {
+			argv = append(argv, "-c", "model_reasoning_effort="+tomlString(e))
+		}
+		argv = append(append(argv, cfg...), p.ExtraArgs...)
+		return SandboxPlan{Argv: argv, Env: map[string]string{"BATON_DRIVER_URL": sb.HubURL, "BATON_DRIVER_TOKEN": sb.HubToken}}, nil
+	}
+	argv := append(codexBase(model, effort), cfg...)
+	argv = append(argv, "-c", `approval_policy="never"`) // nobody to ask: a blocked action fails
 	argv = append(argv, p.ExtraArgs...)
-	return append(argv, "-"), nil, nil // brief on stdin
+	return SandboxPlan{Argv: append(argv, "-")}, nil // brief on stdin
 }
+
+func tomlString(s string) string { b, _ := json.Marshal(s); return string(b) }
 
 // DenyAround lists the entries under root that are not on the way to any of keep: walking from
 // root down to each kept path, every sibling at every level. Entries created later are not

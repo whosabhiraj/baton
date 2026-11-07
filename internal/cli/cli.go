@@ -14,6 +14,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/whosabhiraj/baton/internal/codexapp"
 )
 
 // Version is set at build time via -ldflags "-X github.com/whosabhiraj/baton/internal/cli.Version=...".
@@ -76,6 +78,10 @@ func need(v string, what string) (string, error) {
 func (c *ctx) dispatch(argv []string) (int, error) {
 	if len(argv) > 0 && argv[0] == "login" {
 		return c.cmdLogin(argv[1:]) // own flag parsing: --status here takes no value
+	}
+	if len(argv) > 0 && argv[0] == "__codex" { // hidden: the sandboxed codex driver; args go to codex
+		return codexapp.Run(codexapp.Options{Args: argv[1:], Stdin: c.stdin, Stdout: c.stdout, Stderr: c.stderr,
+			Getenv: c.getenv, Version: Version}), nil
 	}
 	o, pos, err := parseArgs(argv)
 	if err != nil {
