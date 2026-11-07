@@ -71,6 +71,7 @@ type Options struct {
 	ConductorEnv  map[string]string // extra conductor env (tests)
 	ConductorWake time.Duration     // auto-wake debounce; default 2s (tests)
 	IdleStop      time.Duration     // 0 = config hub.idle_stop_min (0 there = never); <0 = disabled; >0 overrides the config
+	GCInterval    time.Duration     // automatic worktree cleanup pass period; 0 = hourly, <0 = off (tests shorten it)
 }
 
 // Hub is a running hub.
@@ -88,6 +89,7 @@ type Hub struct {
 	srv       *http.Server
 	timeout   time.Duration // fixed heartbeat timeout (tests); 0 = from live config
 	idleStop  time.Duration
+	gcEvery   time.Duration
 	cfg       *config.Watcher
 	audit     *audit.Log
 	runs      *runs.Manager
@@ -160,7 +162,7 @@ func Start(ctx context.Context, o Options) (*Hub, error) {
 		return nil, fmt.Errorf("%w (%s)", ErrAlreadyRunning, dataDir)
 	}
 	h := &Hub{DataDir: dataDir, log: log, lock: lock, timeout: o.HeartbeatTimeout,
-		idleStop: o.IdleStop, stopCh: make(chan struct{}), done: make(chan struct{})}
+		idleStop: o.IdleStop, gcEvery: o.GCInterval, stopCh: make(chan struct{}), done: make(chan struct{})}
 	h.lastAdm.Store(time.Now().UnixNano())
 	fail := func(err error) (*Hub, error) {
 		h.cfg.Stop()
@@ -273,6 +275,10 @@ func Start(ctx context.Context, o Options) (*Hub, error) {
 	go h.detectStalls()
 	h.detWG.Add(1)
 	go h.watchIdle()
+	if h.runs != nil && h.gcEvery >= 0 {
+		h.detWG.Add(1)
+		go h.gcLoop()
+	}
 
 	go func() {
 		select {
@@ -388,6 +394,49 @@ func (h *Hub) detectStalls() {
 					r.CheckStalled(now, h.stallTimeout(r, &cfg))
 				}
 			}()
+		}
+	}
+}
+
+// gcLoop applies the worktree cleanup policy at start and then every gcEvery (default hourly).
+// Never forced: a worktree with uncommitted changes stays. Run folders are left to `baton gc`.
+func (h *Hub) gcLoop() {
+	defer h.detWG.Done()
+	every := h.gcEvery
+	if every == 0 {
+		every = time.Hour
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		select {
+		case <-h.stopCh:
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
+	pass := func() {
+		defer func() {
+			if p := recover(); p != nil {
+				h.log.Error("worktree cleanup panic", "panic", fmt.Sprint(p))
+			}
+		}()
+		rep := h.runs.GC(ctx, time.Now(), runs.GCOptions{PolicyOnly: true, Actor: audit.ActorHub, Audit: h.audit})
+		for _, it := range rep.Items {
+			if it.Skipped == "" {
+				h.log.Info("removed worktree", "run", it.RunID, "agent", it.AgentID, "reason", it.Reason)
+			}
+		}
+	}
+	pass()
+	t := time.NewTicker(every)
+	defer t.Stop()
+	for {
+		select {
+		case <-h.stopCh:
+			return
+		case <-t.C:
+			pass()
 		}
 	}
 }

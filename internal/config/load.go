@@ -53,9 +53,9 @@ func Defaults() Config {
 		Hub: Hub{
 			Port: 7777, Bind: "127.0.0.1", HeartbeatTimeoutS: 120, AskTimeoutS: 900,
 			PollIntervalS: 2, IdleStopMin: 30, OpenBrowser: true, Mode: ModePropose,
-			MaxAgentsAuto: 6,
-			Worktrees:     Worktrees{Cleanup: CleanupKeep, Days: 14},
-			Approvals:     Approvals{Merge: true, Spawn: false},
+			MaxAgentsAuto: 6, RunsKeepDays: 30,
+			Worktrees: Worktrees{Cleanup: CleanupKeep, Days: 14},
+			Approvals: Approvals{Merge: true, Spawn: false},
 		},
 		Conductor: Conductor{Model: "opus", Effort: "high", AutoWake: true},
 		Accounts:  []Account{},
@@ -517,6 +517,9 @@ func (b *builder) validate(root *yaml.Node, cfg *Config) {
 	}
 	if h.IdleStopMin < 0 {
 		bad("must be >= 0", "hub", "idle_stop_min")
+	}
+	if h.RunsKeepDays < 0 {
+		bad("must be >= 0", "hub", "runs_keep_days")
 	}
 	if h.MaxAgentsAuto < 0 {
 		bad("must be >= 0", "hub", "max_agents_auto")

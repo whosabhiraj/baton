@@ -199,3 +199,18 @@ func (s *Store) Create(c CreateOpts) (*Run, string, error) {
 	s.mu.Unlock()
 	return r, c.Token, nil
 }
+
+// Remove closes the run, forgets it and deletes its folder (events, inbox, run.json). The caller
+// must make sure it is ended; its token stops working. Unknown id: error.
+func (s *Store) Remove(id string) error {
+	s.mu.Lock()
+	r := s.runs[id]
+	if r == nil {
+		s.mu.Unlock()
+		return fmt.Errorf("store: no run %s", id)
+	}
+	delete(s.runs, id)
+	s.mu.Unlock()
+	_ = r.Close() // Windows cannot delete an open file
+	return os.RemoveAll(r.dir)
+}
