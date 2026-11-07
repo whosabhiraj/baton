@@ -124,7 +124,8 @@ func (a *api) decide(approve bool) http.HandlerFunc {
 		if prev, ok := a.Approvals.Get(r.PathValue("id")); ok && approve && prev.Kind == approvals.KindMerge &&
 			prev.Status == approvals.Pending && (a.Runs != nil || a.FakeMerges) {
 			if run := a.Store.Get(prev.RunID); run != nil && !run.Summary().Merged {
-				if _, perr := a.doMerge(r.Context(), actor, run); perr != nil {
+				head, _ := prev.Detail["head"].(string) // the tip that was reviewed (absent on older approvals)
+				if _, perr := a.doMerge(runs.WithHead(r.Context(), head), actor, run); perr != nil {
 					writeErr(w, perr)
 					return
 				}

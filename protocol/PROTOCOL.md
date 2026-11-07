@@ -342,7 +342,7 @@ decisions, `/api/stream`, `/api/hub/shutdown`, `/api/dev/runs`, token rotation. 
 pending one): `202 { ok, status:"pending", approval }`. A human request, or the gate off, merges now:
 `200 { ok, status:"merged", merge: { run_id, branch, base_branch, commit, already_merged, method } }`;
 already merged: `200 { ok, status:"merged", already_merged:true }`. Approving a merge approval runs the
-merge first; if it fails the approval **stays pending** and the approve call answers the error.
+merge first; if it fails the approval **stays pending** and the approve call answers the error. The approval `detail` carries `head` (the branch tip when requested): approving merges that commit, or refuses with `MERGE_BLOCKED` ("branch moved since review") if the branch has moved.
 Merge rules: always a merge commit (`--no-ff`); refused with `409 MERGE_BLOCKED` when the agent's
 worktree has uncommitted changes, the base is not a local branch, the base is checked out in another
 worktree, or the base is checked out in the project folder and that checkout has uncommitted changes
