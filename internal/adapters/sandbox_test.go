@@ -161,14 +161,15 @@ func TestCodexDriverArgv(t *testing.T) {
 	if plan.Argv[0] != "/bin/baton" || plan.Argv[1] != "__codex" || plan.Argv[len(plan.Argv)-1] != "--e" ||
 		!strings.Contains(line, `model="gpt-x"`) || !strings.Contains(line, `model_reasoning_effort="high"`) ||
 		!strings.Contains(line, `windows.sandbox="mxc"`) || !strings.Contains(line, `default_permissions="baton"`) ||
-		strings.Contains(line, "approval_policy") || strings.Contains(line, " exec ") || strings.Contains(line, " - ") {
+		strings.Contains(line, "approval_policy") || strings.Contains(line, " exec ") || strings.Contains(line, " - ") ||
+		!strings.Contains(line, "features.network_proxy=true -c permissions.baton.network={enabled=true}") {
 		t.Fatalf("driver argv: %s", line)
 	}
 	if plan.Env["BATON_DRIVER_URL"] != sb.HubURL || plan.Env["BATON_DRIVER_TOKEN"] != sb.HubToken {
 		t.Fatalf("driver env: %v", plan.Env)
 	}
 	sb.Driver = "" // no driver known: plain exec
-	if plan, _ := (codex{}).SandboxArgv(acct, "", "", sb); plan.Argv[0] != "codex" {
+	if plan, _ := (codex{}).SandboxArgv(acct, "", "", sb); plan.Argv[0] != "codex" || strings.Contains(strings.Join(plan.Argv, " "), "network") {
 		t.Fatalf("fallback: %v", plan.Argv)
 	}
 }

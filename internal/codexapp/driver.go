@@ -313,19 +313,24 @@ func (d *driver) serve(m rpcMsg) {
 	switch m.Method {
 	case "item/commandExecution/requestApproval":
 		detail := map[string]any{"command": adapters.UnwrapShell(str("command")), "cwd": str("cwd")}
-		if nc, ok := p["networkApprovalContext"].(map[string]any); ok {
-			for _, k := range []string{"host", "url", "domain"} {
-				if s, ok := nc[k].(string); ok && s != "" {
-					detail["network_host"] = s
-				}
-			}
-		}
 		summary := str("reason")
 		if summary == "" {
 			summary = "run outside the sandbox: " + str("command")
 		}
+		accept := "accept"
+		if nc, ok := p["networkApprovalContext"].(map[string]any); ok {
+			host, _ := nc["host"].(string)
+			detail["network_host"] = host
+			if proto, _ := nc["protocol"].(string); proto != "" {
+				detail["network_protocol"] = proto
+			}
+			if str("reason") == "" {
+				summary = "network access to " + host
+			}
+			accept = "acceptForSession" // the host stays open for the rest of this run
+		}
 		if d.ask("command", summary, detail) {
-			reply(map[string]any{"decision": "accept"})
+			reply(map[string]any{"decision": accept})
 		} else {
 			reply(map[string]any{"decision": "decline"})
 		}

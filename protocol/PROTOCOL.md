@@ -484,4 +484,7 @@ The codex driver (`baton __codex`, used for sandboxed codex accounts) runs `code
 notifications to stdout as JSONL for the codex parser, answers `item/commandExecution/requestApproval`,
 `item/fileChange/requestApproval` and `item/permissions/requestApproval` from the user's decision
 (timeout = the run's ask timeout, then declined), declines every other server request, and exits
-when the turn completes.
+when the turn completes. Its network goes through codex's managed proxy with an empty allowlist
+(`features.network_proxy`, `permissions.baton.network.enabled`): each new host asks
+(`networkApprovalContext`, detail `network_host`), and an approved host stays open for the rest of
+the run (`acceptForSession`).

@@ -94,8 +94,10 @@ func (c claude) SandboxArgv(acct config.Account, model, effort string, sb Sandbo
 // ---- codex ----
 
 // SandboxArgv runs codex with a named permissions profile: read everything but Baton's home
-// (and deny_read), write the worktree, the run dir and the git paths, no network, never ask
-// (a blocked action fails). On Windows it uses the mxc sandbox (deny-read needs it).
+// (and deny_read), write the worktree, the run dir and the git paths, no network. With
+// permissions.ask and a driver, blocked actions (network hosts included) become access
+// requests; otherwise it never asks (a blocked action fails). On Windows it uses the mxc
+// sandbox (deny-read needs it).
 func (codex) SandboxArgv(acct config.Account, model, effort string, sb Sandbox) (SandboxPlan, error) {
 	p := acct.Permissions
 	if len(p.AllowedTools) > 0 || len(p.DeniedTools) > 0 {
@@ -138,7 +140,11 @@ func (codex) SandboxArgv(acct config.Account, model, effort string, sb Sandbox) 
 		if e := codexEffort(effort); e != "" {
 			argv = append(argv, "-c", "model_reasoning_effort="+tomlString(e))
 		}
-		argv = append(append(argv, cfg...), p.ExtraArgs...)
+		// Network goes through codex's managed proxy with an empty allowlist: every host is
+		// blocked and asks (approved = open for the rest of the run). Without the feature,
+		// network.enabled alone opens everything.
+		argv = append(append(argv, cfg...), "-c", "features.network_proxy=true", "-c", "permissions.baton.network={enabled=true}")
+		argv = append(argv, p.ExtraArgs...)
 		return SandboxPlan{Argv: argv, Env: map[string]string{"BATON_DRIVER_URL": sb.HubURL, "BATON_DRIVER_TOKEN": sb.HubToken}}, nil
 	}
 	argv := append(codexBase(model, effort), cfg...)

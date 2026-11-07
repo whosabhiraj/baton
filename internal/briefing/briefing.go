@@ -34,7 +34,7 @@ type Data struct {
 }
 
 // SandboxNote tells a sandboxed agent what it can and cannot do.
-const SandboxNote = "You run in a sandbox: you can write only inside your worktree, there is no network, and some folders outside it cannot be read. Work with what is in the repo; if you need something outside (a package, a file, a site), say so with `baton ask` instead of trying to get around it. `baton` prints \"spooled (hub unreachable)\": that is expected here, your reports still arrive."
+const SandboxNote = "You run in a sandbox: you can write only inside your worktree, there is no network unless the user allows it, and some folders outside it cannot be read. Work with what is in the repo; if you need something outside (a package, a file, a site), say so with `baton ask` instead of trying to get around it. `baton` prints \"spooled (hub unreachable)\": that is expected here, your reports still arrive."
 
 type view struct {
 	Data

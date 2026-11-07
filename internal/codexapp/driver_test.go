@@ -51,8 +51,12 @@ func fakeAppServer() {
 			out.Encode(map[string]any{"method": "turn/started", "params": map[string]any{"brief": text,
 				"leak": os.Getenv(EnvToken) + os.Getenv("BATON_TOKEN") + os.Getenv(EnvURL)}})
 			out.Encode(map[string]any{"method": "item/started", "params": map[string]any{"item": map[string]any{"type": "commandExecution", "command": "curl x"}}})
-			out.Encode(map[string]any{"id": 99, "method": "item/commandExecution/requestApproval",
-				"params": map[string]any{"command": "curl https://example.com", "cwd": "/w", "reason": "needs network", "threadId": "th1", "turnId": "tu1", "itemId": "i1", "startedAtMs": 1}})
+			params := map[string]any{"command": "curl https://example.com", "cwd": "/w", "reason": "needs network", "threadId": "th1", "turnId": "tu1", "itemId": "i1", "startedAtMs": 1}
+			if os.Getenv("FAKE_NETWORK") == "1" { // a managed-proxy prompt: host, no reason
+				delete(params, "reason")
+				params["networkApprovalContext"] = map[string]any{"host": "example.com", "protocol": "https"}
+			}
+			out.Encode(map[string]any{"id": 99, "method": "item/commandExecution/requestApproval", "params": params})
 			out.Encode(map[string]any{"id": 98, "method": "item/tool/requestUserInput", "params": map[string]any{}})
 		default:
 			if method == "<nil>" && id != nil { // a response from the driver
@@ -140,6 +144,22 @@ func TestDriverApproved(t *testing.T) {
 	}
 	if d, _ := hub.created[0]["detail"].(map[string]any); d["command"] != "curl https://example.com" || d["reason"] != nil {
 		t.Fatalf("detail %+v", hub.created[0]["detail"])
+	}
+}
+
+func TestDriverNetworkHost(t *testing.T) {
+	t.Setenv("FAKE_NETWORK", "1")
+	hub := &fakeHub{decision: "approved"}
+	code, out, errs := runDriver(t, hub, 5*time.Second)
+	if code != 0 || !strings.Contains(out, `"decision":"acceptForSession"`) {
+		t.Fatalf("code %d: %s\n%s", code, errs, out)
+	}
+	d, _ := hub.created[0]["detail"].(map[string]any)
+	if hub.created[0]["summary"] != "network access to example.com" || d["network_host"] != "example.com" || d["network_protocol"] != "https" {
+		t.Fatalf("hub saw %+v", hub.created)
+	}
+	if _, out, _ := runDriver(t, &fakeHub{decision: "rejected"}, 5*time.Second); !strings.Contains(out, `"decision":"decline"`) {
+		t.Fatalf("rejected:\n%s", out)
 	}
 }
 
