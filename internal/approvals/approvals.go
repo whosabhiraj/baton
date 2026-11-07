@@ -23,6 +23,7 @@ const (
 	KindMerge  = "merge"
 	KindSpawn  = "spawn"
 	KindLineup = "lineup" // a team of agents proposed by the conductor (detail.agents)
+	KindAccess = "access" // a sandboxed agent asks for access it lacks (A20); approving has no hub effect
 
 	Pending  = "pending"
 	Approved = "approved"

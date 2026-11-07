@@ -122,6 +122,9 @@ func New(d Deps) http.Handler {
 	mux.HandleFunc("GET /api/config", a.route("GET", authAdminOrCond, a.getConfig))
 	mux.HandleFunc("PATCH /api/config", a.route("PATCH", authAdminOrCond, a.patchConfig))
 	mux.HandleFunc("/api/runs/{id}/kill", a.route("POST", authAdminOrCond, a.kill))
+	mux.HandleFunc("/api/runs/{id}/access", a.route("POST", authNone, a.accessCreate))
+	mux.HandleFunc("/api/runs/{id}/access/{aid}", a.route("GET", authNone, a.accessPoll))
+	mux.HandleFunc("/api/runs/{id}/access/{aid}/cancel", a.route("POST", authNone, a.accessCancel))
 	mux.HandleFunc("/api/approvals", a.route("GET", authAdminOrCond, a.listApprovals))
 	mux.HandleFunc("/api/approvals/{id}/approve", a.route("POST", authAdmin, a.decide(true)))
 	mux.HandleFunc("/api/approvals/{id}/reject", a.route("POST", authAdmin, a.decide(false)))
@@ -140,6 +143,7 @@ func New(d Deps) http.Handler {
 		writeErr(w, proto.NewError(proto.CodeNotFound, "no such route"))
 	})
 	mux.Handle("/", d.Dashboard)
+	a.watchRunEnds()
 	return a.recoverMW(a.hostGuard(mux))
 }
 
