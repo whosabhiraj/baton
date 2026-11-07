@@ -1,7 +1,8 @@
 # HANDOFF — read this first
 
-Last updated: **2026-11-07**, **Phases 5 and 6 done**, verified with real runs (codex check, first real
-conductor, two-account acceptance). Next: Phase 7 (hardening + release), decisions already in §E.
+Last updated: **2026-11-07**, **Phase 7 code done** (hardening + release): `baton gc`, conductor usage in
+account totals, error-path tests, `npm run release`, one full code review with its findings fixed.
+Waiting on the user: Windows CI log, and one design question (§E).
 
 Big change since Phase 0: the hub **and** the `baton` CLI are written in **Go** (one binary).
 `docs/GO_HUB_DESIGN.md` is approved and overrides `docs/PLAN.md` §3, §4.7, §5 and §6.
@@ -72,7 +73,7 @@ Things only you can do:
 | 4 Dashboard | ✅ done: list + panels, 3D rail-yard map, timeline + replay, phone layout; design iterated live with the user | `4b771b3` … `20f9bfe` |
 | 5 Adapters | ✅ done: supervisor, env allowlist, claude + codex (real runs ok), opencode + refusal, custom kinds, `baton login` (adds unknown ids) | `852719b` … `72e99ec` |
 | 6 Conductor | ✅ done: 6a conductor token, run/diff/merge/wait routes, real merges, `baton mcp`; 6b headless conductor (history, resume, auto-wake); 6c chat (Bubble Tea + dashboard sheet); 6d lineups. Acceptance passed on real accounts | `12da74f` … `b9cb6fe` |
-| 7 Hardening | pending | — |
+| 7 Hardening + release | code done: gc + cleanup policy enforced, conductor usage, error-path tests, release script, review fixes | `172cec5` … `93f6a83` |
 | 8 Remote access (future) | not planned yet | — |
 
 ## D. What exists right now
@@ -113,62 +114,28 @@ Runtime data: `~/.baton/projects/<repo-name>-<hash8>/` (override with `BATON_HOM
 brief.md, stdout.jsonl, stderr.log, supervisor.json, exit.json}`. Global config:
 `~/.baton/config.yaml`; per project: `<repo>/baton.config.yaml`.
 
-## E. Resume here (Phases 5-6 done; Phase 7 next, start when the user says go)
+## E. Resume here (Phase 7 code done; waiting on the user)
 
-Real runs (2026-11-07, throwaway repo): (1) codex: one task, steps/artifacts/done reported, usage
-parsed; (2) conductor: MCP tools visible (loaded through ToolSearch), `get_settings` etc. work,
-`--resume` after a hub restart keeps the conversation; (3) acceptance: lineup proposed and approved,
-claude + codex agents ran, a blocking question answered by the conductor, both diffs reviewed,
-two `--no-ff` merges approved, merged tests pass. Total ~$1.15 conductor + agents.
-Fixes from those runs: codex `input_tokens` includes cached tokens (now subtracted), cache writes
-parsed, shell wrapper stripped from activity, Baton's untracked AGENTS.md no longer blocks merges,
-conductor gets only Read/Grep/Glob/ToolSearch built-ins (`--tools`), no auto-wake for events the
-conductor already read (seen cursor from `/api/wait`), Linux/macOS CI path test fixed.
+Phase 7 (2026-11-07): 7a conductor usage counted in its account's totals (`conductor/usage.json`:
+claude's `result` lines carry session running totals that survive `--resume`); 7b `baton gc`
+(+ `POST /api/gc`, A19, `hub.runs_keep_days`, the worktree cleanup policy now runs hourly in the
+hub); 7c `*_errpaths_test.go` (every error code has a status test); 7d `npm run release`; 7e one
+code review. Fixed from it: spawn `kind` must match the account (subscription preflight could be
+bypassed); admin token no longer printed to `hub.out`, data dirs 0700 / logs 0600; no run tokens
+in spawn responses to the conductor, conductor history redacted, `bt_cond_` rule, envelope extras
+redacted; conductor wait after a restart starts where it last read; idle stop works with a
+conductor; merge approvals bound to the reviewed commit (`detail.head`); Unix kill always
+SIGKILLs the group; runs orphaned by a crash mid-spawn get an exit; history fanout order; conductor
+stdout read to EOF before Wait. Verified on Windows and Linux (WSL).
 
-Open small items: the conductor's own usage is not added to its account's usage totals; the claude
-adapter sometimes emits two identical `usage` events (harmless, latest wins); a Windows CI run
-failed once in `go test` (passes locally 3x; log needs a signed-in user).
-
-Phase 7 decisions (2026-11-07, answered ahead of time): `baton gc` removes worktrees the cleanup
-policy allows plus ended run folders older than N days (a setting); it lists what it would remove
-and asks (`--yes` skips), never touches live runs or unmerged branches without `--force`. Release:
-`npm run release` cross-compiles 6 targets with checksums into `dist/release`; a GitHub Releases
-workflow comes later (needs the token's `workflow` scope). Scope: make sure every error code and
-the redaction / OpenCode refusal / stalled paths have tests, then one code review of the whole
-codebase, fix the real bugs it finds.
-
-Phase 6 decisions (2026-11-07): conductor = Claude Code only, extensible; default `claude-a` /
-opus / high (config); Bubble Tea chat; REST + SSE (no WebSockets); merges = `--no-ff` merge commits,
-refused on conflict / uncommitted agent work / dirty base checkout (approval stays pending);
-conductor token limited (mode + account enabled only, never approvals); auto-wake nudges an idle
-conductor (`conductor.auto_wake`); conductor tools = Baton MCP + Read/Grep/Glob, everything else
-denied without a prompt; lineups: approval in user/propose mode, spawn now in auto, conductor
-spawns outside auto refused (LINEUP_REQUIRED). Working style from now on: continue sub-phase to
-sub-phase without asking; anything needing the user goes to `TODO.local.md`.
-
-Testing without quota: `baton mock` has a working (echo) conductor chat and proposes one lineup.
-Visual checks: headless Chrome over CDP (a plain `--screenshot` hangs on the SSE streams); the
-dashboard opens a sheet from the URL fragment (`#open=chat`, `#open=approvals`).
-
-API surface for the dashboard (PROTOCOL.md A11–A15):
-- `GET /api/state` (runs with status, plan, step_states, open_questions, usage; accounts with
-  used/max, rate_limited, usage totals; conductor state; pending approvals; config_ok/issues)
-  and `GET /api/stream` (SSE: `event: baton` = stored events, `event: hub` = notices
-  `config_reloaded | spool_warning | idle_stop | conductor | approval`; replay via Last-Event-ID).
-- Controls: `POST /api/runs/:id/{message,answer,plan_update,pause,resume,stop,kill}`,
-  `POST /api/spawn` (+ `dry_run`), `PATCH /api/accounts/:id`, `GET|PATCH /api/config`,
-  `GET /api/approvals`, `POST /api/approvals/:id/{approve,reject}`, `GET /api/audit`,
-  `GET /api/runs/:id/events?since=` (timeline/replay).
-- Answer body is `{"qid": "...", "text": "..."}`. Admin auth = `Authorization: Bearer <admin token>`
-  (SSE: `?token=`). Dev against `baton mock --speed 5` (no quota; data in `<BATON_HOME>/mock`);
-  `npm run dev:web` with `BATON_HUB_URL=<mock url>` for hot reload.
-
-Dashboard work: the design contract is a local, uncommitted file (`web/DESIGN.local.md`; if it is
-missing, follow the existing tokens in `web/src/style.css`). Verify visually against the mock (no
-quota), e.g. with a headless browser; keep the list view able to reach every action.
-
-Known small items: multi-field PATCH /api/accounts is not atomic; kill route answers 409
-RUN_ENDED (global mapping 410); mock hub data lives in `<BATON_HOME>/mock/data`.
+Open (ask the user):
+- Design: agents run permissive as the same OS user, so an agent can read `admin.token` (two
+  folders up from its run dir) and approve its own merge. Options: accept (document it), or keep
+  the admin token outside the data dir agents can reach / require a fresh human step for approvals.
+- Windows CI job fails in `go test` on recent pushes (Linux, macOS and local Windows pass); job
+  logs need a signed-in GitHub user.
+- Known small items: multi-field PATCH /api/accounts not atomic; kill answers 409 RUN_ENDED; claude
+  adapter may emit two identical `usage` events; gc removes an old run even with a pending approval.
 
 ## F. Decisions log (details in PLAN.md §4 and GO_HUB_DESIGN.md §0)
 
