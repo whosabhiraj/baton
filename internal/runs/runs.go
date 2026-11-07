@@ -336,12 +336,14 @@ func (m *Manager) Spawn(ctx context.Context, req SpawnRequest) (*SpawnResult, *p
 	if e != nil {
 		return nil, e
 	}
-	kind := req.Kind
-	if kind == "" {
-		kind = acc.Kind
-	}
+	kind := acc.Kind
 	if kind == "" {
 		kind = "generic"
+	}
+	// The account's credentials and isolation env belong to its own kind; running another kind
+	// with them could use the user's global login (never on a Claude subscription).
+	if req.Kind != "" && req.Kind != kind {
+		return nil, perr(proto.CodeInvalidPayload, "kind %q does not match account %q (kind %q); pick an account of that kind instead of overriding it", req.Kind, acc.ID, kind)
 	}
 	seq := m.peekSeq() + 1
 	agentID := fmt.Sprintf("%s-%s-%04d", kindPrefix(kind), accountPart(acc.ID), seq)

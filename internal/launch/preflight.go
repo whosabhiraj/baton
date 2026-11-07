@@ -28,8 +28,14 @@ var subscriptionEnv = []string{"CLAUDE_CODE_OAUTH_TOKEN", "CLAUDE_CODE_OAUTH_REF
 // forbid_claude_subscription account never run on a Claude subscription). Decisions use only
 // the structure of the credentials (provider name and type); values are never read into
 // messages or logs.
-func preflight(acct *config.Account, _ runs.SpawnResult) error {
-	if acct == nil || (acct.Kind != "opencode" && !acct.ForbidClaudeSubscription) {
+func preflight(acct *config.Account, res runs.SpawnResult) error {
+	if acct == nil {
+		return nil
+	}
+	if res.Kind != "" && res.Kind != acct.Kind && !(res.Kind == "generic" && acct.Kind == "") {
+		return fmt.Errorf("refusing to start account %q: run kind %q does not match the account's kind %q", acct.ID, res.Kind, acct.Kind)
+	}
+	if acct.Kind != "opencode" && !acct.ForbidClaudeSubscription {
 		return nil
 	}
 	env := envMap(proc.BuildEnv(nil, acct.Env, nil))
