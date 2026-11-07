@@ -14,6 +14,7 @@ import (
 	"github.com/whosabhiraj/baton/internal/config"
 	"github.com/whosabhiraj/baton/internal/proto"
 	"github.com/whosabhiraj/baton/internal/runs"
+	"github.com/whosabhiraj/baton/internal/store"
 )
 
 // ActorHeader names who is calling an admin route: "human" (default) or "conductor".
@@ -283,18 +284,52 @@ func (a *api) patchFields(w http.ResponseWriter, r *http.Request, action, target
 		vals[k] = v
 	}
 	sort.Strings(fields)
+	// All or nothing: if a later field is refused, the files go back to how they were.
+	a.patchMu.Lock()
+	defer a.patchMu.Unlock()
+	start := a.Config.Current()
+	orig := map[string][]byte{}
+	for _, p := range []string{start.GlobalPath, start.ProjectPath} {
+		if p != "" {
+			orig[p] = fileBytes(p)
+		}
+	}
+	type change struct{ field, file string }
+	var done []change
 	for _, f := range fields {
 		snap := a.Config.Current()
 		before := map[string][]byte{snap.GlobalPath: fileBytes(snap.GlobalPath), snap.ProjectPath: fileBytes(snap.ProjectPath)}
 		if err := set(snap, f, vals[f]); err != nil {
+			restoreFiles(orig)
 			a.Config.Reload()
 			configInvalid(w, err)
 			return false
 		}
-		a.recordReq(r, action, target, map[string]any{"field": f, "value": vals[f], "file": changedFile(snap, before)})
+		done = append(done, change{f, changedFile(snap, before)})
 		a.Config.Reload() // later fields must see this write
 	}
+	for _, c := range done {
+		a.recordReq(r, action, target, map[string]any{"field": c.field, "value": vals[c.field], "file": c.file})
+	}
 	return true
+}
+
+// restoreFiles puts config files back to the given contents (nil = the file did not exist).
+func restoreFiles(orig map[string][]byte) {
+	for p, b := range orig {
+		if bytes.Equal(fileBytes(p), b) {
+			continue
+		}
+		if b == nil {
+			_ = os.Remove(p)
+			continue
+		}
+		mode := os.FileMode(0o600)
+		if fi, err := os.Stat(p); err == nil {
+			mode = fi.Mode().Perm()
+		}
+		_ = store.WriteFileAtomic(p, b, mode)
+	}
 }
 
 func (a *api) patchAccount(w http.ResponseWriter, r *http.Request) {

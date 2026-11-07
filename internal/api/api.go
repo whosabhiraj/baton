@@ -79,6 +79,7 @@ type api struct {
 	Deps
 	adminHash [32]byte
 	lineupMu  sync.Mutex // one lineup approval spawns at a time
+	patchMu   sync.Mutex // one config PATCH at a time (rollback on failure)
 }
 
 // New builds the hub's http.Handler.

@@ -351,6 +351,17 @@ func TestP2PatchAccountAndHubConfig(t *testing.T) {
 	if st != 400 || m["code"] != "CONFIG_INVALID" {
 		t.Fatalf("invalid patch: %d %v", st, m)
 	}
+	// all or nothing: "enabled" (applied first) is rolled back when "max_concurrent" is refused
+	before, _ := os.ReadFile(e.cfg)
+	if st, m = e.obj(t, "PATCH", "/api/accounts/a1", map[string]any{"enabled": false, "max_concurrent": -3}); st != 400 || m["code"] != "CONFIG_INVALID" {
+		t.Fatalf("mixed patch: %d %v", st, m)
+	}
+	if after, _ := os.ReadFile(e.cfg); string(after) != string(before) {
+		t.Fatalf("mixed patch left a partial write:\n%s", after)
+	}
+	if a := e.account(t, "a1"); a["enabled"] != true {
+		t.Fatalf("a1 after refused mixed patch: %v", a)
+	}
 	if st, m = e.obj(t, "PATCH", "/api/accounts/a1", map[string]any{"nope": 1}); st != 400 || m["code"] != "CONFIG_INVALID" {
 		t.Fatalf("unknown field: %d %v", st, m)
 	}
