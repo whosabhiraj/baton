@@ -162,7 +162,8 @@ func TestCodexDriverArgv(t *testing.T) {
 		!strings.Contains(line, `model="gpt-x"`) || !strings.Contains(line, `model_reasoning_effort="high"`) ||
 		!strings.Contains(line, `windows.sandbox="mxc"`) || !strings.Contains(line, `default_permissions="baton"`) ||
 		strings.Contains(line, "approval_policy") || strings.Contains(line, " exec ") || strings.Contains(line, " - ") ||
-		!strings.Contains(line, "features.network_proxy=true -c permissions.baton.network={enabled=true}") {
+		!strings.Contains(line, "features.exec_permission_approvals=true -c features.request_permissions_tool=true") ||
+		strings.Contains(line, "network") {
 		t.Fatalf("driver argv: %s", line)
 	}
 	if plan.Env["BATON_DRIVER_URL"] != sb.HubURL || plan.Env["BATON_DRIVER_TOKEN"] != sb.HubToken {

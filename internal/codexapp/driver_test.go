@@ -52,6 +52,10 @@ func fakeAppServer() {
 				"leak": os.Getenv(EnvToken) + os.Getenv("BATON_TOKEN") + os.Getenv(EnvURL)}})
 			out.Encode(map[string]any{"method": "item/started", "params": map[string]any{"item": map[string]any{"type": "commandExecution", "command": "curl x"}}})
 			params := map[string]any{"command": "curl https://example.com", "cwd": "/w", "reason": "needs network", "threadId": "th1", "turnId": "tu1", "itemId": "i1", "startedAtMs": 1}
+			if os.Getenv("FAKE_EXTRA") == "1" { // a command asking for extra permissions, no reason
+				delete(params, "reason")
+				params["additionalPermissions"] = map[string]any{"network": map[string]any{"enabled": true}}
+			}
 			if os.Getenv("FAKE_NETWORK") == "1" { // a managed-proxy prompt: host, no reason
 				delete(params, "reason")
 				params["networkApprovalContext"] = map[string]any{"host": "example.com", "protocol": "https"}
@@ -160,6 +164,18 @@ func TestDriverNetworkHost(t *testing.T) {
 	}
 	if _, out, _ := runDriver(t, &fakeHub{decision: "rejected"}, 5*time.Second); !strings.Contains(out, `"decision":"decline"`) {
 		t.Fatalf("rejected:\n%s", out)
+	}
+}
+
+func TestDriverExtraPermissions(t *testing.T) {
+	t.Setenv("FAKE_EXTRA", "1")
+	hub := &fakeHub{decision: "approved"}
+	if code, out, errs := runDriver(t, hub, 5*time.Second); code != 0 || !strings.Contains(out, `"decision":"accept"`) {
+		t.Fatalf("code %d: %s %s", code, errs, out)
+	}
+	d, _ := hub.created[0]["detail"].(map[string]any)
+	if hub.created[0]["summary"] != "run with network access: curl https://example.com" || d["permissions"] != "network access" {
+		t.Fatalf("hub saw %+v", hub.created)
 	}
 }
 

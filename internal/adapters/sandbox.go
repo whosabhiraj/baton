@@ -140,10 +140,10 @@ func (codex) SandboxArgv(acct config.Account, model, effort string, sb Sandbox) 
 		if e := codexEffort(effort); e != "" {
 			argv = append(argv, "-c", "model_reasoning_effort="+tomlString(e))
 		}
-		// Network goes through codex's managed proxy with an empty allowlist: every host is
-		// blocked and asks (approved = open for the rest of the run). Without the feature,
-		// network.enabled alone opens everything.
-		argv = append(append(argv, cfg...), "-c", "features.network_proxy=true", "-c", "permissions.baton.network={enabled=true}")
+		// A blocked command may ask for extra permissions (network, paths) with its approval, or
+		// through the request_permissions tool; both become access requests. Both features are
+		// experimental in codex. The profile itself has no network section: no network.
+		argv = append(append(argv, cfg...), "-c", "features.exec_permission_approvals=true", "-c", "features.request_permissions_tool=true")
 		argv = append(argv, p.ExtraArgs...)
 		return SandboxPlan{Argv: argv, Env: map[string]string{"BATON_DRIVER_URL": sb.HubURL, "BATON_DRIVER_TOKEN": sb.HubToken}}, nil
 	}

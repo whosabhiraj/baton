@@ -173,7 +173,9 @@ func childEnv(env []string) []string {
 
 // start: initialize, initialized, thread/start, turn/start.
 func (d *driver) start(brief string) error {
-	if _, err := d.call("initialize", map[string]any{"clientInfo": map[string]any{"name": "baton", "title": "Baton", "version": d.o.Version}}); err != nil {
+	// experimentalApi: command approvals carry additionalPermissions (network, paths).
+	if _, err := d.call("initialize", map[string]any{"clientInfo": map[string]any{"name": "baton", "title": "Baton", "version": d.o.Version},
+		"capabilities": map[string]any{"experimentalApi": true}}); err != nil {
 		return fmt.Errorf("initialize: %w", err)
 	}
 	if err := d.send(map[string]any{"method": "initialized"}); err != nil {
@@ -318,6 +320,13 @@ func (d *driver) serve(m rpcMsg) {
 			summary = "run outside the sandbox: " + str("command")
 		}
 		accept := "accept"
+		if ap, ok := p["additionalPermissions"].(map[string]any); ok {
+			perms := describePermissions(ap)
+			detail["permissions"] = perms
+			if str("reason") == "" {
+				summary = "run with " + perms + ": " + adapters.UnwrapShell(str("command"))
+			}
+		}
 		if nc, ok := p["networkApprovalContext"].(map[string]any); ok {
 			host, _ := nc["host"].(string)
 			detail["network_host"] = host
@@ -353,7 +362,7 @@ func (d *driver) serve(m rpcMsg) {
 		}
 		detail := map[string]any{"reason": str("reason"), "cwd": str("cwd"), "permissions": describePermissions(perms)}
 		if d.ask("permissions", summary, detail) {
-			reply(map[string]any{"permissions": perms, "scope": "turn"})
+			reply(map[string]any{"permissions": perms, "scope": "session"}) // the rest of this run
 		} else {
 			reply(map[string]any{"permissions": map[string]any{}, "scope": "turn"})
 		}
