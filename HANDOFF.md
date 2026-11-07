@@ -177,6 +177,12 @@ Open (ask the user):
 - 2026-11-07: Phase 6b-6d: headless conductor with history/resume/auto-wake, Bubble Tea and
   dashboard chat, lineups (propose -> approve, editable -> spawn); conductor read-only + MCP tools.
 
+- 2026-11-07: Phase 7: `baton gc` = worktrees the cleanup policy allows + ended run folders older
+  than `hub.runs_keep_days` (30); dry list, asks (`--yes`), never live runs, uncommitted worktrees
+  only with `--force`, branches never deleted. Release = local `npm run release` (GitHub Releases
+  workflow later, needs the `workflow` token scope). Hardening = error-path tests + one code review.
+  The conductor's own usage counts toward its account's totals.
+
 ## G. Privacy rule for this repo (public)
 
 Never commit the user's name, email, local paths, folder layout, OS/machine details, or which
