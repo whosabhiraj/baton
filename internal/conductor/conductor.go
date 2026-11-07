@@ -28,6 +28,7 @@ import (
 	"github.com/whosabhiraj/baton/internal/ids"
 	"github.com/whosabhiraj/baton/internal/proc"
 	"github.com/whosabhiraj/baton/internal/proto"
+	"github.com/whosabhiraj/baton/internal/redact"
 	"github.com/whosabhiraj/baton/internal/store"
 )
 
@@ -268,6 +269,18 @@ func countLines(p string) (int, error) {
 // ---- history ----
 
 func (m *Manager) record(e Entry) {
+	// Tool results can carry secrets (tokens, keys an agent printed); history is kept on disk
+	// and served to the dashboard, so redact like run events. Msg is decoded first: text rules
+	// on raw JSON could break its escaping.
+	e.Text = redact.String(e.Text)
+	if len(e.Msg) > 0 {
+		var v any
+		if json.Unmarshal(e.Msg, &v) == nil {
+			if b, err := json.Marshal(redact.Value(v)); err == nil {
+				e.Msg = b
+			}
+		}
+	}
 	m.histMu.Lock()
 	m.histN++
 	e.N = m.histN
@@ -278,8 +291,8 @@ func (m *Manager) record(e Entry) {
 	if _, err := m.hist.Write(append(b, '\n')); err != nil {
 		m.log.Warn("conductor history write failed", "err", err)
 	}
+	m.fanout(Update{Entry: &e}) // under histMu: subscribers must see entries in N order
 	m.histMu.Unlock()
-	m.fanout(Update{Entry: &e})
 	if m.o.OnEntry != nil {
 		m.o.OnEntry(e)
 	}

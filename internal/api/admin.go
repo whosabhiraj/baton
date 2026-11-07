@@ -164,6 +164,14 @@ func (a *api) spawn(w http.ResponseWriter, r *http.Request) {
 	if !a.launch(w, res) {
 		return
 	}
+	if isConductorReq(r) {
+		// The agent gets its env (with its run token) from the launcher. The conductor never needs
+		// it, and whatever the conductor sees ends up in its history and transcript.
+		out := *res
+		out.Env = nil
+		writeJSON(w, 200, &out)
+		return
+	}
 	writeJSON(w, 200, res)
 }
 

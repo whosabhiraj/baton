@@ -125,7 +125,7 @@ accounts:
 func TestErrPathsMergeConflictAndBlockedOverHTTP(t *testing.T) {
 	h, repo := epRepoHub(t, epMergeCfg)
 	tok := h.MintConductorToken()
-	r := spawnAndCommit(t, h, tok, "clash.txt")
+	r := spawnAndCommit(t, h, "tok", "clash.txt") // admin: the conductor never sees run tokens
 	rid := r["run_id"].(string)
 	run := map[string]any{"run_id": rid, "agent_id": r["agent_id"], "token": r["env"].(map[string]any)["BATON_TOKEN"]}
 	ingest(t, h, run, "done", "d1", `{"status":"success","summary":"ok"}`)

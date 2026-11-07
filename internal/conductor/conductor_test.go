@@ -387,3 +387,25 @@ func TestUsage(t *testing.T) {
 		t.Fatalf("after restart: %v", got)
 	}
 }
+
+// TestHistoryRedacted: secrets never reach history.jsonl, neither in the human's text nor in
+// the CLI's output lines (the fake echoes the message back in an assistant line).
+func TestHistoryRedacted(t *testing.T) {
+	f := newFixture(t)
+	m := f.manager()
+	m.Start()
+	waitFor(t, "running", func() bool { return m.Info().Running })
+	secret := "bt_run_abcdefghijklmnop"
+	if err := m.Send("token is "+secret, "human"); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "reply", func() bool { return hasOut(m, "echo: token is") && m.State().State == StateIdle })
+	m.Close()
+	b, err := os.ReadFile(filepath.Join(m.dir, HistoryFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(b), secret) || !strings.Contains(string(b), "bt_run_[REDACTED]") {
+		t.Fatalf("history not redacted:\n%s", b)
+	}
+}

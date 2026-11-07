@@ -75,6 +75,9 @@ func TestConductorTokenLimits(t *testing.T) {
 	if st != 200 {
 		t.Fatal(st, r)
 	}
+	if _, leaked := r["env"]; leaked {
+		t.Fatal("spawn response to the conductor must not carry the agent env (run token)")
+	}
 	run := h.Store().Get(r["run_id"].(string))
 	if run.Record().Actor != "conductor" {
 		t.Fatal(run.Record().Actor)
@@ -226,7 +229,7 @@ func TestMergeThroughApproval(t *testing.T) {
 	_, w := call(t, h, "GET", "/api/wait?timeout_s=0", tok, "")
 	cur := w["cursor"].(interface{ String() string }).String()
 
-	r := spawnAndCommit(t, h, tok, "feature.txt")
+	r := spawnAndCommit(t, h, "tok", "feature.txt") // admin: the conductor never sees run tokens
 	rid := r["run_id"].(string)
 	run := map[string]any{"run_id": rid, "agent_id": r["agent_id"], "token": r["env"].(map[string]any)["BATON_TOKEN"]}
 
