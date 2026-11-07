@@ -114,14 +114,19 @@ Runtime data: `~/.baton/projects/<repo-name>-<hash8>/` (override with `BATON_HOM
 brief.md, stdout.jsonl, stderr.log, supervisor.json, exit.json}`. Global config:
 `~/.baton/config.yaml`; per project: `<repo>/baton.config.yaml`.
 
-## E. Resume here (Phase 7 code done; sandbox part 4 has one open problem)
+## E. Resume here (Phase 7 code done; sandbox part 4 done and verified)
 
-OPEN (2026-11-07): real run of part 4: the access request reached the dashboard, was approved,
-codex got `accept` for a `require_escalated` command, but the command still had no network
-(Windows, mxc sandbox + `default_permissions` profile). Next: find how to grant network on
-approval (try `acceptForSession`, the network-policy-amendment decision, a
-`permissions.baton.network` entry, or `item/permissions/requestApproval` with granular
-`request_permissions`); each try is a small real run (ask first). Stop any leftover test hub.
+Sandbox part 4, network on approval (2026-11-07), SOLVED (`8d313bb`): `baton __codex` opts into
+codex's experimental app-server API (`capabilities.experimentalApi`) and turns on
+`features.exec_permission_approvals` + `features.request_permissions_tool` (both "under
+development" in codex 0.167). A blocked agent asks for network with a permissions request, the user
+approves it in the dashboard, and the grant holds for the rest of the run (scope `session`). Real run
+on Windows/mxc: approved, curl exit 0, task committed. What did NOT work (do not retry): approving a
+`require_escalated` command (still sandboxed under mxc, no network); codex's managed network proxy
+(`features.network_proxy` + `permissions.<p>.network`) hard-denies hosts not on its allowlist and
+never asks (host prompts look admin-only, `requirements.toml`); `network.enabled` without that
+feature opens all network. Risk: both features are experimental and may change with codex
+updates. Approval is network-wide (any host), not per host.
 
 
 Phase 7 (2026-11-07): 7a conductor usage counted in its account's totals (`conductor/usage.json`:
@@ -148,7 +153,7 @@ Open (ask the user):
   detail). Claude: `--settings` sandbox file (macOS/Linux/WSL2; refuses on native Windows, config
   note). Agents get no hub URL/token (spool). (2) Claude access approvals via
   `--permission-prompts host --permission-prompt-tool` (an agent MCP tool -> Baton approval).
-  (3) `runtime: wsl` for Claude on Windows (not started). (4) DONE in code: `baton __codex` driver over the app-server
+  (3) `runtime: wsl` for Claude on Windows (not started). (4) DONE + verified (network grant, see top of §E): `baton __codex` driver over the app-server
   (`codex app-server generate-json-schema`: CommandExecutionRequestApproval, FileChange...,
   network policy amendments). The user's Claude accounts are set to permissive for now.
 - Windows CI: two timing flakes found from the job log and fixed (`d476bf2`).
