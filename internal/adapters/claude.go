@@ -2,6 +2,7 @@ package adapters
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -11,6 +12,16 @@ import (
 type claude struct{}
 
 func (claude) Argv(acct config.Account, model, effort string) ([]string, error) {
+	if acct.Permissions.Mode == config.ModeSandboxed {
+		return nil, errors.New("sandboxed mode needs SandboxArgv")
+	}
+	argv := claudeBase(model, effort)
+	argv = append(argv, permissionFlags(acct.Permissions)...)
+	argv = append(argv, claudeToolFlags(acct.Permissions)...)
+	return append(argv, acct.Permissions.ExtraArgs...), nil
+}
+
+func claudeBase(model, effort string) []string {
 	argv := []string{"claude", "-p", "--output-format", "stream-json", "--verbose"}
 	if model != "" && model != "default" {
 		argv = append(argv, "--model", model)
@@ -18,15 +29,18 @@ func (claude) Argv(acct config.Account, model, effort string) ([]string, error) 
 	if effort != "" {
 		argv = append(argv, "--effort", effort)
 	}
-	p := acct.Permissions
-	argv = append(argv, permissionFlags(p)...)
+	return argv
+}
+
+func claudeToolFlags(p config.Permissions) []string {
+	var out []string
 	if len(p.AllowedTools) > 0 {
-		argv = append(argv, "--allowedTools", strings.Join(p.AllowedTools, ","))
+		out = append(out, "--allowedTools", strings.Join(p.AllowedTools, ","))
 	}
 	if len(p.DeniedTools) > 0 {
-		argv = append(argv, "--disallowedTools", strings.Join(p.DeniedTools, ","))
+		out = append(out, "--disallowedTools", strings.Join(p.DeniedTools, ","))
 	}
-	return append(argv, p.ExtraArgs...), nil
+	return out
 }
 
 func (claude) Parser() Parser { return newClaudeParser() }

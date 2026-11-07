@@ -86,7 +86,7 @@ accounts:
 	}
 	a, _ := s.Config.Account("a")
 	b, _ := s.Config.Account("b")
-	if !a.Enabled || a.MaxConcurrent != 1 || a.Permissions.Mode != "permissive" {
+	if !a.Enabled || a.MaxConcurrent != 1 || a.Permissions.Mode != ModeSandboxed {
 		t.Fatalf("a %+v", a)
 	}
 	if b.Enabled || b.MaxConcurrent != 4 {
@@ -519,6 +519,9 @@ func TestSetHubField(t *testing.T) {
 }
 
 func TestExampleYAML(t *testing.T) {
+	old := hostOS
+	hostOS = "linux" // the example must be clean; the native-Windows note is tested separately
+	t.Cleanup(func() { hostOS = old })
 	path := filepath.Join("..", "..", "baton.config.example.yaml")
 	s := Load(path, "")
 	for _, i := range s.Issues {
@@ -562,5 +565,46 @@ func TestWatchReloadNow(t *testing.T) {
 	}
 	if s := w.Reload(); s.Version != 2 || calls.Load() != 1 {
 		t.Fatal("second reload must be a no-op")
+	}
+}
+
+// TestSandboxedClaudeOnWindowsNote: a sandboxed claude account on native Windows loads (it is
+// only a note), and an explicit permissive one has no note; deny_read expands ~.
+func TestSandboxedClaudeOnWindowsNote(t *testing.T) {
+	old := hostOS
+	t.Cleanup(func() { hostOS = old })
+	gp := filepath.Join(t.TempDir(), "g.yaml")
+	os.WriteFile(gp, []byte(`accounts:
+  - id: c
+    kind: claude
+    permissions: { deny_read: ["~/secrets"] }
+  - id: p
+    kind: claude
+    permissions: { mode: permissive }
+  - id: x
+    kind: codex
+`), 0o600)
+	for _, goos := range []string{"windows", "linux"} {
+		hostOS = goos
+		s := Load(gp, "")
+		if !s.OK() {
+			t.Fatalf("%s: %+v", goos, s.Issues)
+		}
+		var notes []string
+		for _, i := range s.Issues {
+			notes = append(notes, i.Path)
+		}
+		want := 0
+		if goos == "windows" {
+			want = 1
+		}
+		if len(notes) != want || (want == 1 && notes[0] != "accounts[0].permissions.mode") {
+			t.Fatalf("%s: %v", goos, notes)
+		}
+		c, _ := s.Config.Account("c")
+		home, _ := os.UserHomeDir()
+		if c.Permissions.Mode != ModeSandboxed || c.Permissions.DenyRead[0] != filepath.Join(home, "secrets") {
+			t.Fatalf("%+v", c.Permissions)
+		}
 	}
 }

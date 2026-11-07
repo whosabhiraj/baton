@@ -29,7 +29,12 @@ type Data struct {
 	KindNotes string
 	// ExtraNote is appended to the kind notes (e.g. "AGENTS.md already existed").
 	ExtraNote string
+	// Sandboxed adds the sandbox rules (permissions.mode: sandboxed).
+	Sandboxed bool
 }
+
+// SandboxNote tells a sandboxed agent what it can and cannot do.
+const SandboxNote = "You run in a sandbox: you can write only inside your worktree, there is no network, and some folders outside it cannot be read. Work with what is in the repo; if you need something outside (a package, a file, a site), say so with `baton ask` instead of trying to get around it. `baton` prints \"spooled (hub unreachable)\": that is expected here, your reports still arrive."
 
 type view struct {
 	Data
@@ -84,6 +89,9 @@ func Render(d Data) (string, error) {
 	}
 	if d.ExtraNote != "" {
 		notes += "\n" + d.ExtraNote
+	}
+	if d.Sandboxed {
+		notes += "\n" + SandboxNote
 	}
 	d.KindNotes = strings.TrimSpace(notes)
 	v := view{Data: d,

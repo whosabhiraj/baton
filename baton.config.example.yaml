@@ -45,8 +45,15 @@ accounts:
     roles: [conductor, planner, reviewer]
     max_concurrent: 2        # default 1
     enabled: true            # default true
-    permissions:             # workers run unattended, so they are fully permissive by default
-      mode: permissive       # permissive (default) | acceptEdits | default (the CLI's own prompts)
+    permissions:
+      # sandboxed (default): the agent writes only to its worktree and run folder, cannot read
+      #   ~/.baton (logins, tokens, other runs) or deny_read, and has no network.
+      #   claude: macOS, Linux and WSL2 only (on native Windows it refuses to start).
+      #   codex: its own sandbox (on Windows the mxc one; no admin setup needed).
+      # permissive: no checks at all; the agent can do anything you can.
+      # acceptEdits | default: the CLI's own prompts, which nobody answers in a headless run.
+      mode: sandboxed
+      deny_read: [~/.ssh, ~/.aws]   # extra paths sandboxed agents may not read
       allowed_tools: []
       denied_tools: []
       extra_args: []

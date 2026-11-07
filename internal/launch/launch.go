@@ -12,11 +12,15 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/whosabhiraj/baton/internal/adapters"
 	"github.com/whosabhiraj/baton/internal/config"
+	"github.com/whosabhiraj/baton/internal/gitx"
+	"github.com/whosabhiraj/baton/internal/paths"
 	"github.com/whosabhiraj/baton/internal/proc"
 	"github.com/whosabhiraj/baton/internal/proto"
 	"github.com/whosabhiraj/baton/internal/runs"
@@ -119,7 +123,17 @@ func (l *Launcher) Start(res runs.SpawnResult) error {
 	if err != nil {
 		return err
 	}
-	argv, err := ad.Argv(*acct, res.Model, run.Record().Effort)
+	runDir, err := filepath.Abs(res.RunDir)
+	if err != nil {
+		return err
+	}
+	sandboxed := acct.Permissions.Mode == config.ModeSandboxed
+	var argv []string
+	if sandboxed {
+		argv, err = l.sandboxArgv(ad, *acct, res, run.Record().Effort, runDir)
+	} else {
+		argv, err = ad.Argv(*acct, res.Model, run.Record().Effort)
+	}
 	if err != nil {
 		return err
 	}
@@ -136,12 +150,14 @@ func (l *Launcher) Start(res runs.SpawnResult) error {
 	for k, v := range res.Env {
 		batonEnv[k] = v
 	}
+	if sandboxed {
+		// No network in the sandbox: `baton` writes to the run dir's spool and reads the inbox
+		// from files, so the agent needs neither the hub's URL nor a token.
+		delete(batonEnv, "BATON_URL")
+		delete(batonEnv, "BATON_TOKEN")
+	}
 	env := proc.PrependPath(proc.BuildEnv(nil, acctEnv, batonEnv), filepath.Dir(l.o.Exe))
 
-	runDir, err := filepath.Abs(res.RunDir)
-	if err != nil {
-		return err
-	}
 	brief := filepath.Join(runDir, briefFile)
 	if err := os.WriteFile(brief, []byte(res.Brief), 0o644); err != nil {
 		return fmt.Errorf("write brief: %w", err)
@@ -152,6 +168,59 @@ func (l *Launcher) Start(res runs.SpawnResult) error {
 	}
 	l.watch(run, ad)
 	return nil
+}
+
+// sandboxArgv builds a sandboxed command line (permissions.mode: sandboxed) and writes the
+// files it needs into the run dir.
+func (l *Launcher) sandboxArgv(ad adapters.Adapter, acct config.Account, res runs.SpawnResult, effort, runDir string) ([]string, error) {
+	sbx, ok := ad.(adapters.Sandboxer)
+	if !ok {
+		return nil, fmt.Errorf("%s agents cannot be sandboxed; set permissions.mode: permissive on account %s to run them unsandboxed", res.Kind, acct.ID)
+	}
+	wt, err := filepath.Abs(res.Worktree)
+	if err != nil {
+		return nil, err
+	}
+	gitWrite, err := gitWritePaths(wt, res.Branch)
+	if err != nil {
+		return nil, fmt.Errorf("sandbox: %w", err)
+	}
+	argv, files, err := sbx.SandboxArgv(acct, res.Model, effort, adapters.Sandbox{Worktree: wt, RunDir: runDir,
+		GitWrite: gitWrite, BatonHome: paths.BatonHome(), DenyRead: acct.Permissions.DenyRead, GOOS: runtime.GOOS})
+	if err != nil {
+		return nil, err
+	}
+	for name, b := range files {
+		if err := os.WriteFile(filepath.Join(runDir, name), b, 0o600); err != nil {
+			return nil, err
+		}
+	}
+	return argv, nil
+}
+
+// gitWritePaths are the parts of the main repo's .git a commit on the agent's own branch
+// writes: objects, the worktree's own git dir, and the branch's ref and log folders. Not the
+// rest of refs/ (so main cannot be moved) and not the main checkout.
+func gitWritePaths(worktree, branch string) ([]string, error) {
+	out, err := gitx.Run(context.Background(), worktree, "rev-parse", "--path-format=absolute", "--git-dir", "--git-common-dir")
+	if err != nil {
+		return nil, err
+	}
+	lines := strings.Fields(out)
+	if len(lines) != 2 {
+		return nil, fmt.Errorf("unexpected git rev-parse output %q", out)
+	}
+	gitDir, common := filepath.Clean(lines[0]), filepath.Clean(lines[1])
+	ps := []string{gitDir, filepath.Join(common, "objects")}
+	if branch != "" {
+		refDir := filepath.Dir(filepath.FromSlash("refs/heads/" + branch))
+		logDir := filepath.Join(common, "logs", refDir)
+		if err := os.MkdirAll(logDir, 0o755); err != nil {
+			return nil, err
+		}
+		ps = append(ps, filepath.Join(common, refDir), logDir)
+	}
+	return ps, nil
 }
 
 // Kill stops the run's agent tree, then records `killed`; the watcher records `exit`. Safe to

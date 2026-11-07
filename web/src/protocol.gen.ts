@@ -464,6 +464,10 @@ export namespace ApiState {
 export namespace Config {
   export type Id = string;
   export type StringList = string[];
+  /**
+   * sandboxed: extra paths agents may not read
+   */
+  export type StringList1 = string[];
 
   /**
    * Shape of baton.config.yaml (global or project file), as JSON. Unknown keys are tolerated by the hub (warning only), so additionalProperties is left open. Cross-field rules (unique ids, routing targets, loopback checks beyond the pattern) are enforced by the hub, not here.
@@ -516,7 +520,8 @@ export namespace Config {
     enabled?: boolean;
     forbid_claude_subscription?: boolean;
     permissions?: {
-      mode?: 'default' | 'acceptEdits' | 'permissive';
+      mode?: 'sandboxed' | 'permissive' | 'acceptEdits' | 'default';
+      deny_read?: StringList1;
       allowed_tools?: StringList;
       denied_tools?: StringList;
       extra_args?: StringList;

@@ -87,10 +87,13 @@ type Account struct {
 	PollIntervalS     float64 `yaml:"poll_interval_s" json:"poll_interval_s"`
 }
 
-// Permissions are the worker permission settings. Workers run unattended and cannot answer
-// prompts, so the default is fully permissive; "default" restores the CLI's own prompts.
+// Permissions are the worker permission settings. Workers run unattended. "sandboxed" (the
+// default) runs them in the CLI's OS sandbox: writes only to their worktree and run folder,
+// no reading of Baton's home, no network. "permissive" turns all checks off; "default" and
+// "acceptEdits" use the CLI's own prompts, which nobody can answer in a headless run.
 type Permissions struct {
-	Mode         string   `yaml:"mode" json:"mode"` // [permissive] default | acceptEdits | permissive
+	Mode         string   `yaml:"mode" json:"mode"`           // [sandboxed] sandboxed | permissive | acceptEdits | default
+	DenyRead     []string `yaml:"deny_read" json:"deny_read"` // sandboxed: extra paths agents may not read (~ expanded); Baton's home is always denied
 	AllowedTools []string `yaml:"allowed_tools" json:"allowed_tools"`
 	DeniedTools  []string `yaml:"denied_tools" json:"denied_tools"`
 	ExtraArgs    []string `yaml:"extra_args" json:"extra_args"`

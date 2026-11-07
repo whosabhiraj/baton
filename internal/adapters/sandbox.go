@@ -1,0 +1,175 @@
+package adapters
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
+
+	"github.com/whosabhiraj/baton/internal/config"
+)
+
+// Sandbox describes what a sandboxed agent may touch. The worktree (its cwd) and RunDir are
+// writable, GitWrite are the few paths of the main repo's .git a commit on the agent's own
+// branch needs; BatonHome and DenyRead are not readable; there is no network.
+type Sandbox struct {
+	Worktree  string
+	RunDir    string
+	GitWrite  []string
+	BatonHome string
+	DenyRead  []string
+	GOOS      string
+}
+
+// ErrNoSandbox: this kind cannot be sandboxed on this platform.
+var ErrNoSandbox = errors.New("cannot be sandboxed here")
+
+// Sandboxer is implemented by adapters that can run their agent inside the CLI's OS sandbox
+// (permissions.mode: sandboxed). Files are written into RunDir before the agent starts.
+type Sandboxer interface {
+	SandboxArgv(acct config.Account, model, effort string, sb Sandbox) (argv []string, files map[string][]byte, err error)
+}
+
+func (sb Sandbox) denied() []string {
+	return append([]string{sb.BatonHome}, sb.DenyRead...)
+}
+
+// ---- claude ----
+
+// ClaudeSandboxFile is the --settings file Baton writes into the run dir.
+const ClaudeSandboxFile = "claude-sandbox.json"
+
+func (c claude) SandboxArgv(acct config.Account, model, effort string, sb Sandbox) ([]string, map[string][]byte, error) {
+	if sb.GOOS == "windows" {
+		return nil, nil, fmt.Errorf("claude %w: Claude Code's sandbox needs macOS, Linux or WSL2; set permissions.mode: permissive on account %s to run it unsandboxed", ErrNoSandbox, acct.ID)
+	}
+	write := append([]string{sb.Worktree, sb.RunDir}, sb.GitWrite...)
+	// Permission rules cannot re-allow inside a deny (deny always wins), and the worktree lives
+	// inside Baton's home, so the Read/Edit tools get every sibling on the way down instead.
+	var deny []string
+	for _, p := range append(DenyAround(sb.BatonHome, []string{sb.Worktree, sb.RunDir}), sb.DenyRead...) {
+		p = filepath.ToSlash(p)
+		deny = append(deny, "Read(/"+p+"/**)", "Edit(/"+p+"/**)") // "//abs/path" in permission rules
+	}
+	settings := map[string]any{
+		"sandbox": map[string]any{
+			"enabled":                  true,
+			"failIfUnavailable":        true,  // never fall back to running unsandboxed
+			"allowUnsandboxedCommands": false, // the agent cannot ask to leave the sandbox
+			"filesystem": map[string]any{
+				"denyRead":   sb.denied(),
+				"allowRead":  []string{sb.Worktree, sb.RunDir}, // inside Baton's home: its code, its spool and inbox
+				"allowWrite": write,
+			},
+			"network": map[string]any{"allowedDomains": []string{}, "strictAllowlist": true},
+		},
+		"permissions": map[string]any{"deny": deny},
+	}
+	b, err := json.MarshalIndent(settings, "", "  ")
+	if err != nil {
+		return nil, nil, err
+	}
+	argv := claudeBase(model, effort)
+	argv = append(argv, "--permission-mode", "acceptEdits", "--permission-prompts", "none",
+		"--settings", filepath.Join(sb.RunDir, ClaudeSandboxFile))
+	argv = append(argv, claudeToolFlags(acct.Permissions)...)
+	return append(argv, acct.Permissions.ExtraArgs...), map[string][]byte{ClaudeSandboxFile: b}, nil
+}
+
+// ---- codex ----
+
+// SandboxArgv runs codex with a named permissions profile: read everything but Baton's home
+// (and deny_read), write the worktree, the run dir and the git paths, no network, never ask
+// (a blocked action fails). On Windows it uses the mxc sandbox (deny-read needs it).
+func (codex) SandboxArgv(acct config.Account, model, effort string, sb Sandbox) ([]string, map[string][]byte, error) {
+	p := acct.Permissions
+	if len(p.AllowedTools) > 0 || len(p.DeniedTools) > 0 {
+		return nil, nil, errors.New("allowed_tools/denied_tools are claude-only")
+	}
+	entries := []string{`":root"="read"`, `":workspace_roots"="write"`}
+	add := func(path, access string) error {
+		if strings.ContainsAny(path, "'\n\r") {
+			return fmt.Errorf("codex sandbox: path %q cannot be used (contains a quote or newline)", path)
+		}
+		entries = append(entries, "'"+path+"'=\""+access+"\"")
+		return nil
+	}
+	for _, w := range append([]string{sb.RunDir}, sb.GitWrite...) {
+		if err := add(w, "write"); err != nil {
+			return nil, nil, err
+		}
+	}
+	for _, d := range sb.denied() {
+		if err := add(d, "deny"); err != nil {
+			return nil, nil, err
+		}
+	}
+	argv := codexBase(model, effort)
+	if sb.GOOS == "windows" {
+		argv = append(argv, "-c", `windows.sandbox="mxc"`)
+	}
+	argv = append(argv, "-c", `default_permissions="baton"`,
+		"-c", "permissions.baton.filesystem={"+strings.Join(entries, ", ")+"}",
+		"-c", `approval_policy="never"`)
+	argv = append(argv, p.ExtraArgs...)
+	return append(argv, "-"), nil, nil // brief on stdin
+}
+
+// DenyAround lists the entries under root that are not on the way to any of keep: walking from
+// root down to each kept path, every sibling at every level. Entries created later are not
+// covered, which is fine for Baton's home (new runs land in runs/, which is listed).
+func DenyAround(root string, keep []string) []string {
+	root = filepath.Clean(root)
+	onPath := map[string]bool{}
+	for _, k := range keep {
+		for p := filepath.Clean(k); ; p = filepath.Dir(p) {
+			onPath[pathKey(p)] = true
+			if len(p) <= len(root) || filepath.Dir(p) == p {
+				break
+			}
+		}
+	}
+	var out []string
+	var walk func(dir string)
+	walk = func(dir string) {
+		ents, err := os.ReadDir(dir)
+		if err != nil {
+			return
+		}
+		for _, e := range ents {
+			p := filepath.Join(dir, e.Name())
+			key := pathKey(p)
+			switch {
+			case !onPath[key]:
+				out = append(out, p)
+			case e.IsDir() && !isKept(key, keep):
+				walk(p)
+			}
+		}
+	}
+	if !onPath[pathKey(root)] {
+		return []string{root} // nothing to keep inside: deny it whole
+	}
+	walk(root)
+	return out
+}
+
+func isKept(key string, keep []string) bool {
+	for _, k := range keep {
+		if pathKey(filepath.Clean(k)) == key {
+			return true
+		}
+	}
+	return false
+}
+
+// pathKey compares paths case-insensitively where the file system usually is.
+func pathKey(p string) string {
+	if runtime.GOOS == "windows" || runtime.GOOS == "darwin" {
+		return strings.ToLower(p)
+	}
+	return p
+}

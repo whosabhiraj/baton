@@ -78,29 +78,33 @@ the conductor's defaults live under `conductor:` in the config (account, model, 
 `auto_wake`), and `hub.mode` picks whether its lineups wait for your ok (`user`, `propose`) or
 it just spawns (`auto`).
 
-> NOTE: worker agents run with permission checks off by default. read the security section
-> below before you point baton at anything you care about.
+> NOTE: worker agents are sandboxed by default, except claude on native windows, which can't
+> be. read the security section below.
 
 ## security
 
-be clear about what baton does and doesn't protect against right now:
+worker agents run with `permissions.mode: sandboxed` unless you change it:
 
-- worker agents run as you, with permission checks off (`permissions.mode: permissive`). each
-  one is told to stay in its own worktree, but nothing enforces that. an agent can run any
-  command you could: edit your main checkout, push with your git credentials, read your files,
-  read the other accounts' logins under `~/.baton/accounts/`
-- that includes baton's own admin token (`~/.baton/projects/<repo>/admin.token`). with it an
-  agent can do anything the dashboard can, including approving its own merge or turning
-  approvals off. so merge approvals stop a careless conductor, not a hostile agent
-- the conductor is restricted for real: it can only read the project and call baton's tools,
-  its token can't approve anything, and it never sees the agents' tokens
-- the hub only listens on 127.0.0.1, and its data folders are private to your user
+- they can write only to their own worktree and run folder (and the bits of the repo's `.git`
+  a commit on their own branch needs, so they can't move `main`)
+- they can't read `~/.baton` (account logins, the admin token, other runs) or anything you list
+  in `permissions.deny_read`, and they have no network. `baton` still works: it reports through
+  files in the run folder
+- codex uses its own sandbox (on windows the `mxc` one, no admin setup). claude uses claude
+  code's sandbox, which only exists on macos, linux and wsl2: on native windows a sandboxed
+  claude account refuses to start and tells you so
 
-so for now: only run agents on repos and tasks you'd trust a script with, and keep secrets you
-care about out of reach of your user account. `permissions.mode: default` or `acceptEdits` per
-account makes agents ask for permission instead, but nobody can answer those prompts in a
-headless run, so they mostly just get stuck. sandboxed agents (claude code's sandbox on
-macos/linux/wsl2, codex's `workspace-write` sandbox) are the planned fix.
+`permissions.mode: permissive` turns all of that off for an account: the agent runs as you and
+can do anything you can, including reading baton's admin token and approving its own merge.
+use it only for repos and tasks you'd trust a script with. `acceptEdits` and `default` use the
+cli's own prompts, which nobody can answer in a headless run.
+
+the conductor is restricted either way: it can only read the project and call baton's tools,
+its token can't approve anything, and it never sees the agents' tokens. the hub only listens on
+127.0.0.1 and its data folders are private to your user.
+
+coming next: agents asking you (in the dashboard) for network or files outside their area,
+and running claude agents inside wsl2 on windows.
 
 ## try it without agents
 

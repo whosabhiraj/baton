@@ -16,6 +16,21 @@ func (codex) Argv(acct config.Account, model, effort string) ([]string, error) {
 	if len(p.AllowedTools) > 0 || len(p.DeniedTools) > 0 {
 		return nil, errors.New("allowed_tools/denied_tools are claude-only")
 	}
+	if p.Mode == config.ModeSandboxed {
+		return nil, errors.New("sandboxed mode needs SandboxArgv")
+	}
+	argv := codexBase(model, effort)
+	switch p.Mode {
+	case "", "permissive":
+		argv = append(argv, "--dangerously-bypass-approvals-and-sandbox")
+	case "acceptEdits":
+		argv = append(argv, "--sandbox", "workspace-write", "--approve-for-me")
+	}
+	argv = append(argv, p.ExtraArgs...)
+	return append(argv, "-"), nil // brief on stdin
+}
+
+func codexBase(model, effort string) []string {
 	argv := []string{"codex", "exec", "--json"}
 	if model != "" && model != "default" {
 		argv = append(argv, "-m", model)
@@ -27,14 +42,7 @@ func (codex) Argv(acct config.Account, model, effort string) ([]string, error) {
 	default:
 		argv = append(argv, "-c", `model_reasoning_effort="`+effort+`"`)
 	}
-	switch p.Mode {
-	case "", "permissive":
-		argv = append(argv, "--dangerously-bypass-approvals-and-sandbox")
-	case "acceptEdits":
-		argv = append(argv, "--sandbox", "workspace-write", "--approve-for-me")
-	}
-	argv = append(argv, p.ExtraArgs...)
-	return append(argv, "-"), nil // brief on stdin
+	return argv
 }
 
 func (codex) Parser() Parser { return &codexParser{} }

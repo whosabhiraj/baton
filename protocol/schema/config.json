@@ -24,7 +24,8 @@
         "permissions": {
           "type": "object",
           "properties": {
-            "mode": { "enum": ["default", "acceptEdits", "permissive"], "default": "default" },
+            "mode": { "enum": ["sandboxed", "permissive", "acceptEdits", "default"], "default": "sandboxed" },
+            "deny_read": { "$ref": "#/$defs/stringList", "description": "sandboxed: extra paths agents may not read" },
             "allowed_tools": { "$ref": "#/$defs/stringList" },
             "denied_tools": { "$ref": "#/$defs/stringList" },
             "extra_args": { "$ref": "#/$defs/stringList" }

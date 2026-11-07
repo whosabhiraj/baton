@@ -372,6 +372,7 @@ func (m *Manager) Spawn(ctx context.Context, req SpawnRequest) (*SpawnResult, *p
 		Callsign: callsign, AgentID: agentID, Role: req.Role, Kind: kind, Model: model,
 		AccountLabel: label, Branch: branch, Worktree: worktree, Task: req.Task,
 		Paths: req.Scope.Paths, Forbidden: req.Scope.Forbidden, AskBefore: req.Scope.AskBefore,
+		Sandboxed: acc.Permissions.Mode == config.ModeSandboxed,
 	}
 	if ck, ok := cfg.Kinds[kind]; ok && ck.Notes != "" {
 		data.KindNotes = ck.Notes

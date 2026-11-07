@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -20,6 +21,7 @@ import (
 const (
 	unknownKeyPrefix = "unknown key"
 	forcedPrefix     = "forced:"
+	notePrefix       = "note:" // advisory: valid, but it will not work the way it reads here
 )
 
 var (
@@ -31,7 +33,7 @@ var (
 // Warning reports whether the issue is advisory (unknown key, forced value). Warnings never
 // stop a config from loading.
 func (i Issue) Warning() bool {
-	return strings.HasPrefix(i.Msg, unknownKeyPrefix) || strings.HasPrefix(i.Msg, forcedPrefix)
+	return strings.HasPrefix(i.Msg, unknownKeyPrefix) || strings.HasPrefix(i.Msg, forcedPrefix) || strings.HasPrefix(i.Msg, notePrefix)
 }
 
 // OK reports whether the snapshot has no error-level issues.
@@ -64,8 +66,14 @@ func Defaults() Config {
 	}
 }
 
+// ModeSandboxed is the default worker permission mode (see Permissions).
+const ModeSandboxed = "sandboxed"
+
+// hostOS is runtime.GOOS; a variable so tests can check other platforms' advice.
+var hostOS = runtime.GOOS
+
 func defaultAccount() Account {
-	return Account{MaxConcurrent: 1, Enabled: true, Permissions: Permissions{Mode: "permissive"}}
+	return Account{MaxConcurrent: 1, Enabled: true, Permissions: Permissions{Mode: ModeSandboxed}}
 }
 
 func defaultKind() CustomKind { return CustomKind{Parser: "none"} }
@@ -357,6 +365,9 @@ func (b *builder) decode(root *yaml.Node, cfg *Config) {
 	home, _ := os.UserHomeDir()
 	for i := range cfg.Accounts {
 		expandEnv(cfg.Accounts[i].Env, home)
+		for j, p := range cfg.Accounts[i].Permissions.DenyRead {
+			cfg.Accounts[i].Permissions.DenyRead[j] = expandHome(p, home)
+		}
 	}
 	for _, k := range cfg.Kinds {
 		expandEnv(k.Env, home)
@@ -375,16 +386,21 @@ func lookupExact(m *yaml.Node, key string) *yaml.Node {
 
 // expandEnv expands a leading ~ to the home directory; nothing else is expanded.
 func expandEnv(env map[string]string, home string) {
-	if home == "" {
-		return
-	}
 	for k, v := range env {
-		if v == "~" {
-			env[k] = home
-		} else if strings.HasPrefix(v, "~/") || strings.HasPrefix(v, `~\`) {
-			env[k] = filepath.Join(home, v[2:])
-		}
+		env[k] = expandHome(v, home)
 	}
+}
+
+func expandHome(v, home string) string {
+	switch {
+	case home == "":
+		return v
+	case v == "~":
+		return home
+	case strings.HasPrefix(v, "~/") || strings.HasPrefix(v, `~\`):
+		return filepath.Join(home, v[2:])
+	}
+	return v
 }
 
 // ---- paths / lookup ----
@@ -555,8 +571,10 @@ func (b *builder) validate(root *yaml.Node, cfg *Config) {
 		if a.MaxConcurrent < 1 {
 			bad("max_concurrent must be >= 1", "accounts", i, "max_concurrent")
 		}
-		if !oneOf(a.Permissions.Mode, "default", "acceptEdits", "permissive") {
-			bad("mode must be default, acceptEdits or permissive", "accounts", i, "permissions", "mode")
+		if !oneOf(a.Permissions.Mode, ModeSandboxed, "permissive", "acceptEdits", "default") {
+			bad("mode must be sandboxed, permissive, acceptEdits or default", "accounts", i, "permissions", "mode")
+		} else if a.Permissions.Mode == ModeSandboxed && a.Kind == "claude" && hostOS == "windows" {
+			bad(notePrefix+" claude agents cannot be sandboxed on native Windows, so this account's agents will refuse to start; set permissions.mode: permissive to run them unsandboxed", "accounts", i, "permissions", "mode")
 		}
 		if a.HeartbeatTimeoutS < 0 {
 			bad("must be >= 0", "accounts", i, "heartbeat_timeout_s")
