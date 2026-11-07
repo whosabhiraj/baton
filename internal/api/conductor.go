@@ -341,6 +341,7 @@ func (a *api) wait(w http.ResponseWriter, r *http.Request) {
 		types = splitList(v)
 	}
 	cursor := a.Bus.LastID()
+	cond := isConductorReq(r) && a.ConductorCtl != nil
 	if v := q.Get("cursor"); v != "" {
 		n, err := strconv.ParseUint(v, 10, 64)
 		if err != nil {
@@ -348,6 +349,15 @@ func (a *api) wait(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		cursor = n
+	} else if cond {
+		// A fresh `baton mcp` (conductor restart) starts where the conductor last read, not at
+		// "now": the event that woke it must still be returned.
+		cursor = min(cursor, a.ConductorCtl.SeenCursor())
+	}
+	if q.Get("types") == "-" { // pin only: report the start cursor, consume nothing
+		writeJSON(w, 200, map[string]any{"ok": true, "cursor": cursor, "instance": a.Instance, "items": []waitItem{},
+			"timed_out": false, "reset": false})
+		return
 	}
 	sub, replay, reset := a.Bus.Subscribe(cursor, true)
 	defer sub.Close()
@@ -420,7 +430,7 @@ func (a *api) wait(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	if isConductorReq(r) && a.ConductorCtl != nil && !dropped {
+	if cond && !dropped && q.Get("types") == "" { // a filtered wait skips items it did not show
 		a.ConductorCtl.Seen(cursor)
 	}
 	writeJSON(w, 200, map[string]any{"ok": true, "cursor": cursor, "instance": a.Instance, "items": items,

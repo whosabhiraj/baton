@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -28,10 +29,26 @@ accounts:
     max_concurrent: 2
 `
 
+// noLaunch starts nothing but keeps each run's token, as a real launcher hands it to the agent
+// (the conductor itself never sees run tokens).
 type noLaunch struct{}
 
-func (noLaunch) Start(runs.SpawnResult) error { return nil }
-func (noLaunch) Kill(string) error            { return nil }
+var runTokens sync.Map // run id -> BATON_TOKEN
+
+func (noLaunch) Start(res runs.SpawnResult) error {
+	runTokens.Store(res.RunID, res.Env["BATON_TOKEN"])
+	return nil
+}
+func (noLaunch) Kill(string) error { return nil }
+
+func runToken(t *testing.T, runID string) string {
+	t.Helper()
+	v, ok := runTokens.Load(runID)
+	if !ok || v.(string) == "" {
+		t.Fatalf("no token for %s", runID)
+	}
+	return v.(string)
+}
 
 func setup(t *testing.T) (*hub.Hub, *mcp.ClientSession) {
 	t.Helper()
@@ -130,7 +147,7 @@ func TestTools(t *testing.T) {
 	}
 	var sp struct {
 		RunID, AgentID, Worktree string
-		Env                      map[string]string
+		Env                      map[string]string // must stay empty: no run token for the conductor
 	}
 	sp.RunID = jsonField(t, out, "run_id")
 	sp.AgentID = jsonField(t, out, "agent_id")
@@ -138,9 +155,12 @@ func TestTools(t *testing.T) {
 		Worktree *string            `json:"worktree"`
 		Env      *map[string]string `json:"env"`
 	}{&sp.Worktree, &sp.Env})
+	if len(sp.Env) != 0 {
+		t.Fatalf("spawn_agent returned the agent env to the conductor: %v", sp.Env)
+	}
 
 	// the agent asks, then finishes; the conductor's first wait still sees both (cursor pinned at the first tool call)
-	agent(t, h, sp.RunID, sp.AgentID, sp.Env["BATON_TOKEN"], "question", `{"qid":"q_1","text":"tabs or spaces?","blocking":true}`)
+	agent(t, h, sp.RunID, sp.AgentID, runToken(t, sp.RunID), "question", `{"qid":"q_1","text":"tabs or spaces?","blocking":true}`)
 	out, _ = callTool(t, cs, "wait_for_events", map[string]any{"timeout_s": 2})
 	if !strings.Contains(out, `"type":"question"`) || !strings.Contains(out, "tabs or spaces?") {
 		t.Fatal(out)
@@ -151,7 +171,7 @@ func TestTools(t *testing.T) {
 	os.WriteFile(filepath.Join(sp.Worktree, "notes.txt"), []byte("n\n"), 0o644)
 	gitx.Run(context.Background(), sp.Worktree, "add", "notes.txt")
 	gitx.Run(context.Background(), sp.Worktree, "commit", "-m", "notes")
-	agent(t, h, sp.RunID, sp.AgentID, sp.Env["BATON_TOKEN"], "done", `{"status":"success","summary":"wrote notes"}`)
+	agent(t, h, sp.RunID, sp.AgentID, runToken(t, sp.RunID), "done", `{"status":"success","summary":"wrote notes"}`)
 	out, _ = callTool(t, cs, "wait_for_events", map[string]any{"timeout_s": 2})
 	if !strings.Contains(out, `"type":"done"`) {
 		t.Fatal(out)

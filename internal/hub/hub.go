@@ -27,6 +27,7 @@ import (
 	"github.com/whosabhiraj/baton/internal/conductor"
 	"github.com/whosabhiraj/baton/internal/config"
 	"github.com/whosabhiraj/baton/internal/ids"
+	"github.com/whosabhiraj/baton/internal/paths"
 	"github.com/whosabhiraj/baton/internal/proto"
 	"github.com/whosabhiraj/baton/internal/redact"
 	"github.com/whosabhiraj/baton/internal/runs"
@@ -150,7 +151,7 @@ func Start(ctx context.Context, o Options) (*Hub, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := os.MkdirAll(dataDir, 0o755); err != nil {
+	if err := paths.EnsureDataDir(dataDir); err != nil { // private: logs and runs hold tokens
 		return nil, err
 	}
 

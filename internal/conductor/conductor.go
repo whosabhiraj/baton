@@ -841,6 +841,13 @@ func (m *Manager) Seen(cursor uint64) {
 	m.mu.Unlock()
 }
 
+// SeenCursor is the newest bus id the conductor has read (see Seen).
+func (m *Manager) SeenCursor() uint64 {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.seenN
+}
+
 func (m *Manager) armWakeLocked() {
 	if m.wakeT != nil {
 		return // a nudge is already scheduled

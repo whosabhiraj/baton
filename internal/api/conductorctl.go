@@ -25,6 +25,7 @@ type ConductorCtl interface {
 	History(after, limit int) ([]conductor.Entry, int, error)
 	Subscribe() (<-chan conductor.Update, func())
 	Seen(cursor uint64)               // the conductor read the bus up to cursor (GET /api/wait)
+	SeenCursor() uint64               // where the conductor last read up to (0 = nothing yet)
 	Usage() map[string]map[string]any // the conductor's own usage totals per account
 }
 

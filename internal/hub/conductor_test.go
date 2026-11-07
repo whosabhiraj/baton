@@ -444,3 +444,38 @@ func TestLineupFlow(t *testing.T) {
 		t.Fatal(st, r)
 	}
 }
+
+// TestWaitStartsWhereConductorLastRead: a fresh `baton mcp` (conductor restart) pins its
+// cursor where the conductor last read, so the event that woke it is still returned; a
+// filtered wait does not count as having read the rest.
+func TestWaitStartsWhereConductorLastRead(t *testing.T) {
+	o, _ := p2opts(t)
+	o.Dev = true
+	o.Repo = filepath.Join(t.TempDir(), "repo")
+	os.MkdirAll(o.Repo, 0o755)
+	if err := gitx.Init(o.Repo); err != nil {
+		t.Fatal(err)
+	}
+	o.ConductorExe, o.ConductorCLI = "baton", "baton-test-no-such-cli"
+	h := start(t, o)
+	tok := h.MintConductorToken()
+	run := devRun(t, h, `{"role":"x"}`)
+	if _, w := call(t, h, "GET", "/api/wait?timeout_s=0", tok, ""); w["ok"] != true { // reads everything so far
+		t.Fatal(w)
+	}
+	if st, r := ingest(t, h, run, "question", "q1", `{"qid":"q_1","text":"which db?","blocking":false}`); st != 200 {
+		t.Fatal(st, r)
+	}
+	// a filtered wait that does not show the question
+	if _, w := call(t, h, "GET", "/api/wait?timeout_s=0.1&types=done", tok, ""); len(w["items"].([]any)) != 0 {
+		t.Fatal(w)
+	}
+	// the restarted conductor's mcp pins first, then waits from there
+	_, pin := call(t, h, "GET", "/api/wait?timeout_s=0&types=-", tok, "")
+	cur, inst := pin["cursor"].(interface{ String() string }).String(), pin["instance"].(string)
+	_, w := call(t, h, "GET", "/api/wait?timeout_s=1&cursor="+cur+"&instance="+inst, tok, "")
+	items := w["items"].([]any)
+	if len(items) != 1 || items[0].(map[string]any)["type"] != "question" {
+		t.Fatalf("the waking question was missed: %v", w)
+	}
+}

@@ -124,8 +124,9 @@ func (c *Client) Do(ctx context.Context, method, path string, body any) (json.Ra
 	}
 }
 
-// startCursor pins the wait cursor to "now" the first time any tool runs, so events that
-// arrive between a spawn and the first wait_for_events are not missed.
+// startCursor pins the wait cursor the first time any tool runs, so events that arrive between
+// a spawn and the first wait_for_events are not missed. The hub picks the start: where the
+// conductor last read, so a restarted conductor still gets the event that woke it.
 func (c *Client) startCursor(ctx context.Context) {
 	c.mu.Lock()
 	started := c.started
