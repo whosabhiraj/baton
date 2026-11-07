@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/whosabhiraj/baton/internal/gitx"
 	"github.com/whosabhiraj/baton/internal/hub"
 )
 
@@ -186,5 +187,24 @@ func TestAuditAndActor(t *testing.T) {
 	got := strings.Join(acts, ",")
 	if !strings.Contains(got, "dev.run@human") || !strings.Contains(got, "deliver.message@human") {
 		t.Fatalf("audit: %s", got)
+	}
+}
+
+// TestIdleStopWithConductor: the conductor's own bus listener (auto-wake) is not a viewer, so
+// a repo hub with a conductor still stops when idle.
+func TestIdleStopWithConductor(t *testing.T) {
+	o, _ := p2opts(t)
+	o.IdleStop = 300 * time.Millisecond
+	o.Repo = filepath.Join(t.TempDir(), "repo")
+	os.MkdirAll(o.Repo, 0o755)
+	if err := gitx.Init(o.Repo); err != nil {
+		t.Fatal(err)
+	}
+	o.ConductorExe, o.ConductorCLI = "baton", "baton-test-no-such-cli"
+	h := start(t, o)
+	select {
+	case <-h.Done():
+	case <-time.After(5 * time.Second):
+		t.Fatal("idle hub with a conductor did not stop")
 	}
 }

@@ -521,15 +521,21 @@ func (m *Manager) startLocked() error {
 	if err != nil {
 		return err
 	}
-	stdout, err := cmd.StdoutPipe()
+	// Our own pipe, not StdoutPipe: cmd.Wait closes a StdoutPipe even while lines (often the
+	// final result) are still unread. With os.Pipe the reader drains to EOF on its own.
+	stdout, stdoutW, err := os.Pipe()
 	if err != nil {
 		return err
 	}
+	cmd.Stdout = stdoutW
 	if ef, err := os.OpenFile(filepath.Join(m.dir, StderrFile), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600); err == nil {
 		cmd.Stderr = ef
 		defer ef.Close() // the child holds its own handle
 	}
-	if err := cmd.Start(); err != nil {
+	err = cmd.Start()
+	stdoutW.Close() // the child holds its own handle
+	if err != nil {
+		stdout.Close()
 		m.lastErr = err.Error()
 		return fmt.Errorf("start conductor: %w", err)
 	}
@@ -551,8 +557,13 @@ func (m *Manager) startLocked() error {
 		parts = append(parts, "new conversation")
 	}
 	m.record(Entry{Dir: "hub", Event: "started", Text: strings.Join(parts, " · ")})
-	go m.readLoop(stdout, m.done)
-	go m.waitLoop(cmd, m.done)
+	readDone := make(chan struct{})
+	go func() {
+		defer close(readDone)
+		defer stdout.Close()
+		m.readLoop(stdout, m.done)
+	}()
+	go m.waitLoop(cmd, m.done, readDone)
 	return nil
 }
 
@@ -613,8 +624,12 @@ func (m *Manager) handleOut(line []byte) {
 	}
 }
 
-func (m *Manager) waitLoop(cmd *exec.Cmd, done chan struct{}) {
+func (m *Manager) waitLoop(cmd *exec.Cmd, done, readDone chan struct{}) {
 	err := cmd.Wait()
+	select { // let the reader record the last lines; a grandchild may keep the pipe open
+	case <-readDone:
+	case <-time.After(2 * time.Second):
+	}
 	code := 0
 	if err != nil {
 		code = -1
@@ -779,7 +794,7 @@ func wakes(it bus.Item) bool {
 }
 
 func (m *Manager) wakeLoop() {
-	sub, _, _ := m.o.Bus.Subscribe(m.o.Bus.LastID(), true)
+	sub, _, _ := m.o.Bus.SubscribeInternal(m.o.Bus.LastID(), true)
 	defer sub.Close()
 	for {
 		select {
@@ -798,13 +813,24 @@ func (m *Manager) wakeLoop() {
 			}
 			m.mu.Unlock()
 		case <-sub.Dropped:
-			sub, _, _ = m.o.Bus.Subscribe(m.o.Bus.LastID(), true)
+			sub, _, _ = m.o.Bus.SubscribeInternal(m.o.Bus.LastID(), true)
 		case <-m.stopWake:
 			return
 		case <-m.o.Bus.Closed:
 			return
 		}
 	}
+}
+
+// Active reports work worth keeping the hub up for: a chat or dashboard is attached to the
+// conductor stream, or the conductor is in the middle of a turn.
+func (m *Manager) Active() bool {
+	m.subMu.Lock()
+	viewers := len(m.subs)
+	m.subMu.Unlock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return viewers > 0 || (m.running && m.busy)
 }
 
 // Seen records that the conductor read the bus up to cursor (its wait_for_events calls), so

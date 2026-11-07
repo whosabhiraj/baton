@@ -35,9 +35,10 @@ type Sub struct {
 	C chan Item
 	// Dropped is closed when the subscriber fell behind and was removed. Items already in C
 	// may still be read; the stream should then tell the client to reset.
-	Dropped chan struct{}
-	b       *Broker
-	once    sync.Once
+	Dropped  chan struct{}
+	b        *Broker
+	once     sync.Once
+	internal bool // hub-internal (e.g. the conductor's auto-wake): not a viewer for idle stop
 }
 
 // Close unsubscribes. Safe to call more than once.
@@ -80,10 +81,17 @@ func (b *Broker) PublishNotice(typ string, data map[string]any) uint64 {
 }
 
 // Subscribers returns the number of live subscribers.
+// Subscribers counts outside subscribers (SSE streams, long polls); internal ones are skipped.
 func (b *Broker) Subscribers() int {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	return len(b.subs)
+	n := 0
+	for s := range b.subs {
+		if !s.internal {
+			n++
+		}
+	}
+	return n
 }
 
 func (b *Broker) publish(it Item) uint64 {
@@ -121,9 +129,19 @@ func (b *Broker) LastID() uint64 {
 // duplicated). If lastID is older than the ring or newer than anything published (the hub
 // restarted), reset is true and no replay is returned: the client must re-fetch /api/state.
 func (b *Broker) Subscribe(lastID uint64, hasLast bool) (sub *Sub, replay []Item, reset bool) {
+	return b.subscribe(lastID, hasLast, false)
+}
+
+// SubscribeInternal is Subscribe for the hub's own long-lived listeners; they do not count
+// in Subscribers, so they never keep an idle hub running.
+func (b *Broker) SubscribeInternal(lastID uint64, hasLast bool) (sub *Sub, replay []Item, reset bool) {
+	return b.subscribe(lastID, hasLast, true)
+}
+
+func (b *Broker) subscribe(lastID uint64, hasLast, internal bool) (sub *Sub, replay []Item, reset bool) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	sub = &Sub{C: make(chan Item, b.subBuf), Dropped: make(chan struct{}), b: b}
+	sub = &Sub{C: make(chan Item, b.subBuf), Dropped: make(chan struct{}), b: b, internal: internal}
 	if hasLast {
 		oldest := b.n - uint64(b.count) + 1 // id of the oldest buffered item (n+1 when empty)
 		switch {

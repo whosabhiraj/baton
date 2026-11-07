@@ -470,7 +470,7 @@ func (h *Hub) watchIdle() {
 		case <-h.stopCh:
 			return
 		case now := <-t.C:
-			busy := h.broker.Subscribers() > 0
+			busy := h.broker.Subscribers() > 0 || (h.cond != nil && h.cond.Active())
 			if !busy {
 				for _, r := range h.store.List() {
 					if !r.Ended() {
