@@ -1,7 +1,7 @@
 import { api, errText } from '../api';
 import type { ApiConfig } from '../protocol.gen';
 import { refresh } from '../store';
-import { h, setKids } from '../util';
+import { busy, h, setKids, toast } from '../util';
 import type { Panel } from './overlay';
 
 type Kind = 'text' | 'number' | 'bool' | { select: string[] };
@@ -29,6 +29,7 @@ export function configPanel(): Panel {
   const issues = h('ul', { class: 'issues', role: 'status' });
   const err = h('div', { class: 'err', role: 'alert', hidden: true });
   const info = h('p', { class: 'muted' });
+  const note = h('p', { class: 'note', role: 'status', hidden: true });
   let current: ApiConfig.ApiConfig | null = null;
   const inputs = new Map<string, HTMLInputElement | HTMLSelectElement>();
 
@@ -53,6 +54,7 @@ export function configPanel(): Panel {
         return h('div', { class: f.kind === 'bool' ? 'field inline' : 'field' }, h('label', { for: id }, f.label), ctl, f.hint && h('small', { class: 'muted' }, f.hint));
       }),
       err,
+      note,
       h('button', { type: 'submit', class: 'primary' }, 'Save changes'),
     );
   }
@@ -67,35 +69,40 @@ export function configPanel(): Panel {
 
   form.addEventListener('submit', (e) => {
     e.preventDefault();
-    void (async () => {
-      err.hidden = true;
-      const changes: Record<string, unknown> = {};
-      for (const f of FIELDS) {
-        const ctl = inputs.get(f.key);
-        if (!ctl) continue;
-        const old = dig((current?.config as { hub?: unknown } | undefined)?.hub, f.key);
-        let val: unknown;
-        if (f.kind === 'bool') val = (ctl as HTMLInputElement).checked;
-        else if (f.kind === 'number') {
-          if (ctl.value.trim() === '') continue;
-          val = Number(ctl.value);
-        } else val = ctl.value;
-        if (val !== old) changes[f.key] = val;
-      }
-      if (!Object.keys(changes).length) {
-        err.textContent = 'Nothing changed.';
-        err.hidden = false;
-        return;
-      }
+    const btn = form.querySelector<HTMLButtonElement>('button[type=submit]');
+    if (!btn) return;
+    err.hidden = true;
+    note.hidden = true;
+    const changes: Record<string, unknown> = {};
+    for (const f of FIELDS) {
+      const ctl = inputs.get(f.key);
+      if (!ctl) continue;
+      const old = dig((current?.config as { hub?: unknown } | undefined)?.hub, f.key);
+      let val: unknown;
+      if (f.kind === 'bool') val = (ctl as HTMLInputElement).checked;
+      else if (f.kind === 'number') {
+        if (ctl.value.trim() === '') continue;
+        val = Number(ctl.value);
+      } else val = ctl.value;
+      if (val !== old) changes[f.key] = val;
+    }
+    const n = Object.keys(changes).length;
+    if (!n) {
+      note.textContent = 'Nothing changed.';
+      note.hidden = false;
+      return;
+    }
+    void busy(btn, 'Saving...', async () => {
       try {
         show(await api.patchConfig(changes));
+        toast(n === 1 ? 'Saved 1 setting' : `Saved ${n} settings`);
         await refresh();
       } catch (ex) {
-        await load(); // fields before the bad one stay applied, so show the real state
+        await load(); // a failed save changes nothing (all or nothing): show the real state
         err.textContent = errText(ex);
         err.hidden = false;
       }
-    })();
+    }, [form]);
   });
 
   void load();

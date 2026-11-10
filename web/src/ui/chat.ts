@@ -4,7 +4,7 @@ import { api, errText } from '../api';
 import { getToken } from '../auth';
 import { I, icon } from '../icons';
 import { accountById, state } from '../store';
-import { h, renderIf, setKids } from '../util';
+import { busy, h, renderIf, setKids, toast } from '../util';
 import type { Panel } from './overlay';
 
 export interface ConductorEntry {
@@ -174,25 +174,29 @@ export function chatPanel(): Panel {
   async function doSend(): Promise<void> {
     const text = input.value.trim();
     if (!text) return;
-    send.disabled = true;
-    try {
-      await api.conductorSend(text);
-      input.value = '';
-      showErr('');
-    } catch (e) {
-      showErr(errText(e));
-    } finally {
-      send.disabled = false;
-      input.focus();
-    }
+    // busy() ignores a second Enter or click while this send is still in flight
+    await busy(send, 'Sending...', async () => {
+      try {
+        await api.conductorSend(text);
+        if (input.value.trim() === text) input.value = ''; // keep anything typed meanwhile
+        showErr('');
+      } catch (e) {
+        showErr(errText(e));
+      }
+    });
+    input.focus();
   }
 
-  async function control(verb: 'start' | 'stop'): Promise<void> {
-    try {
-      await api.conductorControl(verb);
-    } catch (e) {
-      showErr(errText(e));
-    }
+  async function control(btn: HTMLButtonElement, verb: 'start' | 'stop'): Promise<void> {
+    await busy(btn, verb === 'start' ? 'Starting...' : 'Stopping...', async () => {
+      try {
+        await api.conductorControl(verb);
+        showErr('');
+        toast(verb === 'start' ? 'Conductor started' : 'Conductor stopped (agents keep running)');
+      } catch (e) {
+        showErr(errText(e));
+      }
+    });
     void loadInfo();
   }
 
@@ -208,8 +212,8 @@ export function chatPanel(): Panel {
         info?.last_error ? h('span', { class: 'warn-text', title: info.last_error }, 'last error: ' + clip(info.last_error, 60)) : null,
         info &&
           (info.running
-            ? h('button', { class: 'quiet', onclick: () => void control('stop'), title: 'Stop the conductor (agents keep running)' }, icon(I.stop), 'Stop')
-            : h('button', { class: 'quiet', onclick: () => void control('start') }, icon(I.play), 'Start')),
+            ? h('button', { class: 'quiet', onclick: (e: Event) => void control(e.currentTarget as HTMLButtonElement, 'stop'), title: 'Stop the conductor (agents keep running)' }, icon(I.stop), 'Stop')
+            : h('button', { class: 'quiet', onclick: (e: Event) => void control(e.currentTarget as HTMLButtonElement, 'start') }, icon(I.play), 'Start')),
       ),
     );
   }

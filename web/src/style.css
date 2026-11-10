@@ -268,6 +268,21 @@ legend { padding: 0 6px; color: var(--text-2); font-size: 12.5px; }
 .stats > .stat.cond.stat-btn { min-width: 8.5em; flex-shrink: 1; } /* it alone may shrink: never to nothing */
 .brief { max-height: 50vh; }
 
+/* working: a small rotating ring in a busy button; a dimmed card while its request runs */
+.spin { flex: none; width: 12px; height: 12px; border-radius: 50%; border: 1.5px solid currentColor; border-right-color: transparent; animation: spin .8s linear infinite; }
+button[aria-busy=true] { cursor: progress; }
+button[aria-busy=true]:disabled { opacity: .75; }
+.approval.busy, .question.answered { opacity: .55; transition: opacity var(--fast) ease-out; }
+.note { margin: 8px 0; color: var(--text-2); font-size: 12.5px; }
+
+/* toasts: what just happened, bottom right, gone by themselves */
+.toasts { position: fixed; right: 16px; bottom: 16px; z-index: 20; display: grid; gap: 8px; justify-items: end; max-width: min(380px, calc(100vw - 32px)); pointer-events: none; }
+.toast { padding: 9px 14px; border-radius: var(--r); background: var(--raise); color: var(--text); font-size: 13px; box-shadow: inset 0 0 0 1px var(--line-2), 0 8px 24px rgba(0, 0, 0, .5); word-break: break-word; animation: rise 180ms ease-out; transition: opacity 200ms ease-out, transform 200ms ease-out; }
+.toast-ok { box-shadow: inset 3px 0 0 var(--go), inset 0 0 0 1px var(--line-2), 0 8px 24px rgba(0, 0, 0, .5); }
+.toast-info { color: var(--text-2); }
+.toast-bad { color: var(--warn); box-shadow: inset 3px 0 0 var(--warn), inset 0 0 0 1px color-mix(in srgb, var(--warn) 35%, var(--line-2)), 0 8px 24px rgba(0, 0, 0, .5); }
+.toast.gone { opacity: 0; transform: translateY(6px); }
+
 .login-wrap { display: grid; place-items: center; height: 100%; }
 .login { display: grid; gap: 12px; width: min(420px, 92vw); padding: 28px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
 .login h1 { font: 650 28px/1 var(--sans); letter-spacing: -.02em; }
@@ -275,6 +290,8 @@ legend { padding: 0 6px; color: var(--text-2); font-size: 12.5px; }
 @keyframes breathe { 50% { opacity: .45; } }
 @keyframes fade { from { opacity: 0; } }
 @keyframes slide { from { transform: translateX(24px); opacity: 0; } }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes rise { from { transform: translateY(6px); opacity: 0; } }
 
 /* 3D map */
 #scene { position: relative; flex: 1; min-height: 260px; border: 0; padding: 0; overflow: hidden; }

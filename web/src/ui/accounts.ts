@@ -1,6 +1,6 @@
 import { api, errText } from '../api';
 import { emit, refresh, state } from '../store';
-import { bullet, h, lineColor, renderIf, setKids, usageText } from '../util';
+import { bullet, h, lineColor, renderIf, setKids, toast, usageText } from '../util';
 
 /** Capacity as a mini line: one station per slot, the first `used` filled. */
 function slots(a: { used: number; max_concurrent: number; color?: string }): HTMLElement {
@@ -20,14 +20,19 @@ export function accountsRail(host: HTMLElement): () => void {
   const list = h('div', { class: 'acct-list' });
   setKids(host, h('h2', {}, 'Accounts'), list, err);
 
-  async function toggle(id: string, enabled: boolean): Promise<void> {
+  async function toggle(cb: HTMLInputElement, id: string, name: string): Promise<void> {
+    const enabled = cb.checked;
     err.hidden = true;
+    cb.disabled = true; // one change at a time; the rail redraws with the new state
     try {
       await api.patchAccount(id, { enabled });
+      toast(`${name} ${enabled ? 'enabled' : 'disabled'}`);
     } catch (e) {
+      cb.checked = !enabled;
       err.textContent = errText(e);
       err.hidden = false;
     }
+    cb.disabled = false;
     await refresh();
   }
 
@@ -63,7 +68,7 @@ export function accountsRail(host: HTMLElement): () => void {
             type: 'checkbox',
             checked: a.enabled,
             'aria-label': `Enable ${a.label || a.id}`,
-            onchange: () => void toggle(a.id, cb.checked),
+            onchange: () => void toggle(cb, a.id, a.label || a.id),
           });
           return h('div', { class: 'acct' + (on ? ' on' : '') }, main, h('label', { class: 'toggle', title: a.enabled ? 'Enabled: new agents may use it' : 'Disabled: no new agents' }, cb));
         }),

@@ -307,6 +307,25 @@ func TestStalledEmitAndClear(t *testing.T) {
 	}
 }
 
+// Agent output that stores no event (thinking deltas, tool chatter) still counts as alive.
+func TestTouchKeepsStallAway(t *testing.T) {
+	s := openStore(t, t.TempDir())
+	r := newRun(t, s)
+	r.IngestEnvelope(hb("a"), proto.SrcCLI)
+	timeout := 200 * time.Millisecond
+	time.Sleep(timeout + 50*time.Millisecond)
+	r.Touch()
+	if r.CheckStalled(time.Now(), timeout) {
+		t.Fatal("touched just now: must not stall")
+	}
+	if r.Summary().Status == proto.StatusStalled {
+		t.Fatal("status stalled after touch")
+	}
+	if !r.CheckStalled(time.Now().Add(time.Second), timeout) {
+		t.Fatal("silence after the touch should still stall")
+	}
+}
+
 // ---- fixtures ----
 
 func normalise(v any) any {
