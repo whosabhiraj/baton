@@ -110,7 +110,7 @@ func (m *model) render() string {
 		case KindHub:
 			b.WriteString(stHubTag.Render("baton · " + clip(l.Text, w-8)))
 		case KindConductor:
-			b.WriteString(body.Render(l.Text))
+			b.WriteString(renderMarkdown(l.Text, w))
 		case KindTool:
 			b.WriteString(stDim.Render("  ↳ " + clip(l.Text, w-4)))
 		case KindError:

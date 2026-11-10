@@ -1,6 +1,6 @@
 # HANDOFF — read this first
 
-Last updated: **2026-11-10**: a UX fix cycle is **in progress** (first-use feedback), see §E first.
+Last updated: **2026-11-10**: a UX fix cycle is **almost done** (first-use feedback; one real run left), see §E first.
 Before that: **2026-11-07**, **Phase 7 code done** (hardening + release): `baton gc`, conductor usage in
 account totals, error-path tests, `npm run release`, one full code review with its findings fixed.
 Since then: sandboxed agents (parts 1 and 4 done and verified), the known small issues fixed, CI green
@@ -144,22 +144,15 @@ Done in the WIP commit after `f613d5b` (builds; web typechecks; NOT yet run in a
   streams = sign of life); the supervisor thins delta lines (`Spec.ThinSuffixes`,
   `supervise/thin.go`, one per 5 s) so stdout.jsonl stays small. Codex app-server deltas too.
 
-Still to do, in order:
-1. CSS in `web/src/style.css`: `.spin` (small rotating ring, none under prefers-reduced-motion),
-   `button[aria-busy=true]`, `.approval.busy` (dimmed), `.question.answered`, `.toasts` /
-   `.toast` / `.toast-ok|bad|info` / `.gone` (bottom-right, quiet palette, amber only for bad).
-2. Same treatment for: `ui/chat.ts` (Enter can send twice while a send is in flight: guard it;
-   Start/Stop busy), `ui/config.ts` (busy Save, "Saved" toast, "Nothing changed" as a muted note
-   not an error), `ui/accounts.ts` (disable the toggle while its PATCH runs).
-3. Store test for `Touch` (stall not raised while lines arrive); `npm run check`.
-4. Check in a browser against `baton mock` (Chromium for Playwright is installed locally; the
-   playwright package is not). Then one real claude agent run to confirm partial messages parse
-   fine and stalls stop (ask before spending quota).
-5. Terminal chat markdown (not started): conductor replies show raw `**bold**`, backticks,
-   `- ` lists. Plan: a small renderer in `internal/chat` (bold, italic, inline code, headings,
-   bullets, fenced code, links) applied to KindConductor lines before wrapping; glamour is the
-   alternative but heavy (chroma). Dashboard chat could reuse the same rules later.
-6. Commit, push, update this section.
+Done since (2026-11-10): busy/toast CSS; chat send guarded (Enter x3 = one send), Start/Stop busy;
+config Save busy + "Saved N" toast, "Nothing changed" as a muted note; account toggle locked while
+its PATCH runs; `TestTouchKeepsStallAway`. Checked in headless Chromium against `baton mock`: all
+four behave. Terminal chat renders the conductor's Markdown (`internal/chat/markdown.go`: bold,
+italic, code, strike, links, headings, lists with hanging indent, quotes, rules, fenced code).
+
+Still to do:
+1. One real claude agent run to confirm partial messages parse fine and stalls stop (quota: ask).
+2. Optional: dashboard chat could reuse the same Markdown rules.
 
 
 Sandbox part 4, network on approval (2026-11-07), SOLVED (`8d313bb`): `baton __codex` opts into
