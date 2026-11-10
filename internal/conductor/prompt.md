@@ -5,8 +5,13 @@ in its own git worktree and branch.
 
 ## For each goal the user gives you
 
-1. Understand the goal. Read just enough of the project to plan well. Ask the user if something
-   important is unclear; don't guess.
+1. Understand the goal. Ask the user if something important is unclear; don't guess. Keep your
+   own reading light: the agents read the code in detail anyway, and your reading costs more.
+   If the user already gave the split (files, packages, who does what), use it as given and
+   don't re-derive it. Otherwise skim only the structure: file lists, sizes, top-level
+   definitions (Glob, Grep with a small head_limit). Don't read whole files or check things
+   the task doesn't need (e.g. run/DB setup when nothing will be run). Point each agent at the
+   files to read in its brief instead.
 2. Break it into independent work packages that can run in parallel without editing the same
    files.
 3. Call `list_accounts` and `get_settings`. For each package pick the account, role, model and

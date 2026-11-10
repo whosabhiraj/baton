@@ -37,6 +37,7 @@ type (
 	statusMsg Status
 	tickMsg   struct{}
 	localMsg  []Line
+	flashMsg  struct{} // the footer notice has expired
 )
 
 type model struct {
@@ -50,6 +51,11 @@ type model struct {
 	height int
 	ready  bool
 	quit   bool
+
+	content    []string  // rendered conversation lines (what the viewport shows, unhighlighted)
+	sel        selection // mouse selection in content
+	flash      string    // short footer notice ("copied ...")
+	flashUntil time.Time
 }
 
 const inputHeight = 3
@@ -62,6 +68,8 @@ func newModel(s *Session, past []conductor.Entry) *model {
 	ta.CharLimit = 0
 	ta.SetHeight(inputHeight)
 	ta.KeyMap.InsertNewline = key.NewBinding(key.WithKeys("alt+enter", "ctrl+j"))
+	ta.KeyMap.WordForward = key.NewBinding(key.WithKeys("ctrl+right", "alt+right", "alt+f"))
+	ta.KeyMap.WordBackward = key.NewBinding(key.WithKeys("ctrl+left", "alt+left", "alt+b"))
 	ta.FocusedStyle.CursorLine = lipgloss.NewStyle()
 	ta.Focus()
 	m := &model{s: s, ta: ta}
@@ -123,10 +131,64 @@ func (m *model) refresh() {
 		return
 	}
 	bottom := m.vp.AtBottom()
-	m.vp.SetContent(m.render())
+	m.setContent()
 	if bottom {
 		m.vp.GotoBottom()
 	}
+}
+
+// setContent re-renders the conversation into the viewport, with the selection drawn on it.
+func (m *model) setContent() {
+	m.content = strings.Split(m.render(), "\n")
+	m.paint()
+}
+
+// paint redraws the selection without re-rendering the conversation.
+func (m *model) paint() {
+	m.vp.SetContent(strings.Join(highlight(m.content, m.sel), "\n"))
+}
+
+// mouse handles the conversation's mouse events: the wheel scrolls, a left drag selects, and
+// releasing the button copies the selection.
+func (m *model) mouse(msg tea.MouseMsg) tea.Cmd {
+	if msg.Button == tea.MouseButtonWheelUp || msg.Button == tea.MouseButtonWheelDown {
+		var c tea.Cmd
+		m.vp, c = m.vp.Update(msg)
+		return c
+	}
+	at := func(drag bool) cell {
+		y := msg.Y
+		switch {
+		case !drag:
+		case y <= 0 && m.vp.YOffset > 0: // dragging onto the top or bottom row scrolls
+			m.vp.ScrollUp(1)
+		case y >= m.vp.Height-1:
+			m.vp.ScrollDown(1)
+		}
+		y = min(max(y, 0), m.vp.Height-1)
+		return cell{line: m.vp.YOffset + y, col: max(msg.X, 0)}
+	}
+	switch {
+	case msg.Action == tea.MouseActionPress && msg.Button == tea.MouseButtonLeft:
+		if msg.Y >= m.vp.Height {
+			return nil // the input and footer: nothing to select there
+		}
+		c := at(false)
+		m.sel = selection{dragging: true, a: c, b: c}
+		m.paint()
+	case msg.Action == tea.MouseActionMotion && m.sel.dragging:
+		m.sel.b = at(true)
+		m.paint()
+	case msg.Action == tea.MouseActionRelease && m.sel.dragging:
+		m.sel.dragging = false
+		if text := selectedText(m.content, m.sel); text != "" {
+			copyFn(text)
+			m.flash = fmt.Sprintf("copied %d character(s)", len([]rune(text)))
+			m.flashUntil = time.Now().Add(3 * time.Second)
+			return tea.Tick(3*time.Second, func(time.Time) tea.Msg { return flashMsg{} })
+		}
+	}
+	return nil
 }
 
 func (m *model) footer() string {
@@ -134,7 +196,17 @@ func (m *model) footer() string {
 	if cond.State == "" {
 		cond = m.status.Conductor
 	}
-	parts := []string{stateText(cond)}
+	if cond.Account == "" {
+		cond.Account = m.status.Account
+	}
+	if cond.Model == "" {
+		cond.Model = m.status.Model
+	}
+	who := stateText(cond)
+	if m.status.Effort != "" && cond.State != "" {
+		who += " · effort " + m.status.Effort
+	}
+	parts := []string{who}
 	if m.status.Mode != "" {
 		parts = append(parts, "mode "+m.status.Mode)
 	}
@@ -145,6 +217,9 @@ func (m *model) footer() string {
 	}
 	if m.status.Err != "" {
 		left += stFooter.Render(" · ") + stErr.Render("hub: "+clip(m.status.Err, 60))
+	}
+	if m.flash != "" && time.Now().Before(m.flashUntil) {
+		left += stFooter.Render(" · ") + stNotice.Render(m.flash)
 	}
 	return left
 }
@@ -164,7 +239,8 @@ func (m *model) layout() {
 		m.vp.Width, m.vp.Height = m.width, vh
 	}
 	m.ta.SetWidth(max(m.width-2, 10))
-	m.vp.SetContent(m.render())
+	m.sel = selection{} // the lines rewrap: old positions mean nothing now
+	m.setContent()
 	m.vp.GotoBottom()
 }
 
@@ -176,6 +252,10 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.layout()
 		return m, nil
 	case tea.KeyMsg:
+		if m.sel.active() { // typing drops the highlight (the text stays copied)
+			m.sel = selection{}
+			m.paint()
+		}
 		switch msg.String() {
 		case "ctrl+c":
 			m.quit = true
@@ -200,9 +280,9 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, c
 		}
 	case tea.MouseMsg:
-		var c tea.Cmd
-		m.vp, c = m.vp.Update(msg)
-		return m, c
+		return m, m.mouse(msg)
+	case flashMsg:
+		return m, nil // re-render drops the expired notice
 	case entryMsg:
 		m.lines = append(m.lines, Render(conductor.Entry(msg))...)
 		m.refresh()

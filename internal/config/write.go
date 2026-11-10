@@ -62,29 +62,37 @@ func SetAccountField(snap *Snapshot, accountID, field string, value any) error {
 // the project file when it exists and sets the key, else the global file. Nested keys use a
 // dot ("worktrees.cleanup", "approvals.merge").
 func SetHubField(snap *Snapshot, field string, value any) error {
+	return setSectionField(snap, "hub", reflect.TypeOf(Hub{}), field, value)
+}
+
+// SetConductorField is SetHubField for the conductor section ("model", "effort", "account").
+func SetConductorField(snap *Snapshot, field string, value any) error {
+	return setSectionField(snap, "conductor", reflect.TypeOf(Conductor{}), field, value)
+}
+
+func setSectionField(snap *Snapshot, section string, t reflect.Type, field string, value any) error {
 	if snap == nil {
 		return errors.New("config: nil snapshot")
 	}
 	segs := strings.Split(field, ".")
-	t := reflect.TypeOf(Hub{})
 	for i, s := range segs {
 		ft, ok := yamlTags(t)[s]
 		if !ok {
-			return fmt.Errorf("config: unknown hub field %q", field)
+			return fmt.Errorf("config: unknown %s field %q", section, field)
 		}
 		if i < len(segs)-1 {
 			if ft.Kind() != reflect.Struct {
-				return fmt.Errorf("config: unknown hub field %q", field)
+				return fmt.Errorf("config: unknown %s field %q", section, field)
 			}
 			t = ft
 		} else if ft.Kind() == reflect.Struct {
-			return fmt.Errorf("config: hub field %q is a section, set its keys", field)
+			return fmt.Errorf("config: %s field %q is a section, set its keys", section, field)
 		}
 	}
 	writeMu.Lock()
 	defer writeMu.Unlock()
 	gp, pp := effectivePaths(snap)
-	full := append([]string{"hub"}, segs...)
+	full := append([]string{section}, segs...)
 	target := gp
 	if pp != "" {
 		doc, exists, err := readDoc(pp)

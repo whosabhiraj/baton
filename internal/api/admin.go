@@ -359,7 +359,11 @@ func (a *api) patchConfig(w http.ResponseWriter, r *http.Request) {
 	if a.noConfig(w) {
 		return
 	}
+	// "conductor.<key>" sets the conductor section (model, effort, account); the rest is hub.
 	if !a.patchFields(w, r, "config.hub", "hub", conductorHubFields, func(s *config.Snapshot, f string, v any) error {
+		if k, ok := strings.CutPrefix(f, "conductor."); ok {
+			return config.SetConductorField(s, k, v)
+		}
 		return config.SetHubField(s, f, v)
 	}) {
 		return

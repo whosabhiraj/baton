@@ -383,6 +383,14 @@ func TestP2PatchAccountAndHubConfig(t *testing.T) {
 	if hubCfg["mode"] != "auto" || hubCfg["worktrees"].(map[string]any)["cleanup"] != "remove_on_merge" {
 		t.Fatalf("hub cfg: %v", hubCfg)
 	}
+	// conductor section through the same route
+	st, m = e.obj(t, "PATCH", "/api/config", map[string]any{"conductor.effort": "medium", "conductor.model": "sonnet"})
+	if c := m["config"].(map[string]any)["conductor"].(map[string]any); st != 200 || c["effort"] != "medium" || c["model"] != "sonnet" {
+		t.Fatalf("patch conductor: %d %v", st, m)
+	}
+	if st, m = e.obj(t, "PATCH", "/api/config", map[string]any{"conductor.nope": "x"}); st != 400 || m["code"] != "CONFIG_INVALID" {
+		t.Fatalf("bad conductor key: %d %v", st, m)
+	}
 	if st, m = e.obj(t, "PATCH", "/api/config", map[string]any{"mode": "chaos"}); st != 400 || m["code"] != "CONFIG_INVALID" {
 		t.Fatalf("bad mode: %d %v", st, m)
 	}

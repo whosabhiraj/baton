@@ -129,6 +129,18 @@ func TestLineModeAgainstHub(t *testing.T) {
 	waitOut("no live agents")
 	waitOut("mode: propose")
 	waitOut("unknown command /bogus")
+	io.WriteString(pw, "/effort turbo\n/effort medium\n/model sonnet\n")
+	waitOut("effort must be one of")
+	waitOut("conductor effort is now medium")
+	waitOut("conductor model is now sonnet")
+	if b, _ := os.ReadFile(gp); !strings.Contains(string(b), "effort: medium") || !strings.Contains(string(b), "model: sonnet") {
+		t.Fatalf("config not saved:\n%s", b)
+	}
+	// the next message restarts the conductor with the new settings (same conversation)
+	io.WriteString(pw, "again\n")
+	waitOut("sonnet · medium")
+	io.WriteString(pw, "/effort\n")
+	waitOut("conductor effort: medium")
 	io.WriteString(pw, "/quit\n")
 	select {
 	case err := <-done:

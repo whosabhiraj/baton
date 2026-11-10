@@ -252,7 +252,7 @@ for idle stop.
 | `GET /api/accounts` | — | bare JSON array (`api.accounts`) of `{ id, label, kind, color, enabled, max_concurrent, used, roles[], models[], rate_limited, permissions_mode }`. `used` = live (not ended) runs; `rate_limited` = any live run has status `rate_limited`; `permissions_mode` defaults to `default`. |
 | `PATCH /api/accounts/:id` | `{ <account field>: value, ... }` (YAML key names, e.g. `max_concurrent`, `enabled`, `roles`) | `200` the updated account (one `api.accounts` element). Fields are applied in alphabetical order, each written back to the YAML file that defines the account (comments kept), then the config is reloaded. `404 NOT_FOUND` unknown account; `400 CONFIG_INVALID` `{ ok:false, code, error, issues:[string] }` if a value or field is refused (fields before it stay applied). |
 | `GET /api/config` | — | `200` `api.config`: `{ config, issues[{file,path,line?,msg}], global_path, project_path, version, ok }`. `ok:false` = the files currently have errors; `config` is then the last good one. |
-| `PATCH /api/config` | `{ "mode": "auto", "worktrees.cleanup": "keep", ... }` (dotted hub keys) | `200` same as `GET /api/config`; `400 CONFIG_INVALID` as above. |
+| `PATCH /api/config` | `{ "mode": "auto", "worktrees.cleanup": "keep", "conductor.effort": "medium", ... }` (dotted hub keys; `conductor.<key>` sets the conductor section) | `200` same as `GET /api/config`; `400 CONFIG_INVALID` as above. |
 | `GET /api/audit?limit=N` | `limit` default 100, `0` = all | `{ entries: [{ ts, actor, action, target?, detail? }] }`, oldest first. |
 | `GET /api/state` | — | additionally: `accounts` (as `/api/accounts`), `mode` (hub.mode), `config_ok`, `config_issues[]`, `instance` (as in health). |
 

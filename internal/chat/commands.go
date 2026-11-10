@@ -3,6 +3,7 @@ package chat
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -14,9 +15,14 @@ const Help = `Type a message for the conductor and press Enter. Commands:
   /approve <n|id> [note]       approve one (a merge is performed now)
   /reject <n|id> [note]        reject one
   /mode [user|propose|auto]    show or switch how lineups are decided
+  /model [name]                show or set the conductor's model (e.g. opus, sonnet)
+  /effort [level]              show or set its effort (low, medium, high, xhigh, max)
   /start  /stop                start or stop the conductor (agents keep running)
   /reset yes                   stop the conductor and forget the conversation
   /quit                        detach (Ctrl+C too); everything keeps running`
+
+// Efforts are the effort levels /effort accepts (the claude CLI's --effort values).
+var Efforts = []string{"low", "medium", "high", "xhigh", "max"}
 
 // ErrQuit is returned by Command for /quit.
 var ErrQuit = errors.New("quit")
@@ -90,6 +96,27 @@ func (s *Session) Command(text string) ([]Line, error) {
 			return failed(err), nil
 		}
 		return notice("mode is now %s", args[0]), nil
+	case "/model", "/effort":
+		key := cmd[1:]
+		if len(args) == 0 {
+			st := s.C.FetchStatus()
+			if st.Err != "" {
+				return notice("%s: unknown (%s)", key, st.Err), nil
+			}
+			v := map[string]string{"model": st.Model, "effort": st.Effort}[key]
+			if v == "" {
+				v = "CLI default"
+			}
+			return notice("conductor %s: %s", key, v), nil
+		}
+		v := strings.ToLower(args[0])
+		if key == "effort" && !slices.Contains(Efforts, v) {
+			return notice("effort must be one of: %s", strings.Join(Efforts, ", ")), nil
+		}
+		if err := s.C.Do("PATCH", "/api/config", map[string]string{"conductor." + key: v}, nil); err != nil {
+			return failed(err), nil
+		}
+		return notice("conductor %s is now %s (saved to the config; used from your next message)", key, v), nil
 	case "/start", "/stop":
 		if err := s.C.Do("POST", "/api/conductor/"+cmd[1:], nil, nil); err != nil {
 			return failed(err), nil

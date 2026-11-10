@@ -171,6 +171,8 @@ type Status struct {
 	Live      int // agents not ended
 	Approvals int // pending
 	Err       string
+	// the conductor's account, model and effort (what it runs with, or will start with)
+	Account, Model, Effort string
 }
 
 // FetchStatus reads GET /api/state.
@@ -187,6 +189,12 @@ func (c *Client) FetchStatus() Status {
 		return Status{Err: err.Error()}
 	}
 	s := Status{Conductor: st.Conductor, Mode: st.Mode, Approvals: len(st.Approvals)}
+	var ci struct {
+		Conductor struct{ Account, Model, Effort string } `json:"conductor"`
+	}
+	if c.Do("GET", "/api/conductor", nil, &ci) == nil { // NO_CONDUCTOR: just leave it out
+		s.Account, s.Model, s.Effort = ci.Conductor.Account, ci.Conductor.Model, ci.Conductor.Effort
+	}
 	for _, r := range st.Runs {
 		switch r.Status {
 		case "done", "failed", "killed", "exited":

@@ -518,6 +518,29 @@ func TestSetHubField(t *testing.T) {
 	}
 }
 
+func TestSetConductorField(t *testing.T) {
+	d := t.TempDir()
+	gp := filepath.Join(d, "config.yaml")
+	write(t, gp, "conductor:\n  model: opus # pick\n  effort: high\n")
+	snap := Load(gp, "")
+	if err := SetConductorField(snap, "effort", "medium"); err != nil {
+		t.Fatal(err)
+	}
+	if err := SetConductorField(snap, "model", "sonnet"); err != nil {
+		t.Fatal(err)
+	}
+	if err := SetConductorField(snap, "mode", "auto"); err == nil || !strings.Contains(err.Error(), "unknown conductor field") {
+		t.Fatalf("hub key accepted for the conductor: %v", err)
+	}
+	s := Load(gp, "")
+	if c := s.Config.Conductor; c.Effort != "medium" || c.Model != "sonnet" {
+		t.Fatalf("%+v", c)
+	}
+	if b, _ := os.ReadFile(gp); !strings.Contains(string(b), "model: sonnet # pick") {
+		t.Fatalf("comment lost:\n%s", b)
+	}
+}
+
 func TestExampleYAML(t *testing.T) {
 	old := hostOS
 	hostOS = "linux" // the example must be clean; the native-Windows note is tested separately

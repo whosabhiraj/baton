@@ -80,7 +80,8 @@ baton                    # in a repo: hub + conductor, dashboard, and the chat i
   dashboard (or `POST /api/spawn`, see `protocol/PROTOCOL.md`)
 - `baton hub status` / `baton hub stop` do what they say
 - `baton gc` removes worktrees your cleanup policy allows and ended run folders older than `hub.runs_keep_days` (it lists them and asks first; `--yes` skips, `--force` also takes worktrees with uncommitted changes; branches and live runs are never touched)
-- in the chat: `/agents`, `/approvals`, `/approve`, `/reject`, `/mode`, `/stop`, `/help`
+- in the chat: `/agents`, `/approvals`, `/approve`, `/reject`, `/mode`, `/model`, `/effort`, `/stop`, `/help`.
+  Drag with the mouse to select text, it's copied when you let go. Ctrl+Left/Right jump words
 
 the conductor's defaults live under `conductor:` in the config (account, model, effort,
 `auto_wake`), and `hub.mode` picks whether its lineups wait for your ok (`user`, `propose`) or
