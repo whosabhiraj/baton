@@ -1,6 +1,7 @@
 # HANDOFF — read this first
 
-Last updated: **2026-11-10**: a UX fix cycle is **almost done** (first-use feedback; one real run left), see §E first.
+Last updated: **2026-11-10**: a UX fix cycle is **done** (first-use feedback); only an optional real claude run
+to confirm the stall fix is left, see §E first.
 Before that: **2026-11-07**, **Phase 7 code done** (hardening + release): `baton gc`, conductor usage in
 account totals, error-path tests, `npm run release`, one full code review with its findings fixed.
 Since then: sandboxed agents (parts 1 and 4 done and verified), the known small issues fixed, CI green
@@ -119,7 +120,7 @@ brief.md, stdout.jsonl, stderr.log, supervisor.json, exit.json}`. Global config:
 
 ## E. Resume here (Phase 7 code done; sandbox part 4 done and verified)
 
-### UX fix cycle (2026-11-10), IN PROGRESS: resume this first
+### UX fix cycle (2026-11-10), DONE (one optional real run left)
 
 Found while using Baton for real on another repo (conductor + several claude/codex agents).
 
@@ -150,9 +151,14 @@ its PATCH runs; `TestTouchKeepsStallAway`. Checked in headless Chromium against 
 four behave. Terminal chat renders the conductor's Markdown (`internal/chat/markdown.go`: bold,
 italic, code, strike, links, headings, lists with hanging indent, quotes, rules, fenced code).
 
-Still to do:
-1. One real claude agent run to confirm partial messages parse fine and stalls stop (quota: ask).
-2. Optional: dashboard chat could reuse the same Markdown rules.
+Also done: the dashboard chat renders the conductor's Markdown with the same rules
+(`web/src/markdown.ts`, DOM nodes only, never innerHTML; links open only for http(s)/mailto, other
+targets show as dim text). Checked in headless Chromium against `baton mock` (the mock echoes the
+message, so Markdown sent in the chat comes back rendered; raw HTML in the text stays text).
+
+Still open (deferred, quota: ask first):
+1. One real claude agent run to confirm partial messages parse fine and stalls stop. Expect in the
+   run dir: `stdout.jsonl` with at most one delta line per 5 s, no `stalled` events while it thinks.
 
 
 Sandbox part 4, network on approval (2026-11-07), SOLVED (`8d313bb`): `baton __codex` opts into

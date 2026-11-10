@@ -3,6 +3,7 @@
 import { api, errText } from '../api';
 import { getToken } from '../auth';
 import { I, icon } from '../icons';
+import { renderMarkdown } from '../markdown';
 import { accountById, state } from '../store';
 import { busy, h, renderIf, setKids, toast } from '../util';
 import type { Panel } from './overlay';
@@ -135,7 +136,7 @@ export function chatPanel(): Panel {
       if (l.kind === 'you' || l.kind === 'hub' || firstOfTurn) log.append(h('div', { class: 'chat-gap' }));
       if (l.kind === 'you') log.append(h('div', { class: 'chat-who' }, 'you'));
       if (firstOfTurn) log.append(h('div', { class: 'chat-who cond' }, 'conductor'));
-      log.append(h('div', { class: 'chat-line k-' + l.kind }, l.kind === 'tool' ? '↳ ' + l.text : l.kind === 'meta' ? '· ' + l.text : l.text));
+      log.append(h('div', { class: 'chat-line k-' + l.kind }, l.kind === 'conductor' ? renderMarkdown(l.text) : l.kind === 'tool' ? '↳ ' + l.text : l.kind === 'meta' ? '· ' + l.text : l.text));
       prevKind = l.kind;
     }
     if (atBottom) log.scrollTop = log.scrollHeight;
