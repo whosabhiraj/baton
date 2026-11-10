@@ -22,7 +22,9 @@ func (claude) Argv(acct config.Account, model, effort string) ([]string, error) 
 }
 
 func claudeBase(model, effort string) []string {
-	argv := []string{"claude", "-p", "--output-format", "stream-json", "--verbose"}
+	// partial messages stream thinking and text as it is written: a sign of life during long
+	// thinking (the supervisor keeps one delta line per few seconds; the parser ignores them)
+	argv := []string{"claude", "-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages"}
 	if model != "" && model != "default" {
 		argv = append(argv, "--model", model)
 	}

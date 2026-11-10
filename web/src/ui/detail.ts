@@ -1,6 +1,6 @@
 import { api, errText } from '../api';
 import { accountById, refresh, ringOf, runById, select, state, type Run, type StoredEvent } from '../store';
-import { bullet, clock, ENDED, h, lineColor, renderIf, setKids, usageText } from '../util';
+import { bullet, busy, clock, ENDED, h, lineColor, renderIf, setKids, toast, usageText } from '../util';
 import { route, stepProgress, statusBadge } from './runs';
 import { I, icon } from '../icons';
 
@@ -71,19 +71,23 @@ function build(host: HTMLElement): (r: Run) => void {
     err.textContent = errText(e);
     err.hidden = false;
   };
-  const act = async (fn: () => Promise<unknown>) => {
+  /** Runs a control with btn busy (one click, a spinner, `label`), then says what happened. */
+  const act = async (btn: HTMLButtonElement, label: string, fn: () => Promise<unknown>, okText?: string, lock: Element[] = []) => {
     err.hidden = true;
-    try {
-      await fn();
-    } catch (e) {
-      fail(e);
-    }
-    await refresh();
+    const ran = await busy(btn, label, async () => {
+      try {
+        await fn();
+        if (okText) toast(okText);
+      } catch (e) {
+        fail(e);
+      }
+    }, lock);
+    if (ran) await refresh();
   };
 
   // controls (static: keeps typed text across updates)
   const msg = h('input', { type: 'text', 'aria-label': 'Message to the agent', placeholder: 'Message to the agent' });
-  const sendBtn = h('button', { type: 'submit' }, icon(I.send), 'Send');
+  const sendBtn: HTMLButtonElement = h('button', { type: 'submit' }, icon(I.send), 'Send');
   const msgForm = h(
     'form',
     {
@@ -92,24 +96,37 @@ function build(host: HTMLElement): (r: Run) => void {
         e.preventDefault();
         const t = msg.value.trim();
         if (!t || !cur) return;
-        void act(async () => {
+        const who = cur.callsign || cur.agent_id;
+        void act(sendBtn, 'Sending...', async () => {
           await api.message(cur!.run_id, t);
           msg.value = '';
-        });
+        }, `Message sent to ${who}`, [msg]);
       },
     },
     msg,
     sendBtn,
   );
-  const pauseBtn = h('button', { type: 'button', onclick: () => cur && void act(() => api.control(cur!.run_id, cur!.status === 'paused' ? 'resume' : 'pause')) }, icon(I.pause), 'Pause');
-  const stopBtn = h('button', { type: 'button', onclick: () => cur && void act(() => api.control(cur!.run_id, 'stop')) }, icon(I.stop), 'Stop');
-  const killBtn = h(
+  const pauseBtn: HTMLButtonElement = h('button', {
+    type: 'button',
+    onclick: () => {
+      if (!cur) return;
+      const resume = cur.status === 'paused';
+      void act(pauseBtn, resume ? 'Resuming...' : 'Pausing...', () => api.control(cur!.run_id, resume ? 'resume' : 'pause'),
+        resume ? 'Resume sent' : 'Pause sent: the agent stops at its next check-in');
+    },
+  }, icon(I.pause), 'Pause');
+  const stopBtn: HTMLButtonElement = h('button', {
+    type: 'button',
+    title: 'Ask the agent to wrap up and finish',
+    onclick: () => cur && void act(stopBtn, 'Stopping...', () => api.control(cur!.run_id, 'stop'), 'Stop sent: the agent finishes at its next check-in'),
+  }, icon(I.stop), 'Stop');
+  const killBtn: HTMLButtonElement = h(
     'button',
     {
       type: 'button',
       class: 'danger',
       onclick: () => {
-        if (cur && window.confirm(`Kill ${cur.callsign || cur.agent_id}? The process is terminated immediately.`)) void act(() => api.control(cur!.run_id, 'kill'));
+        if (cur && window.confirm(`Kill ${cur.callsign || cur.agent_id}? The process is terminated immediately.`)) void act(killBtn, 'Killing...', () => api.control(cur!.run_id, 'kill'), 'Killed');
       },
     },
     icon(I.kill),
@@ -251,17 +268,30 @@ function build(host: HTMLElement): (r: Run) => void {
   };
 }
 
-function questionBox(r: Run, q: Run['open_questions'][number], ended: boolean, act: (fn: () => Promise<unknown>) => Promise<void>): HTMLElement {
+type Act = (btn: HTMLButtonElement, label: string, fn: () => Promise<unknown>, okText?: string, lock?: Element[]) => Promise<void>;
+
+function questionBox(r: Run, q: Run['open_questions'][number], ended: boolean, act: Act): HTMLElement {
   const input = h('input', { type: 'text', 'aria-label': 'Answer', placeholder: 'Your answer', disabled: ended });
-  const send = (text: string) => {
-    if (text.trim()) void act(() => api.answer(r.run_id, q.qid, text.trim()));
+  const submit: HTMLButtonElement = h('button', { type: 'submit', class: 'primary', disabled: ended }, 'Answer');
+  const send = (btn: HTMLButtonElement, text: string) => {
+    if (!text.trim()) return;
+    void act(btn, 'Answering...', async () => {
+      await api.answer(r.run_id, q.qid, text.trim());
+      box.classList.add('answered'); // stays dimmed and disabled until the hub drops the question
+      box.dataset.done = '1';
+    }, `Answered ${q.qid}`, [box]);
   };
-  return h(
+  const box: HTMLFormElement = h(
     'form',
-    { class: 'question', onsubmit: (e: Event) => { e.preventDefault(); send(input.value); } },
+    { class: 'question', onsubmit: (e: Event) => { e.preventDefault(); send(submit, input.value); } },
     h('div', {}, h('strong', {}, q.blocking ? 'Blocking question' : 'Question'), ` (${q.qid})`),
     h('p', {}, q.text),
-    (q.options?.length ?? 0) > 0 && h('div', { class: 'row wrap' }, ...(q.options ?? []).map((o) => h('button', { type: 'button', disabled: ended, onclick: () => send(o) }, o))),
-    h('div', { class: 'row' }, input, h('button', { type: 'submit', class: 'primary', disabled: ended }, 'Answer')),
+    (q.options?.length ?? 0) > 0 &&
+      h('div', { class: 'row wrap' }, ...(q.options ?? []).map((o) => {
+        const b: HTMLButtonElement = h('button', { type: 'button', disabled: ended, onclick: () => send(b, o) }, o);
+        return b;
+      })),
+    h('div', { class: 'row' }, input, submit),
   );
+  return box;
 }

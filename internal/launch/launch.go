@@ -45,6 +45,10 @@ const (
 	hungDetail = "ended by Baton: the CLI finished its work but did not exit"
 )
 
+// thinSuffixes are the streaming lines the supervisor thins out: claude's partial messages
+// (`stream_event`) and codex app-server deltas (`item/.../delta`, `...TextDelta`).
+var thinSuffixes = []string{"stream_event", "delta"}
+
 // Options configures a Launcher. Store and Runs may be set later with Bind (the hub that owns
 // them is built after the launcher it is given).
 type Options struct {
@@ -171,7 +175,7 @@ func (l *Launcher) Start(res runs.SpawnResult) error {
 		return fmt.Errorf("write brief: %w", err)
 	}
 	if _, err := supervise.Launch(l.o.Exe, supervise.Spec{Argv: argv, Env: env, Dir: res.Worktree,
-		StdinFile: brief, RunDir: runDir, KillGraceS: killGraceS}); err != nil {
+		StdinFile: brief, RunDir: runDir, KillGraceS: killGraceS, ThinSuffixes: thinSuffixes}); err != nil {
 		return err
 	}
 	l.watch(run, ad)
@@ -386,6 +390,7 @@ func (w *watcher) warm() {
 }
 
 func (w *watcher) handle(line []byte, off int64) error {
+	w.run.Touch() // any output (a tool call, a thinking delta) means the agent is alive
 	if w.parser == nil {
 		return nil
 	}

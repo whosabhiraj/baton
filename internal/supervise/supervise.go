@@ -31,6 +31,9 @@ type Spec struct {
 	StdinFile  string   `json:"stdin_file"`
 	RunDir     string   `json:"run_dir"` // absolute
 	KillGraceS int      `json:"kill_grace_s"`
+	// ThinSuffixes: stdout lines whose JSON "type" or "method" ends with one of these (token
+	// deltas) are kept at most once per 5 s; they only show the agent is alive.
+	ThinSuffixes []string `json:"thin_suffixes,omitempty"`
 }
 
 // Exit is the content of exit.json.
@@ -269,6 +272,12 @@ func run(spec Spec) error {
 	}
 	defer ef.Close()
 	cmd.Stdout, cmd.Stderr = of, ef
+	var thin *thinWriter
+	if len(spec.ThinSuffixes) > 0 {
+		thin = newThinWriter(of, spec.ThinSuffixes)
+		cmd.Stdout = thin // exec copies through a pipe; Wait returns once it is drained
+		defer func() { _ = thin.Flush() }()
+	}
 	childAttr(cmd)
 
 	start := time.Now()

@@ -20,7 +20,7 @@ func eq(t *testing.T, got, want []string) {
 }
 
 func TestClaudeArgv(t *testing.T) {
-	base := []string{"claude", "-p", "--output-format", "stream-json", "--verbose"}
+	base := []string{"claude", "-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages"}
 	cat := func(parts ...[]string) []string {
 		var out []string
 		for _, p := range parts {

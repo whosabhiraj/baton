@@ -42,6 +42,47 @@ export function renderIf(el: Element, sig: string, fn: () => void): boolean {
   return true;
 }
 
+/** Runs fn with btn showing it is working: disabled, a spinner, `label` as its text (and every
+ *  control in `lock` disabled too). A second click while it runs does nothing. The button gets
+ *  its old content back afterwards (controls inside a `[data-done]` element stay disabled).
+ *  Returns false when it was already busy. */
+export async function busy(btn: HTMLButtonElement, label: string, fn: () => Promise<unknown>, lock: Element[] = []): Promise<boolean> {
+  if (btn.dataset.busy) return false;
+  btn.dataset.busy = '1';
+  const kids = [...btn.childNodes];
+  const locked = [btn, ...lock.flatMap((el) => [el, ...el.querySelectorAll('button, input, select, textarea')])].filter(
+    (el): el is HTMLButtonElement => 'disabled' in el && !(el as HTMLButtonElement).disabled,
+  );
+  locked.forEach((el) => (el.disabled = true));
+  btn.setAttribute('aria-busy', 'true');
+  btn.replaceChildren(h('i', { class: 'spin', 'aria-hidden': 'true' }), label);
+  try {
+    await fn();
+  } finally {
+    delete btn.dataset.busy;
+    btn.removeAttribute('aria-busy');
+    btn.replaceChildren(...kids);
+    locked.forEach((el) => (el.disabled = !!el.closest('[data-done]'))); // fn may mark its work done
+  }
+  return true;
+}
+
+let toasts: HTMLElement | null = null;
+/** A short message in the corner that goes away by itself: what just happened. */
+export function toast(text: string, kind: 'ok' | 'bad' | 'info' = 'ok', ms = 4000): void {
+  if (!toasts?.isConnected) {
+    toasts = h('div', { class: 'toasts', role: 'status', 'aria-live': 'polite' });
+    document.body.append(toasts);
+  }
+  const t = h('div', { class: 'toast toast-' + kind }, text);
+  toasts.append(t);
+  while (toasts.children.length > 4) toasts.firstElementChild?.remove();
+  window.setTimeout(() => {
+    t.classList.add('gone');
+    window.setTimeout(() => t.remove(), 200);
+  }, ms);
+}
+
 export const ENDED = new Set(['done', 'failed', 'killed', 'exited']);
 
 export function ago(ts: string | undefined, now = Date.now()): string {

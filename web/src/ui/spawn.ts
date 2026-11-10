@@ -1,6 +1,6 @@
 import { api, errText, type SpawnBody } from '../api';
 import { refresh, select, setOverlay, state } from '../store';
-import { h, setKids } from '../util';
+import { busy, h, setKids, toast } from '../util';
 import type { Panel } from './overlay';
 
 const lines = (s: string) => s.split(/[\n,]/).map((x) => x.trim()).filter(Boolean);
@@ -70,25 +70,35 @@ export function spawnPanel(): Panel {
     return b;
   }
 
+  // Spawning can take a few seconds (worktree, launch): the buttons say so and take one click.
   async function submit(dry: boolean): Promise<void> {
-    err.hidden = true;
-    setKids(out);
-    try {
-      const r = await api.spawn(body(dry));
-      if (dry) {
-        setKids(out, h('h3', {}, `Brief for ${r.callsign} (${r.account_id}, ${r.model || r.kind})`), h('pre', { class: 'brief' }, r.brief ?? '(no brief returned)'));
-        return;
+    const btn = dry ? dryBtn : spawnBtn;
+    await busy(btn, dry ? 'Writing brief...' : 'Spawning...', async () => {
+      err.hidden = true;
+      setKids(out);
+      try {
+        const r = await api.spawn(body(dry));
+        if (dry) {
+          setKids(out, h('h3', {}, `Brief for ${r.callsign} (${r.account_id}, ${r.model || r.kind})`), h('pre', { class: 'brief' }, r.brief ?? '(no brief returned)'));
+          out.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+          return;
+        }
+        toast(`Spawned ${r.callsign} on ${r.account_id}`);
+        await refresh();
+        select(r.run_id);
+        setOverlay(null);
+      } catch (e) {
+        err.textContent = errText(e);
+        err.hidden = false;
+        err.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
       }
-      await refresh();
-      select(r.run_id);
-      setOverlay(null);
-    } catch (e) {
-      err.textContent = errText(e);
-      err.hidden = false;
-    }
+    }, [form]);
   }
 
-  const form = h(
+  const dryBtn: HTMLButtonElement = h('button', { type: 'button', onclick: () => form.reportValidity() && void submit(true) }, 'Dry run: show brief');
+  const spawnBtn: HTMLButtonElement = h('button', { type: 'submit', class: 'primary' }, 'Spawn');
+
+  const form: HTMLFormElement = h(
     'form',
     { class: 'spawn', onsubmit: (e: Event) => { e.preventDefault(); void submit(false); } },
     h('div', { class: 'grid2' }, field('sp-account', 'Account', account), field('sp-role', 'Role', role), field('sp-kind', 'Kind', kind), field('sp-model', 'Model', model), field('sp-effort', 'Effort', effort), field('sp-callsign', 'Callsign', callsign)),
@@ -100,7 +110,7 @@ export function spawnPanel(): Panel {
     h('fieldset', {}, h('legend', {}, 'Scope (optional)'), field('sp-paths', 'Allowed paths', paths), field('sp-forb', 'Forbidden paths', forbidden), field('sp-ask', 'Ask before touching', askBefore)),
     field('sp-base', 'Base branch', base),
     err,
-    h('div', { class: 'row' }, h('button', { type: 'button', onclick: () => form.reportValidity() && void submit(true) }, 'Dry run: show brief'), h('button', { type: 'submit', class: 'primary' }, 'Spawn')),
+    h('div', { class: 'row' }, dryBtn, spawnBtn),
     out,
   );
   return { title: 'Spawn an agent', el: form };

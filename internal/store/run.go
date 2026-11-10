@@ -598,6 +598,14 @@ func (r *Run) Deliver(typ string, payload map[string]any) (int, *proto.Error) {
 	return n, nil
 }
 
+// Touch marks the run as alive now (agent output seen) without storing an event, so long
+// thinking or tool work does not count as a stall.
+func (r *Run) Touch() {
+	r.mu.Lock()
+	r.lastAct = time.Now()
+	r.mu.Unlock()
+}
+
 // LastActivity returns when the run last received an agent (non-hub) event, or when it was
 // opened if it has none yet.
 func (r *Run) LastActivity() time.Time {

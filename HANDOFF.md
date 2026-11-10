@@ -1,6 +1,7 @@
 # HANDOFF — read this first
 
-Last updated: **2026-11-07**, **Phase 7 code done** (hardening + release): `baton gc`, conductor usage in
+Last updated: **2026-11-10**: a UX fix cycle is **in progress** (first-use feedback), see §E first.
+Before that: **2026-11-07**, **Phase 7 code done** (hardening + release): `baton gc`, conductor usage in
 account totals, error-path tests, `npm run release`, one full code review with its findings fixed.
 Since then: sandboxed agents (parts 1 and 4 done and verified), the known small issues fixed, CI green
 on all 3 OSes. Agents reading the admin token: answered by sandboxed mode (token unreadable, verified).
@@ -117,6 +118,49 @@ brief.md, stdout.jsonl, stderr.log, supervisor.json, exit.json}`. Global config:
 `~/.baton/config.yaml`; per project: `<repo>/baton.config.yaml`.
 
 ## E. Resume here (Phase 7 code done; sandbox part 4 done and verified)
+
+### UX fix cycle (2026-11-10), IN PROGRESS: resume this first
+
+Found while using Baton for real on another repo (conductor + several claude/codex agents).
+
+Done and pushed (`f613d5b`): terminal chat mouse select-to-copy (`internal/chat/select.go`),
+Ctrl+Left/Right word jumps, footer shows conductor effort, `/model` and `/effort` (PATCH
+`/api/config` takes `conductor.<key>`, `config.SetConductorField`; applied on the conductor's next
+message, not on reload), conductor prompt keeps its own reading light.
+
+Done in the WIP commit after `f613d5b` (builds; web typechecks; NOT yet run in a browser):
+- `web/src/util.ts`: `busy(btn, label, fn, lock)` (one click, spinner, label, locks controls,
+  `[data-done]` keeps them disabled) and `toast(text, kind)` (corner message, auto-dismiss).
+- `ui/approvals.ts`: cards keyed by id (live updates no longer wipe edits or in-flight state),
+  busy labels ("Spawning N agents...", "Merging..."), error inside the card, card removed and
+  count updated at once on success, ALREADY_DECIDED / NOT_FOUND shown as an info toast.
+  Cause of the old double-click: lineup approve spawns every agent before answering (seconds);
+  a second click waits on `lineupMu` and then gets ALREADY_DECIDED.
+- `ui/spawn.ts`: Spawn / Dry run busy (double click used to spawn twice), toast, scroll to error.
+- `ui/detail.ts`: send / pause / stop / kill / answer busy + toasts; answered question dims.
+- Stalls: `store.Run.Touch()` on every agent stdout line (`launch` watcher). Adapter events
+  (activity/usage) used to clear `stalled` without moving `lastAct`, so a working agent was
+  flagged again and again. Claude agents now run with `--include-partial-messages` (thinking
+  streams = sign of life); the supervisor thins delta lines (`Spec.ThinSuffixes`,
+  `supervise/thin.go`, one per 5 s) so stdout.jsonl stays small. Codex app-server deltas too.
+
+Still to do, in order:
+1. CSS in `web/src/style.css`: `.spin` (small rotating ring, none under prefers-reduced-motion),
+   `button[aria-busy=true]`, `.approval.busy` (dimmed), `.question.answered`, `.toasts` /
+   `.toast` / `.toast-ok|bad|info` / `.gone` (bottom-right, quiet palette, amber only for bad).
+2. Same treatment for: `ui/chat.ts` (Enter can send twice while a send is in flight: guard it;
+   Start/Stop busy), `ui/config.ts` (busy Save, "Saved" toast, "Nothing changed" as a muted note
+   not an error), `ui/accounts.ts` (disable the toggle while its PATCH runs).
+3. Store test for `Touch` (stall not raised while lines arrive); `npm run check`.
+4. Check in a browser against `baton mock` (Chromium for Playwright is installed locally; the
+   playwright package is not). Then one real claude agent run to confirm partial messages parse
+   fine and stalls stop (ask before spending quota).
+5. Terminal chat markdown (not started): conductor replies show raw `**bold**`, backticks,
+   `- ` lists. Plan: a small renderer in `internal/chat` (bold, italic, inline code, headings,
+   bullets, fenced code, links) applied to KindConductor lines before wrapping; glamour is the
+   alternative but heavy (chroma). Dashboard chat could reuse the same rules later.
+6. Commit, push, update this section.
+
 
 Sandbox part 4, network on approval (2026-11-07), SOLVED (`8d313bb`): `baton __codex` opts into
 codex's experimental app-server API (`capabilities.experimentalApi`) and turns on
