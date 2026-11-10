@@ -4,8 +4,9 @@ run a bunch of coding agents at once (claude code, codex, opencode, or really an
 run a shell command) across your accounts. one conductor agent splits up the work and keeps
 things moving, you approve the important stuff, and there's a dashboard to watch it all.
 
-still being built: everything up to the conductor is written and tested. claude code agents have
-done real runs; codex and the conductor haven't been tried against the real clis yet.
+still being built, but it works: phases 1-7 are written and tested, and claude code agents, codex
+agents and the conductor have all done real runs on real accounts. ci is green on windows, macos
+and linux.
 
 ## the idea
 
@@ -22,7 +23,7 @@ it only runs the official clis and never touches your login tokens. everything s
 
 ## status
 
-phases 1-6 of 8 written, real runs of codex and the conductor still to do:
+phases 1-7 of 8 done (phase 8, remote access, isn't planned yet):
 
 - protocol + the agent cli, with a file spool so nothing is lost when the hub is down
 - background hub per project: runs, git worktrees, account rules, live config, audit log, stalled detection
@@ -42,9 +43,16 @@ phases 1-6 of 8 written, real runs of codex and the conductor still to do:
 - lineups: outside `auto` mode the conductor proposes the team as an approval; you can change
   each agent's account, model, effort or task, or drop one, before it spawns
 - merges are real `--no-ff` merge commits, only after you approve, and refused if they'd
-  conflict or the base checkout has uncommitted changes
+  conflict or the base checkout has uncommitted changes. an approval is tied to the commit that
+  was reviewed, so a branch that moves afterwards needs a fresh ok
+- sandboxed agents by default (see security below). sandboxed codex agents can ask you for more
+  access (like network) from the dashboard instead of just failing
+- hardening: `baton gc`, the conductor's own usage counts toward its account's totals, a test for
+  every error path, `npm run release` for cross-compiled binaries, and one full code review with
+  its findings fixed (tighter token handling, private data folders, redacted logs)
 
-next: hardening (phase 7). plan and design are in `docs/`.
+next: claude agents asking you for access the way codex ones can, and claude agents inside wsl2
+on windows. plan and design are in `docs/`, current status in `HANDOFF.md`.
 
 ## building
 
@@ -92,9 +100,15 @@ worker agents run with `permissions.mode: sandboxed` unless you change it:
   files in the run folder
 - codex uses its own sandbox (on windows the `mxc` one, no admin setup). codex sometimes
   hangs after finishing under that sandbox; baton ends it 20s after its last turn and records a
-  normal exit. claude uses claude
-  code's sandbox, which only exists on macos, linux and wsl2: on native windows a sandboxed
-  claude account refuses to start and tells you so
+  normal exit
+- claude uses claude code's sandbox, which only exists on macos, linux and wsl2: on native
+  windows a sandboxed claude account refuses to start and tells you so
+
+asking for more: with `permissions.ask: true` (the default), when the sandbox blocks a codex
+agent it asks you in the dashboard's approvals sheet instead of just failing. say yes to network
+and it has network for the rest of that run. two caveats: a network grant is for any host, not
+one at a time, and it relies on experimental codex features that may change between codex
+versions. `ask: false` just refuses. claude agents can't ask yet.
 
 `permissions.mode: permissive` turns all of that off for an account: the agent runs as you and
 can do anything you can, including reading baton's admin token and approving its own merge.
@@ -105,8 +119,8 @@ the conductor is restricted either way: it can only read the project and call ba
 its token can't approve anything, and it never sees the agents' tokens. the hub only listens on
 127.0.0.1 and its data folders are private to your user.
 
-coming next: agents asking you (in the dashboard) for network or files outside their area,
-and running claude agents inside wsl2 on windows.
+coming next: the same asking for claude agents, and running claude agents inside wsl2 on
+windows.
 
 ## try it without agents
 
@@ -125,3 +139,4 @@ the url it printed, and open the vite url with `#token=<admin token>`.
 - `protocol/PROTOCOL.md`: how agents and the conductor talk to the hub
 - `docs/GO_HUB_DESIGN.md`: how it's built and why
 - `docs/PLAN.md`: the plan
+- `HANDOFF.md`: where things stand right now and what's still open
