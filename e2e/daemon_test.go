@@ -166,9 +166,24 @@ func TestDaemonLifecycle(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(dd, "hub.json")); !os.IsNotExist(err) {
 		t.Fatal("hub.json remains after stop")
 	}
-	if _, err := httpClient.Get(in.URL + "/api/health"); err == nil {
+	if stillUp(in.URL, in.Instance) {
 		t.Fatal("hub still answering after stop")
 	}
+}
+
+// stillUp reports whether the hub instance answers at url. Another hub (a parallel test
+// package, a leftover mock) may already have taken the port, so only the same instance counts.
+func stillUp(url, instance string) bool {
+	resp, err := httpClient.Get(url + "/api/health")
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+	var h struct {
+		Instance string `json:"instance"`
+	}
+	_ = json.NewDecoder(resp.Body).Decode(&h)
+	return h.Instance == instance
 }
 
 func TestDaemonHardKillThenUp(t *testing.T) {
@@ -186,8 +201,7 @@ func TestDaemonHardKillThenUp(t *testing.T) {
 		t.Fatal(err)
 	}
 	until(t, 10*time.Second, "hub to die", func() (bool, bool) {
-		_, err := httpClient.Get(old.URL + "/api/health")
-		return true, err != nil
+		return true, !stillUp(old.URL, old.Instance)
 	})
 	// stale hub.json is still there until someone looks
 	if s := d.run(d.repo, "", "hub", "status"); field(s.Out, "hub") != "stopped" {

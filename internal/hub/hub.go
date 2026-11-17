@@ -99,7 +99,8 @@ type Hub struct {
 	conductor proto.ConductorState
 	condTok   atomic.Pointer[[32]byte] // sha256 of the current conductor session token (A16)
 	cond      *conductor.Manager       // nil = no conductor in this hub
-	lastAdm   atomic.Int64             // unix nanos of the last admin API request
+	lastAdm   atomic.Int64             // unix nanos of the last admin API request (start or end)
+	inflight  atomic.Int64             // admin/conductor API requests running now
 	stopCh    chan struct{}            // closed first on shutdown: ends SSE streams and background loops
 	detWG     sync.WaitGroup
 	serveWG   sync.WaitGroup
@@ -257,7 +258,7 @@ func Start(ctx context.Context, o Options) (*Hub, error) {
 		ConductorCtl: condCtl,
 		Runs:         h.runs, Audit: h.audit, Approvals: h.approvals, OnApproval: o.OnApproval, Launcher: o.Launcher,
 		FakeMerges: o.FakeMerges, CheckConductor: h.checkConductor,
-		Conductor: func() proto.ConductorState { h.condMu.Lock(); defer h.condMu.Unlock(); return h.conductor }, Config: h.cfg, Touch: func() { h.lastAdm.Store(time.Now().UnixNano()) },
+		Conductor: func() proto.ConductorState { h.condMu.Lock(); defer h.condMu.Unlock(); return h.conductor }, Config: h.cfg, Touch: h.apiTouch,
 		Store: h.store, Bus: h.broker, AdminToken: h.AdminToken, Instance: ids.UUID(), Dev: o.Dev,
 		Port: h.Port, URL: h.URL, Done: h.stopCh, Logger: log,
 		Shutdown:  func() { _ = h.Close(context.Background()) },
@@ -442,6 +443,17 @@ func (h *Hub) gcLoop() {
 	}
 }
 
+// apiTouch is the API's Touch hook: a request in flight keeps the hub awake, and its start and
+// end both count as activity.
+func (h *Hub) apiTouch() func() {
+	h.lastAdm.Store(time.Now().UnixNano())
+	h.inflight.Add(1)
+	return func() {
+		h.lastAdm.Store(time.Now().UnixNano())
+		h.inflight.Add(-1)
+	}
+}
+
 // idleAfter is the effective idle-stop delay (0 = never).
 func (h *Hub) idleAfter() time.Duration {
 	switch {
@@ -454,7 +466,7 @@ func (h *Hub) idleAfter() time.Duration {
 }
 
 // watchIdle stops the hub once it has had no live runs, no SSE subscribers and no admin API
-// request for the idle-stop delay.
+// request (running or finished) for the idle-stop delay.
 func (h *Hub) watchIdle() {
 	defer h.detWG.Done()
 	iv := time.Second
@@ -471,7 +483,7 @@ func (h *Hub) watchIdle() {
 		case <-h.stopCh:
 			return
 		case now := <-t.C:
-			busy := h.broker.Subscribers() > 0 || (h.cond != nil && h.cond.Active())
+			busy := h.broker.Subscribers() > 0 || h.inflight.Load() > 0 || (h.cond != nil && h.cond.Active())
 			if !busy {
 				for _, r := range h.store.List() {
 					if !r.Ended() {

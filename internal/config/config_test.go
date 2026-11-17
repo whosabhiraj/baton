@@ -17,10 +17,22 @@ import (
 	"github.com/whosabhiraj/baton/internal/proto"
 )
 
+// write replaces path atomically (temp file + rename, like an editor's save), so a poller never
+// reads it half-written. On Windows the rename fails while the poller has the file open: retry.
 func write(t *testing.T, path, s string) {
 	t.Helper()
-	if err := os.WriteFile(path, []byte(s), 0o644); err != nil {
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, []byte(s), 0o644); err != nil {
 		t.Fatal(err)
+	}
+	for end := time.Now().Add(5 * time.Second); ; time.Sleep(5 * time.Millisecond) {
+		err := os.Rename(tmp, path)
+		if err == nil {
+			return
+		}
+		if time.Now().After(end) {
+			t.Fatal(err)
+		}
 	}
 }
 
@@ -279,7 +291,7 @@ func TestWatchReloadAndLastGood(t *testing.T) {
 	}
 	wait := func(cond func(*Snapshot) bool) *Snapshot {
 		t.Helper()
-		for i := 0; i < 200; i++ {
+		for end := time.Now().Add(10 * time.Second); time.Now().Before(end); {
 			if s := w.Current(); cond(s) {
 				return s
 			}
@@ -309,8 +321,17 @@ func TestWatchReloadAndLastGood(t *testing.T) {
 	if s.Version != 3 || calls.Load() < 3 {
 		t.Fatalf("version %d calls %d", s.Version, calls.Load())
 	}
-	// file removal -> defaults
-	os.Remove(gp)
+	// file removal -> defaults. On Windows a remove fails while the poller has the file open
+	// for its read, so retry.
+	for end := time.Now().Add(5 * time.Second); ; time.Sleep(5 * time.Millisecond) {
+		err := os.Remove(gp)
+		if err == nil {
+			break
+		}
+		if time.Now().After(end) {
+			t.Fatal(err)
+		}
+	}
 	wait(func(s *Snapshot) bool { return s.Config.Hub.Port == 7777 })
 	w.Stop()
 	w.Stop()

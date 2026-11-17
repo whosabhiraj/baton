@@ -568,16 +568,18 @@ func TestPhase2RoutesWithoutBackends(t *testing.T) {
 }
 
 func TestTouchOnAdminOnly(t *testing.T) {
-	var n atomic.Int32
-	e := newEnv(t, func(d *api.Deps) { d.Touch = func() { n.Add(1) } })
+	var n, ended atomic.Int32
+	e := newEnv(t, func(d *api.Deps) {
+		d.Touch = func() func() { n.Add(1); return func() { ended.Add(1) } }
+	})
 	e.do("GET", "/api/health", "", "")
 	e.do("GET", "/api/state", "wrong", "")
-	if n.Load() != 0 {
-		t.Fatalf("touched %d", n.Load())
+	if n.Load() != 0 || ended.Load() != 0 {
+		t.Fatalf("touched %d, ended %d", n.Load(), ended.Load())
 	}
 	e.do("GET", "/api/state", adminTok, "")
-	if n.Load() != 1 {
-		t.Fatalf("touched %d", n.Load())
+	if n.Load() != 1 || ended.Load() != 1 { // the end hook runs once the handler is done
+		t.Fatalf("touched %d, ended %d", n.Load(), ended.Load())
 	}
 }
 

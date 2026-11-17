@@ -58,8 +58,10 @@ type Deps struct {
 	ConductorCtl ConductorCtl
 	// FakeMerges marks runs merged without touching git (baton mock).
 	FakeMerges bool
-	// Touch, if set, is called for every authenticated admin request (idle-stop bookkeeping).
-	Touch func()
+	// Touch, if set, is called when an authenticated admin or conductor request starts
+	// (idle-stop bookkeeping); the func it returns, if any, when the request ends, so a slow
+	// request (a spawn creating a worktree) keeps the hub awake while it runs.
+	Touch func() (end func())
 	// Shutdown is called (asynchronously, after the response) by POST /api/hub/shutdown.
 	Shutdown func()
 	// Done is closed when the hub shuts down; it ends SSE streams.
@@ -256,7 +258,9 @@ func (a *api) route(method string, class authClass, h http.HandlerFunc) http.Han
 				return
 			}
 			if a.Touch != nil {
-				a.Touch()
+				if end := a.Touch(); end != nil {
+					defer end()
+				}
 			}
 		case authAdminOrCond:
 			tok := bearer(r)
@@ -269,7 +273,9 @@ func (a *api) route(method string, class authClass, h http.HandlerFunc) http.Han
 				return
 			}
 			if a.Touch != nil {
-				a.Touch()
+				if end := a.Touch(); end != nil {
+					defer end()
+				}
 			}
 		}
 		r.Body = http.MaxBytesReader(w, r.Body, a.MaxBody)

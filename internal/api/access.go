@@ -34,7 +34,9 @@ func (a *api) accessRun(w http.ResponseWriter, r *http.Request) *store.Run {
 	id := r.PathValue("id")
 	if a.isAdmin(tok) {
 		if a.Touch != nil {
-			a.Touch()
+			if end := a.Touch(); end != nil {
+				end()
+			}
 		}
 		run := a.findRun(id)
 		if run == nil {

@@ -355,7 +355,8 @@ func (e *Engine) conduct(ctx context.Context) {
 				pausedOnce[r.RunID] = true
 				pausedByMe[r.RunID] = true
 				post("pausing", "pause", map[string]any{})
-			case a != nil && a.traits["kill"] && !killSent[r.RunID] && time.Since(a.started) > e.d(60):
+			case a != nil && a.traits["kill"] && !killSent[r.RunID] && time.Since(a.started) > e.d(60) &&
+				(!a.traits["stall"] || a.stalled.Load()): // a stalling agent is killed once it was seen stalled
 				killSent[r.RunID] = true
 				post("killing", "kill", nil)
 			case r.Status == "running" && rng.Intn(40) == 0:

@@ -29,6 +29,9 @@ func TestMain(m *testing.M) {
 func fakeAppServer() {
 	in := bufio.NewScanner(os.Stdin)
 	out := json.NewEncoder(os.Stdout)
+	// the turn completes once both requests (99 approval, 98 user input) are answered, in any
+	// order: the driver ends on turn/completed, so a later answer would never be reported
+	var got99, got98 bool
 	for in.Scan() {
 		var m map[string]any
 		if json.Unmarshal(in.Bytes(), &m) != nil {
@@ -65,12 +68,17 @@ func fakeAppServer() {
 		default:
 			if method == "<nil>" && id != nil { // a response from the driver
 				if fmt.Sprint(id) == "99" {
+					got99 = true
 					res, _ := m["result"].(map[string]any)
 					out.Encode(map[string]any{"method": "fake/decision", "params": map[string]any{"decision": res["decision"]}})
-					out.Encode(map[string]any{"method": "turn/completed", "params": map[string]any{"turn": map[string]any{"id": "tu1", "status": "completed"}}})
 				}
 				if fmt.Sprint(id) == "98" {
+					got98 = true
 					out.Encode(map[string]any{"method": "fake/userinput", "params": map[string]any{"error": m["error"] != nil}})
+				}
+				if got99 && got98 {
+					got99 = false
+					out.Encode(map[string]any{"method": "turn/completed", "params": map[string]any{"turn": map[string]any{"id": "tu1", "status": "completed"}}})
 				}
 			}
 		}

@@ -9,6 +9,7 @@ import (
 	"math/rand"
 	"net/http"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/whosabhiraj/baton/internal/ids"
@@ -34,7 +35,8 @@ type agent struct {
 	answers  map[string]bool // answered qids
 	gotMsg   bool
 	paused   bool
-	gotPause bool // a pause request arrived at least once
+	gotPause bool        // a pause request arrived at least once
+	stalled  atomic.Bool // the stall trait is over and the hub flagged the run (read by the engine)
 	stop     bool
 	pct      int
 	use      map[string]float64 // cumulative usage
@@ -156,7 +158,18 @@ func (a *agent) trait() {
 		a.send("progress", map[string]any{"percent": a.pct, "note": "rate limit cleared, continuing"})
 	case a.traits["stall"]:
 		a.sleep(a.e.stall.Seconds() * a.e.speed * 1.6) // silent: no heartbeat, no inbox
+		// on a slow machine the hub may not have flagged it yet: stay silent until it has
+		for t0 := time.Now(); !a.flagged() && a.alive() && time.Since(t0) < a.e.d(60); {
+			a.sleep(1)
+		}
+		a.stalled.Store(true)
 	}
+}
+
+// flagged reports whether the hub currently shows the run as stalled.
+func (a *agent) flagged() bool {
+	r := a.e.hub.Store().Get(a.res.RunID)
+	return r != nil && r.Summary().Status == proto.StatusStalled
 }
 
 // waitMsg idles until a message arrives or sec (scaled) have passed.
