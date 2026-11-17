@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/whosabhiraj/baton/internal/codexapp"
+	"github.com/whosabhiraj/baton/internal/permit"
 )
 
 // Version is set at build time via -ldflags "-X github.com/whosabhiraj/baton/internal/cli.Version=...".
@@ -82,6 +83,9 @@ func (c *ctx) dispatch(argv []string) (int, error) {
 	if len(argv) > 0 && argv[0] == "__codex" { // hidden: the sandboxed codex driver; args go to codex
 		return codexapp.Run(codexapp.Options{Args: argv[1:], Stdin: c.stdin, Stdout: c.stdout, Stderr: c.stderr,
 			Getenv: c.getenv, Version: Version}), nil
+	}
+	if len(argv) > 0 && argv[0] == "__permit" { // hidden: claude's permission prompt tool (MCP stdio)
+		return permit.Run(permit.Options{Stdin: c.stdin, Stdout: c.stdout, Stderr: c.stderr, Getenv: c.getenv, Version: Version}), nil
 	}
 	o, pos, err := parseArgs(argv)
 	if err != nil {

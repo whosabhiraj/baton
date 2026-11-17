@@ -2,17 +2,21 @@ package launch_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/whosabhiraj/baton/internal/adapters"
 	"github.com/whosabhiraj/baton/internal/config"
 	"github.com/whosabhiraj/baton/internal/gitx"
 	"github.com/whosabhiraj/baton/internal/launch"
+	"github.com/whosabhiraj/baton/internal/paths"
 	"github.com/whosabhiraj/baton/internal/proto"
 	"github.com/whosabhiraj/baton/internal/runs"
 	"github.com/whosabhiraj/baton/internal/store"
@@ -44,6 +48,17 @@ func fakeAgent(mode string) {
 		out(`{"type":"result","total_cost_usd":0.5,"usage":{"input_tokens":30,"output_tokens":11}}`)
 		_ = os.WriteFile("x.txt", []byte("hi\n"), 0o644)
 		os.Exit(3)
+	case "argv": // a fake claude: records how it was started and what its --mcp-config holds
+		info := map[string]any{"argv": os.Args[1:], "mcp_tool_timeout": os.Getenv("MCP_TOOL_TIMEOUT")}
+		for i, a := range os.Args {
+			if a == "--mcp-config" && i+1 < len(os.Args) {
+				b, err := os.ReadFile(os.Args[i+1])
+				info["mcp_config"], info["mcp_err"] = string(b), fmt.Sprint(err)
+			}
+		}
+		b, _ := json.Marshal(info)
+		_ = os.WriteFile("argv.json", b, 0o644)
+		out(`{"type":"result","total_cost_usd":0,"usage":{"input_tokens":1,"output_tokens":1}}`)
 	case "hang": // finishes its work, then never exits (codex under the Windows sandbox)
 		out(`{"type":"result","total_cost_usd":0.1,"usage":{"input_tokens":1,"output_tokens":1}}`)
 		time.Sleep(60 * time.Second)
@@ -331,5 +346,78 @@ func TestHungAfterFinish(t *testing.T) {
 	}
 	if len(f.of(res.RunID, "finished")) != 0 {
 		t.Fatal("finished is never stored")
+	}
+}
+
+// TestUnsandboxedClaudeAsks: a claude account in acceptEdits mode with permissions.ask gets
+// --permission-prompt-tool and an MCP config for `baton __permit` in the run's private dir
+// (outside the run dir, holding the run token); the dir is removed when the run exits.
+func TestUnsandboxedClaudeAsks(t *testing.T) {
+	bin := t.TempDir()
+	name := "claude"
+	if runtime.GOOS == "windows" {
+		name += ".exe"
+	}
+	self, _ := os.Executable()
+	b, err := os.ReadFile(self)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(bin, name), b, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	f := newFx(t)
+	f.cfg.Accounts = append(f.cfg.Accounts, config.Account{ID: "c", Kind: "claude", Enabled: true, MaxConcurrent: 1, Roles: []string{"impl"},
+		Env: map[string]string{"BATON_FAKE_AGENT": "argv"}, Permissions: config.Permissions{Mode: "acceptEdits", Ask: true}})
+	res := f.spawn("c")
+	res.Env["BATON_URL"], res.Env["BATON_ASK_TIMEOUT_S"] = "http://127.0.0.1:9", "60"
+	if err := f.launch.Start(*res); err != nil {
+		t.Fatal(err)
+	}
+	f.wait("exit", func() bool { return len(f.of(res.RunID, "exit")) == 1 })
+	raw, err := os.ReadFile(filepath.Join(res.Worktree, "argv.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var info struct {
+		Argv           []string `json:"argv"`
+		MCPToolTimeout string   `json:"mcp_tool_timeout"`
+		MCPConfig      string   `json:"mcp_config"`
+		MCPErr         string   `json:"mcp_err"`
+	}
+	if err := json.Unmarshal(raw, &info); err != nil {
+		t.Fatal(err)
+	}
+	line := strings.Join(info.Argv, " ")
+	priv := paths.PrivateRunDir(f.data, res.RunID)
+	for _, want := range []string{"--permission-mode acceptEdits", "--permission-prompt-tool " + adapters.PermitTool,
+		"--mcp-config " + filepath.Join(priv, adapters.PermitConfig)} {
+		if !strings.Contains(line, want) {
+			t.Errorf("argv lacks %q: %s", want, line)
+		}
+	}
+	if info.MCPErr != "<nil>" || !strings.Contains(info.MCPConfig, `"__permit"`) || !strings.Contains(info.MCPConfig, "bt_run_") ||
+		!strings.Contains(info.MCPConfig, `"BATON_PERMIT_TIMEOUT_S": "60"`) || !strings.Contains(info.MCPConfig, "http://127.0.0.1:9") {
+		t.Fatalf("mcp config (%s): %s", info.MCPErr, info.MCPConfig)
+	}
+	if info.MCPToolTimeout != "120000" {
+		t.Fatalf("MCP_TOOL_TIMEOUT %q", info.MCPToolTimeout)
+	}
+	if rel, _ := filepath.Rel(res.RunDir, priv); !strings.HasPrefix(rel, "..") {
+		t.Fatalf("private dir %s is inside the run dir", priv)
+	}
+	f.wait("private dir removed", func() bool { _, err := os.Stat(priv); return os.IsNotExist(err) })
+
+	// permissions.ask off: no prompt tool, no private files
+	f.cfg.Accounts[len(f.cfg.Accounts)-1].Permissions.Ask = false
+	res2 := f.spawn("c")
+	if err := f.launch.Start(*res2); err != nil {
+		t.Fatal(err)
+	}
+	f.wait("exit", func() bool { return len(f.of(res2.RunID, "exit")) == 1 })
+	raw, _ = os.ReadFile(filepath.Join(res2.Worktree, "argv.json"))
+	if strings.Contains(string(raw), "permission-prompt-tool") {
+		t.Fatalf("ask off: %s", raw)
 	}
 }

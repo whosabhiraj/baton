@@ -51,10 +51,11 @@ accounts:
       #   claude: macOS, Linux and WSL2 only (on native Windows it refuses to start).
       #   codex: its own sandbox (on Windows the mxc one; no admin setup needed).
       # permissive: no checks at all; the agent can do anything you can.
-      # acceptEdits | default: the CLI's own prompts, which nobody answers in a headless run.
+      # acceptEdits | default: the CLI's own permission rules, not sandboxed. claude asks you
+      #   (with ask: true) for anything they don't allow; otherwise it is refused.
       mode: sandboxed
       deny_read: [~/.ssh, ~/.aws]   # extra paths sandboxed agents may not read
-      ask: true                     # sandboxed codex: ask you (dashboard approvals) when the sandbox blocks something
+      ask: true                     # ask you (dashboard approvals) when something is blocked; false = refuse
       allowed_tools: []
       denied_tools: []
       extra_args: []

@@ -215,5 +215,6 @@ func (s *Store) Remove(id string) error {
 	delete(s.runs, id)
 	s.mu.Unlock()
 	_ = r.Close() // Windows cannot delete an open file
+	_ = os.RemoveAll(paths.PrivateRunDir(s.dir, id))
 	return os.RemoveAll(r.dir)
 }

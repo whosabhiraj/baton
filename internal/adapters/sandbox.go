@@ -22,18 +22,31 @@ type Sandbox struct {
 	BatonHome string
 	DenyRead  []string
 	GOOS      string
-	Driver    string // the baton binary (runs `baton __codex`)
+	Driver    string // the baton binary (runs `baton __codex`, `baton __permit`)
 	HubURL    string // for drivers that file access requests (never put in the agent's own env)
 	HubToken  string
+	RunID     string
+	// PrivateDir is a folder the agent cannot read (inside Baton's home, outside its worktree and
+	// run dir), for files with the run token (claude's MCP config). "" = claude cannot ask.
+	PrivateDir  string
+	AskTimeoutS float64 // how long an access request waits for the user
 }
 
-// SandboxPlan is how to start a sandboxed agent: argv, files to write into the run dir, and
-// extra environment for the process Baton starts (a driver; never forwarded to the agent's
-// commands).
+// askVia is how a sandboxed agent's prompts reach the user.
+func (sb Sandbox) askVia() AskVia {
+	return AskVia{Driver: sb.Driver, HubURL: sb.HubURL, HubToken: sb.HubToken, RunID: sb.RunID,
+		PrivateDir: sb.PrivateDir, TimeoutS: sb.AskTimeoutS}
+}
+
+// SandboxPlan is how to start a sandboxed agent: argv, files to write into the run dir, files
+// to write into the private dir (Sandbox.PrivateDir, mode 0600), and extra environment for the
+// process Baton starts (a driver strips its secrets before starting the CLI; for a CLI started
+// directly it holds nothing secret).
 type SandboxPlan struct {
-	Argv  []string
-	Files map[string][]byte
-	Env   map[string]string
+	Argv    []string
+	Files   map[string][]byte
+	Private map[string][]byte
+	Env     map[string]string
 }
 
 // ErrNoSandbox: this kind cannot be sandboxed on this platform.
@@ -66,17 +79,25 @@ func (c claude) SandboxArgv(acct config.Account, model, effort string, sb Sandbo
 		p = filepath.ToSlash(p)
 		deny = append(deny, "Read(/"+p+"/**)", "Edit(/"+p+"/**)") // "//abs/path" in permission rules
 	}
+	// With permissions.ask, what the sandbox blocks becomes a permission prompt that
+	// `baton __permit` turns into an access request: a command may ask to run outside the
+	// sandbox (that one command then runs with the user's full access), a new network host asks
+	// once and stays allowed for the run. Without ask, both are simply refused.
+	ask := acct.Permissions.Ask && sb.askVia().ok()
 	settings := map[string]any{
 		"sandbox": map[string]any{
-			"enabled":                  true,
-			"failIfUnavailable":        true,  // never fall back to running unsandboxed
-			"allowUnsandboxedCommands": false, // the agent cannot ask to leave the sandbox
+			"enabled":           true,
+			"failIfUnavailable": true, // never fall back to running unsandboxed
+			// sandboxed commands run without a prompt (claude's default is to prompt since 2.1.324,
+			// which a headless run can only deny)
+			"autoAllowBashIfSandboxed": true,
+			"allowUnsandboxedCommands": ask,
 			"filesystem": map[string]any{
 				"denyRead":   sb.denied(),
 				"allowRead":  []string{sb.Worktree, sb.RunDir}, // inside Baton's home: its code, its spool and inbox
 				"allowWrite": write,
 			},
-			"network": map[string]any{"allowedDomains": []string{}, "strictAllowlist": true},
+			"network": map[string]any{"allowedDomains": []string{}, "strictAllowlist": !ask},
 		},
 		"permissions": map[string]any{"deny": deny},
 	}
@@ -85,10 +106,21 @@ func (c claude) SandboxArgv(acct config.Account, model, effort string, sb Sandbo
 		return SandboxPlan{}, err
 	}
 	argv := claudeBase(model, effort)
-	argv = append(argv, "--permission-mode", "acceptEdits", "--permission-prompts", "none",
-		"--settings", filepath.Join(sb.RunDir, ClaudeSandboxFile))
+	argv = append(argv, "--permission-mode", "acceptEdits", "--settings", filepath.Join(sb.RunDir, ClaudeSandboxFile))
+	plan := SandboxPlan{Files: map[string][]byte{ClaudeSandboxFile: b}}
+	if ask {
+		pp, err := claude{}.PromptPlan(sb.askVia())
+		if err != nil {
+			return SandboxPlan{}, err
+		}
+		argv = append(argv, pp.Argv...)
+		plan.Private, plan.Env = pp.Private, pp.Env
+	} else {
+		argv = append(argv, "--permission-prompts", "none") // nobody to ask: anything that would prompt is refused
+	}
 	argv = append(argv, claudeToolFlags(acct.Permissions)...)
-	return SandboxPlan{Argv: append(argv, acct.Permissions.ExtraArgs...), Files: map[string][]byte{ClaudeSandboxFile: b}}, nil
+	plan.Argv = append(argv, acct.Permissions.ExtraArgs...)
+	return plan, nil
 }
 
 // ---- codex ----

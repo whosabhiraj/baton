@@ -160,6 +160,11 @@ func TestAccessValidationAndRedaction(t *testing.T) {
 	if n := len([]rune(ap["detail"].(map[string]any)["summary"].(string))); n != 300 {
 		t.Fatalf("summary len %d", n)
 	}
+	// any other tool call (claude's prompt tool, A21)
+	_, m = e.create(tok, "r1", `{"kind":"tool","summary":"fetch https://example.com","detail":{"tool":"WebFetch","url":"https://example.com"}}`)
+	if d := m["approval"].(map[string]any)["detail"].(map[string]any); d["kind"] != "tool" || d["tool"] != "WebFetch" {
+		t.Fatalf("tool kind: %v", d)
+	}
 }
 
 func TestAccessRunEnded(t *testing.T) {

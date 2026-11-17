@@ -373,6 +373,7 @@ func (m *Manager) Spawn(ctx context.Context, req SpawnRequest) (*SpawnResult, *p
 		AccountLabel: label, Branch: branch, Worktree: worktree, Task: req.Task,
 		Paths: req.Scope.Paths, Forbidden: req.Scope.Forbidden, AskBefore: req.Scope.AskBefore,
 		Sandboxed: acc.Permissions.Mode == config.ModeSandboxed,
+		Asks:      asksUser(kind, acc.Permissions),
 	}
 	if ck, ok := cfg.Kinds[kind]; ok && ck.Notes != "" {
 		data.KindNotes = ck.Notes
@@ -630,4 +631,18 @@ func (m *Manager) CleanupDue(now time.Time) []string {
 type Launcher interface {
 	Start(res SpawnResult) error
 	Kill(runID string) error
+}
+
+// asksUser: the agent's blocked actions become access requests (permissions.ask). Sandboxed
+// claude and codex agents ask through their drivers; unsandboxed claude agents in a mode that
+// prompts (acceptEdits, default) through `baton __permit`. Mirrors internal/launch.
+func asksUser(kind string, p config.Permissions) bool {
+	switch {
+	case !p.Ask:
+		return false
+	case p.Mode == config.ModeSandboxed:
+		return kind == "claude" || kind == "codex"
+	default:
+		return kind == "claude" && (p.Mode == "acceptEdits" || p.Mode == "default")
+	}
 }

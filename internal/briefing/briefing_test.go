@@ -33,3 +33,15 @@ func TestNoPlanAndKindNotes(t *testing.T) {
 		}
 	}
 }
+
+func TestAskNote(t *testing.T) {
+	d := briefing.Data{Callsign: "V", AgentID: "a", Role: "impl", Kind: "claude", Task: "T"}
+	out, _ := briefing.Render(d)
+	if strings.Contains(out, briefing.AskNote) {
+		t.Fatal("ask note without Asks")
+	}
+	d.Asks = true
+	if out, _ = briefing.Render(d); !strings.Contains(out, briefing.AskNote) {
+		t.Fatal("no ask note")
+	}
+}

@@ -83,9 +83,9 @@ func (a *api) accessCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	kind, _ := body["kind"].(string)
 	switch kind {
-	case "command", "file_change", "permissions":
+	case "command", "file_change", "permissions", "tool":
 	default:
-		writeErr(w, proto.NewError(proto.CodeInvalidPayload, "kind must be command, file_change or permissions"))
+		writeErr(w, proto.NewError(proto.CodeInvalidPayload, "kind must be command, file_change, permissions or tool"))
 		return
 	}
 	summary, _ := body["summary"].(string)

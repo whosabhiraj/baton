@@ -98,6 +98,10 @@ func RunsDir(dataDir string) string { return filepath.Join(dataDir, "runs") }
 // RunDir returns <dataDir>/runs/<runID>.
 func RunDir(dataDir, runID string) string { return filepath.Join(RunsDir(dataDir), runID) }
 
+// PrivateRunDir holds a run's files the agent must not read (they carry its token, e.g. claude's
+// MCP config for asking the user): in the project data dir, outside the run dir and worktree.
+func PrivateRunDir(dataDir, runID string) string { return filepath.Join(dataDir, "private", runID) }
+
 // InboxFileName returns the inbox file name for message n, e.g. 12 -> "000012.json".
 func InboxFileName(n int) string { return fmt.Sprintf("%06d.json", n) }
 

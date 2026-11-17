@@ -523,7 +523,7 @@ export namespace Config {
       mode?: 'sandboxed' | 'permissive' | 'acceptEdits' | 'default';
       deny_read?: StringList1;
       /**
-       * sandboxed codex: ask the user when the sandbox blocks something (false = just refuse)
+       * ask the user (dashboard approvals) when something is blocked: sandboxed claude and codex, claude in acceptEdits/default (false = just refuse)
        */
       ask?: boolean;
       allowed_tools?: StringList;

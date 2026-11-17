@@ -467,7 +467,8 @@ outside the sandbox), the agent's driver asks the user through an **access reque
 of kind `access` (only a human decides; the conductor token cannot):
 
 - `POST /api/runs/:id/access` (that run's token, or admin) body `{ kind, summary, detail? }`:
-  `kind` is `command | file_change | permissions`, `summary` one line (<= 300 chars, redacted),
+  `kind` is `command | file_change | permissions | tool` (`tool`: any other tool call, A21),
+  `summary` one line (<= 300 chars, redacted),
   `detail` an object (command, cwd, reason, paths, network host; redacted). Answer
   `200 { ok, approval }`; the approval has `kind: "access"`, `run_id`, `title` "<callsign>: <summary>",
   `detail { kind, summary, agent_id, ...detail }`, `status: "pending"`. Run ended: `410 RUN_ENDED`.
@@ -492,3 +493,29 @@ and a permissions request, when approved, holds for the rest of the run (scope `
 profile has no network section, so there is no network otherwise. A managed-proxy host prompt
 (`networkApprovalContext`, detail `network_host`), if codex sends one, is approved with
 `acceptForSession`.
+
+### A21. Claude agents ask through a permission prompt tool
+
+Claude agents hand their permission prompts to `baton __permit`, a one-tool MCP stdio server
+(`mcp__baton_access__approve`), when `permissions.ask` is on and the account is either
+`sandboxed` or in a mode that prompts (`acceptEdits`, `default`). Claude runs with
+`--permission-prompts host --permission-prompt-tool mcp__baton_access__approve --mcp-config
+<data dir>/private/<run_id>/access-mcp.json`. That file (0600) holds the hub URL, the run token,
+the run id and the ask timeout for the MCP server. It lives outside the worktree and run dir, so
+a sandboxed agent cannot read it, and it is removed when the run exits (and by gc).
+
+Each call is filed as an access request (A20): Bash/PowerShell -> `command` (detail `command`,
+`description`, and `unsandboxed` when Claude asks to run it outside the sandbox), Edit/Write/
+MultiEdit/NotebookEdit -> `file_change` (detail `path`), WebFetch/WebSearch and anything else ->
+`tool` (detail `url`, `query`, or `input` as compact JSON). The tool waits up to the run's ask
+timeout (A8), withdraws the request on timeout (`cancel`), and answers Claude with one text
+item: `{"behavior":"allow","updatedInput":<input as received>}` or
+`{"behavior":"deny","message":"..."}`. Claude waits on the call: `MCP_TOOL_TIMEOUT` is set to
+the ask timeout plus 60 s.
+
+Sandboxed Claude settings: `autoAllowBashIfSandboxed: true` (sandboxed commands never prompt).
+With ask: `allowUnsandboxedCommands: true` (a blocked command may ask to run outside the
+sandbox; approved, that one command runs with the user's full access) and
+`network.strictAllowlist: false` (a new host prompts; approved, it stays allowed for the run).
+Without ask: both off and `--permission-prompts none`, so anything that would prompt is refused.
+

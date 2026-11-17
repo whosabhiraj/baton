@@ -31,7 +31,12 @@ type Data struct {
 	ExtraNote string
 	// Sandboxed adds the sandbox rules (permissions.mode: sandboxed).
 	Sandboxed bool
+	// Asks: blocked actions become requests the user answers in the dashboard (permissions.ask).
+	Asks bool
 }
+
+// AskNote tells an agent whose blocked actions are put to the user how that works.
+const AskNote = "When something you try needs the user's OK (a command outside the sandbox, a new network host, a file outside your worktree), Baton asks the user and your tool call waits for the answer. If the answer is no, don't try the same thing again: work around it or explain with `baton ask`."
 
 // SandboxNote tells a sandboxed agent what it can and cannot do.
 const SandboxNote = "You run in a sandbox: you can write only inside your worktree, there is no network unless the user allows it, and some folders outside it cannot be read. Work with what is in the repo; if you need something outside (a package, a file, a site), say so with `baton ask` instead of trying to get around it. `baton` prints \"spooled (hub unreachable)\": that is expected here, your reports still arrive."
@@ -92,6 +97,9 @@ func Render(d Data) (string, error) {
 	}
 	if d.Sandboxed {
 		notes += "\n" + SandboxNote
+	}
+	if d.Asks {
+		notes += "\n" + AskNote
 	}
 	d.KindNotes = strings.TrimSpace(notes)
 	v := view{Data: d,

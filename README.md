@@ -99,7 +99,12 @@ have no network.
   agent asks you in the dashboard instead of failing; a network grant covers any host for the
   rest of that run, and relies on experimental codex features
 - claude uses claude code's sandbox, which exists only on macos, linux and wsl2. on native
-  windows a sandboxed claude account refuses to start. claude agents can't ask for access yet
+  windows a sandboxed claude account refuses to start. with `permissions.ask: true` a blocked
+  command can ask to run outside the sandbox (approved, that one command runs with your full
+  access) and a new host asks once (approved, it stays allowed for the run)
+- `acceptEdits` and `default` aren't sandboxed: claude's own permission rules decide, and with
+  `permissions.ask: true` anything they don't allow comes to you in the dashboard (works on
+  native windows too). without it, it's refused
 - `permissive` turns all of it off: the agent can do anything you can, including approving its
   own merge. only for repos you'd trust a script with
 
@@ -139,8 +144,8 @@ click around the dashboard for free (`--speed 5`, `--seed N`, `--once`, `--reset
 ## status
 
 phases 1-7 of 8 done and tested; claude, codex and the conductor have all done real runs. ci is
-green on windows, macos and linux. next: claude agents asking for access like codex ones, and
-claude inside wsl2 on windows. phase 8 (remote access) isn't planned yet.
+green on windows, macos and linux. next: claude inside wsl2 on windows. phase 8 (remote
+access) isn't planned yet.
 
 ## docs
 

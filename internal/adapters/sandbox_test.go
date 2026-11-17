@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/whosabhiraj/baton/internal/config"
+	"github.com/whosabhiraj/baton/internal/permit"
 )
 
 func sbFixture(t *testing.T) Sandbox {
@@ -106,6 +107,119 @@ func TestClaudeSandboxArgv(t *testing.T) {
 	}
 	if _, err := (claude{}).Argv(acct, "", ""); err == nil {
 		t.Fatal("Argv must refuse sandboxed mode")
+	}
+}
+
+// claudeSettings is the part of the claude sandbox settings the tests look at.
+type claudeSettings struct {
+	Sandbox struct {
+		AutoAllowBashIfSandboxed, AllowUnsandboxedCommands bool
+		Network                                            struct{ StrictAllowlist bool }
+	}
+	Permissions struct{ Deny []string }
+}
+
+func TestClaudeSandboxAsk(t *testing.T) {
+	sb := sbFixture(t)
+	priv := filepath.Join(sb.BatonHome, "projects", "p-1", "private", "r1")
+	if err := os.MkdirAll(priv, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	sb.Driver, sb.HubURL, sb.HubToken, sb.RunID, sb.PrivateDir, sb.AskTimeoutS = "/bin/baton", "http://127.0.0.1:7777", "bt_run_secret", "r1", priv, 120
+	settings := func(plan SandboxPlan) claudeSettings {
+		var s claudeSettings
+		if err := json.Unmarshal(plan.Files[ClaudeSandboxFile], &s); err != nil {
+			t.Fatal(err)
+		}
+		return s
+	}
+
+	// ask off: sandboxed commands run without prompts, everything else is refused
+	acct := config.Account{ID: "c1", Permissions: config.Permissions{Mode: config.ModeSandboxed}}
+	plan, err := (claude{}).SandboxArgv(acct, "", "", sb)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s := settings(plan); !s.Sandbox.AutoAllowBashIfSandboxed || s.Sandbox.AllowUnsandboxedCommands || !s.Sandbox.Network.StrictAllowlist {
+		t.Fatalf("no ask: %+v", s.Sandbox)
+	}
+	if line := strings.Join(plan.Argv, " "); !strings.Contains(line, "--permission-prompts none") || strings.Contains(line, "--permission-prompt-tool") || plan.Private != nil {
+		t.Fatalf("no ask: %s %v", line, plan.Private)
+	}
+
+	// ask on: prompts go to `baton __permit`; its config (with the token) is private
+	acct.Permissions.Ask = true
+	plan, err = (claude{}).SandboxArgv(acct, "", "", sb)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := settings(plan)
+	if !s.Sandbox.AutoAllowBashIfSandboxed || !s.Sandbox.AllowUnsandboxedCommands || s.Sandbox.Network.StrictAllowlist {
+		t.Fatalf("ask: %+v", s.Sandbox)
+	}
+	line := strings.Join(plan.Argv, " ")
+	for _, want := range []string{"--permission-prompts host", "--permission-prompt-tool " + PermitTool,
+		"--mcp-config " + filepath.Join(priv, PermitConfig)} {
+		if !strings.Contains(line, want) {
+			t.Errorf("argv lacks %q: %s", want, line)
+		}
+	}
+	if strings.Contains(line, "none") || strings.Contains(line, sb.HubToken) || strings.Contains(string(plan.Files[ClaudeSandboxFile]), sb.HubToken) {
+		t.Fatalf("ask argv/settings: %s", line)
+	}
+	if plan.Env["MCP_TOOL_TIMEOUT"] != "180000" || strings.Contains(fmt.Sprint(plan.Env), sb.HubToken) {
+		t.Fatalf("env %v", plan.Env)
+	}
+	var mc struct {
+		MCPServers map[string]struct {
+			Command string
+			Args    []string
+			Env     map[string]string
+		} `json:"mcpServers"`
+	}
+	if err := json.Unmarshal(plan.Private[PermitConfig], &mc); err != nil {
+		t.Fatal(err)
+	}
+	srv := mc.MCPServers[PermitServer]
+	if srv.Command != sb.Driver || strings.Join(srv.Args, " ") != "__permit" || srv.Env["BATON_PERMIT_TOKEN"] != sb.HubToken ||
+		srv.Env["BATON_PERMIT_URL"] != sb.HubURL || srv.Env["BATON_PERMIT_RUN"] != "r1" || srv.Env["BATON_PERMIT_TIMEOUT_S"] != "120" {
+		t.Fatalf("mcp config %+v", mc)
+	}
+	// the private folder is among the paths the agent's Read/Edit tools are denied
+	if deny := strings.Join(s.Permissions.Deny, " "); !strings.Contains(deny, "Read(/"+filepath.ToSlash(filepath.Dir(priv))+"/**)") {
+		t.Fatalf("private dir not denied: %s", deny)
+	}
+
+	// ask on but nowhere private to put the token: refuse instead of asking
+	sb.PrivateDir = ""
+	if plan, err = (claude{}).SandboxArgv(acct, "", "", sb); err != nil || !strings.Contains(strings.Join(plan.Argv, " "), "--permission-prompts none") {
+		t.Fatalf("no private dir: %v %v", err, plan.Argv)
+	}
+}
+
+func TestPermitNamesMatch(t *testing.T) {
+	if PermitServer != permit.ServerName || PermitTool != permit.FullToolName {
+		t.Fatalf("adapters %s/%s vs permit %s/%s", PermitServer, PermitTool, permit.ServerName, permit.FullToolName)
+	}
+	plan, err := (claude{}).PromptPlan(AskVia{Driver: "b", HubURL: "u", HubToken: "t", RunID: "r", PrivateDir: "p", TimeoutS: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, k := range []string{permit.EnvURL, permit.EnvToken, permit.EnvRun, permit.EnvTimeout} {
+		if !strings.Contains(string(plan.Private[PermitConfig]), `"`+k+`"`) {
+			t.Errorf("mcp config lacks %s", k)
+		}
+	}
+}
+
+func TestClaudePromptPlanNeedsEverything(t *testing.T) {
+	a := AskVia{Driver: "b", HubURL: "u", HubToken: "t", RunID: "r", PrivateDir: "p"}
+	if _, err := (claude{}).PromptPlan(a); err != nil {
+		t.Fatal(err)
+	}
+	a.HubToken = ""
+	if _, err := (claude{}).PromptPlan(a); err == nil {
+		t.Fatal("no token must fail")
 	}
 }
 

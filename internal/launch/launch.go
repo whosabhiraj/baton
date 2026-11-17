@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -136,12 +137,16 @@ func (l *Launcher) Start(res runs.SpawnResult) error {
 		return err
 	}
 	sandboxed := acct.Permissions.Mode == config.ModeSandboxed
+	privDir := paths.PrivateRunDir(st.DataDir(), res.RunID)
 	var argv []string
-	var driverEnv map[string]string
+	var driverEnv, promptEnv map[string]string
 	if sandboxed {
-		argv, driverEnv, err = l.sandboxArgv(ad, *acct, res, run.Record().Effort, runDir)
+		argv, driverEnv, err = l.sandboxArgv(ad, *acct, res, run.Record().Effort, runDir, privDir)
 	} else {
 		argv, err = ad.Argv(*acct, res.Model, run.Record().Effort)
+		if err == nil {
+			argv, promptEnv, err = l.promptArgv(ad, *acct, res, argv, privDir)
+		}
 	}
 	if err != nil {
 		return err
@@ -151,6 +156,9 @@ func (l *Launcher) Start(res runs.SpawnResult) error {
 		for k, v := range ep.Env() {
 			acctEnv[k] = v
 		}
+	}
+	for k, v := range promptEnv {
+		acctEnv[k] = v
 	}
 	for k, v := range acct.Env {
 		acctEnv[k] = v
@@ -182,9 +190,48 @@ func (l *Launcher) Start(res runs.SpawnResult) error {
 	return nil
 }
 
+// askTimeoutS is the run's ask timeout (the same one `baton ask --blocking` uses).
+func askTimeoutS(res runs.SpawnResult) float64 {
+	f, _ := strconv.ParseFloat(res.Env["BATON_ASK_TIMEOUT_S"], 64)
+	return f
+}
+
+// writePrivate creates the run's private dir (0700) and writes files into it (0600).
+func writePrivate(dir string, files map[string][]byte) error {
+	if err := paths.EnsurePrivateDir(dir); err != nil {
+		return err
+	}
+	for name, b := range files {
+		if err := os.WriteFile(filepath.Join(dir, name), b, 0o600); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// promptArgv: an unsandboxed agent whose CLI would prompt (permissions.mode acceptEdits or
+// default) asks the user through access requests when permissions.ask is on and the CLI can
+// hand its prompts over (claude). Otherwise argv is returned as it is.
+func (l *Launcher) promptArgv(ad adapters.Adapter, acct config.Account, res runs.SpawnResult, argv []string, privDir string) ([]string, map[string]string, error) {
+	pr, ok := ad.(adapters.Prompter)
+	mode := acct.Permissions.Mode
+	if !ok || !acct.Permissions.Ask || (mode != "acceptEdits" && mode != "default") {
+		return argv, nil, nil
+	}
+	plan, err := pr.PromptPlan(adapters.AskVia{Driver: l.o.Exe, HubURL: res.Env["BATON_URL"], HubToken: res.Env["BATON_TOKEN"],
+		RunID: res.RunID, PrivateDir: privDir, TimeoutS: askTimeoutS(res)})
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := writePrivate(privDir, plan.Private); err != nil {
+		return nil, nil, err
+	}
+	return append(argv, plan.Argv...), plan.Env, nil
+}
+
 // sandboxArgv builds a sandboxed command line (permissions.mode: sandboxed) and writes the
-// files it needs into the run dir.
-func (l *Launcher) sandboxArgv(ad adapters.Adapter, acct config.Account, res runs.SpawnResult, effort, runDir string) ([]string, map[string]string, error) {
+// files it needs into the run dir and the private dir.
+func (l *Launcher) sandboxArgv(ad adapters.Adapter, acct config.Account, res runs.SpawnResult, effort, runDir, privDir string) ([]string, map[string]string, error) {
 	sbx, ok := ad.(adapters.Sandboxer)
 	if !ok {
 		return nil, nil, fmt.Errorf("%s agents cannot be sandboxed; set permissions.mode: permissive on account %s to run them unsandboxed", res.Kind, acct.ID)
@@ -197,9 +244,15 @@ func (l *Launcher) sandboxArgv(ad adapters.Adapter, acct config.Account, res run
 	if err != nil {
 		return nil, nil, fmt.Errorf("sandbox: %w", err)
 	}
+	// The private dir must exist before the plan is made: the agent's deny rules list what is
+	// there at that moment (adapters.DenyAround).
+	if err := paths.EnsurePrivateDir(privDir); err != nil {
+		return nil, nil, err
+	}
 	plan, err := sbx.SandboxArgv(acct, res.Model, effort, adapters.Sandbox{Worktree: wt, RunDir: runDir,
 		GitWrite: gitWrite, BatonHome: paths.BatonHome(), DenyRead: acct.Permissions.DenyRead, GOOS: runtime.GOOS,
-		Driver: l.o.Exe, HubURL: res.Env["BATON_URL"], HubToken: res.Env["BATON_TOKEN"]})
+		Driver: l.o.Exe, HubURL: res.Env["BATON_URL"], HubToken: res.Env["BATON_TOKEN"],
+		RunID: res.RunID, PrivateDir: privDir, AskTimeoutS: askTimeoutS(res)})
 	if err != nil {
 		return nil, nil, err
 	}
@@ -207,6 +260,9 @@ func (l *Launcher) sandboxArgv(ad adapters.Adapter, acct config.Account, res run
 		if err := os.WriteFile(filepath.Join(runDir, name), b, 0o600); err != nil {
 			return nil, nil, err
 		}
+	}
+	if err := writePrivate(privDir, plan.Private); err != nil {
+		return nil, nil, err
 	}
 	return plan.Argv, plan.Env, nil
 }
@@ -492,6 +548,9 @@ func (w *watcher) finish(ex *supervise.Exit) {
 		return
 	}
 	_ = os.WriteFile(filepath.Join(w.dir, reportedFile), nil, 0o644)
+	if st := w.l.store(); st != nil { // the run's token is revoked now; its private files can go
+		_ = os.RemoveAll(paths.PrivateRunDir(st.DataDir(), w.run.ID()))
+	}
 	w.l.mu.Lock()
 	delete(w.l.watched, w.run.ID())
 	w.l.mu.Unlock()
