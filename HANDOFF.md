@@ -1,12 +1,11 @@
 # HANDOFF — read this first
 
-Last updated: **2026-11-10**: a UX fix cycle is **done** (first-use feedback); only an optional real claude run
-to confirm the stall fix is left, see §E first.
-Before that: **2026-11-07**, **Phase 7 code done** (hardening + release): `baton gc`, conductor usage in
-account totals, error-path tests, `npm run release`, one full code review with its findings fixed.
-Since then: sandboxed agents (parts 1 and 4 done and verified), the known small issues fixed, CI green
-on all 3 OSes. Agents reading the admin token: answered by sandboxed mode (token unreadable, verified).
-Still open: sandbox parts 2 and 3 (Claude), see §E.
+Last updated: **2026-11-17**: CI flakes fixed (CI green on all 3 OSes again) and **sandbox part 2
+done**: Claude agents ask for access through the dashboard (`baton __permit`, PROTOCOL.md A21),
+verified with two small real runs on Windows (one prompt approved, one rejected). Open: sandbox
+part 3 (`runtime: wsl` for Claude on Windows) and the sandbox-only prompts that need it, see §E.
+Before that: **2026-11-10** UX fix cycle (first-use feedback), **2026-11-07** Phase 7 code done
+(hardening + release), sandbox parts 1 and 4.
 
 Big change since Phase 0: the hub **and** the `baton` CLI are written in **Go** (one binary).
 `docs/GO_HUB_DESIGN.md` is approved and overrides `docs/PLAN.md` §3, §4.7, §5 and §6.
@@ -78,6 +77,7 @@ Things only you can do:
 | 5 Adapters | ✅ done: supervisor, env allowlist, claude + codex (real runs ok), opencode + refusal, custom kinds, `baton login` (adds unknown ids) | `852719b` … `72e99ec` |
 | 6 Conductor | ✅ done: 6a conductor token, run/diff/merge/wait routes, real merges, `baton mcp`; 6b headless conductor (history, resume, auto-wake); 6c chat (Bubble Tea + dashboard sheet); 6d lineups. Acceptance passed on real accounts | `12da74f` … `b9cb6fe` |
 | 7 Hardening + release | code done: gc + cleanup policy enforced, conductor usage, error-path tests, release script, review fixes | `172cec5` … `93f6a83` |
+| Sandbox parts 1, 2, 4 | ✅ done: sandboxed by default; codex asks (network grant); claude asks via `baton __permit` (verified on Windows in acceptEdits). Part 3 (claude in WSL2) open | `eab4bbf` … `c62c17c` |
 | 8 Remote access (future) | not planned yet | — |
 
 ## D. What exists right now
@@ -100,6 +100,7 @@ internal/launch         real Launcher: start, stdout -> activity/usage, exit + d
                         adoption after hub restart, preflight (OpenCode/Claude-subscription refusal)
 internal/mock           `baton mock`: fake conductor + agents through the real hub
 internal/mcpserver      `baton mcp`: the conductor's MCP stdio server, 20 tools = thin REST calls (A16, A18)
+internal/permit         `baton __permit`: MCP stdio server, claude's --permission-prompt-tool -> access requests (A21)
 internal/conductor      headless conductor process (claude -p stream-json), history, resume, auto-wake,
                         embedded prompt.md, FakeCLI (BATON_FAKE_CLAUDE=1) for mock and tests (A17)
 internal/chat           terminal chat: Bubble Tea UI + line mode, slash commands
@@ -118,7 +119,44 @@ Runtime data: `~/.baton/projects/<repo-name>-<hash8>/` (override with `BATON_HOM
 brief.md, stdout.jsonl, stderr.log, supervisor.json, exit.json}`. Global config:
 `~/.baton/config.yaml`; per project: `<repo>/baton.config.yaml`.
 
-## E. Resume here (Phase 7 code done; sandbox part 4 done and verified)
+## E. Resume here (sandbox parts 1, 2 and 4 done; part 3 open)
+
+### 2026-11-17: CI flakes fixed, sandbox part 2 (Claude access approvals) DONE
+
+CI (`26ec8ac`, `bf51ac6`): five timing flakes, found from the CI logs and heavy local stress
+(GOMAXPROCS=1, two suites at once, Windows and WSL). One was a real bug: idle stop could fire in
+the middle of a slow request (a spawn creating its worktree); requests in flight now keep the hub
+awake. The rest were test races (fake app-server order, mock kill vs stall detection, config
+file written in place / removed while the poller had it open on Windows, a freed port taken by
+another test's hub, a `bytes.Buffer` shared with exec's stderr copier).
+
+Sandbox part 2 (`5bfb9ba`, `c62c17c`), PROTOCOL.md A21:
+- `baton __permit` (`internal/permit`): one-tool MCP stdio server used as claude's
+  `--permission-prompt-tool mcp__baton_access__approve`. Each prompt becomes an access request
+  (A20; new kind `tool` for non-Bash/non-edit tools); the decision goes back as
+  `{"behavior":"allow","updatedInput":...}` / `{"behavior":"deny","message":...}`.
+- Its MCP config (with the run token) is in `<data>/private/<run_id>/access-mcp.json` (0600),
+  outside the worktree and run dir, created before the sandbox deny list is computed, removed at
+  exit and by gc. `MCP_TOOL_TIMEOUT` = ask timeout + 60 s.
+- Sandboxed claude + ask: `allowUnsandboxedCommands: true`, `network.strictAllowlist: false`.
+  Both modes: `autoAllowBashIfSandboxed: true` (claude prompts for sandboxed Bash by default
+  since 2.1.324; with prompts none every Bash call would have been denied: a latent part-1 bug).
+- Unsandboxed claude in `acceptEdits`/`default` + ask uses the same tool (works on native
+  Windows). `Bash(baton:*)` is pre-allowed there so the agent's reports never prompt.
+- Brief: asking agents get a note not to retry a rejected action.
+- Real runs (one claude account, haiku, acceptEdits + ask, ~2 cents): a compound heredoc command
+  prompted and was rejected (Claude got the message, did not retry); a `git commit` prompted,
+  was approved, ran. Single `baton` calls and read-only commands did not prompt.
+
+Still open:
+1. **Sandbox part 3**, `runtime: wsl` for Claude on Windows (not started). Needed to check, for
+   real, that the sandbox's own prompts (unsandboxed retry, a new network host) reach the
+   prompt tool in `-p` mode: the docs don't say, and it can only run on macOS/Linux/WSL2.
+2. Small: an agent tried `baton ask ... --blocking=false`; the CLI rejects a value on a boolean
+   flag (usage error, exit 2). Accepting `=true|false` would be friendlier.
+3. Optional (quota): one long-thinking claude run to confirm no `stalled` events while it
+   thinks. Partial messages already parse fine (today's runs had them on).
+
 
 ### UX fix cycle (2026-11-10), DONE (one optional real run left)
 
@@ -251,6 +289,10 @@ Open (ask the user):
   only with `--force`, branches never deleted. Release = local `npm run release` (GitHub Releases
   workflow later, needs the `workflow` token scope). Hardening = error-path tests + one code review.
   The conductor's own usage counts toward its account's totals.
+
+- 2026-11-17: sandbox part 2 next (before part 3). Claude prompts go to an MCP permission tool
+  (`baton __permit`) -> access requests; also for unsandboxed `acceptEdits`/`default` accounts
+  with `ask`; the agent's `baton` reports pre-allowed there. One small real run approved first.
 
 ## G. Privacy rule for this repo (public)
 
