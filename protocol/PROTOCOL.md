@@ -511,7 +511,14 @@ MultiEdit/NotebookEdit -> `file_change` (detail `path`), WebFetch/WebSearch and 
 timeout (A8), withdraws the request on timeout (`cancel`), and answers Claude with one text
 item: `{"behavior":"allow","updatedInput":<input as received>}` or
 `{"behavior":"deny","message":"..."}`. Claude waits on the call: `MCP_TOOL_TIMEOUT` is set to
-the ask timeout plus 60 s.
+the ask timeout plus 60 s. Claude calls the tool with `{tool_name, input, tool_use_id}`
+(checked with real runs, claude 2.1.326: Bash input `{command, description}`); a deny reaches
+the model as an error tool result carrying the message.
+
+In `acceptEdits` and `default` mode the agent's own reports are pre-allowed
+(`--allowedTools Bash(baton:*)`, added to the account's `allowed_tools`), so they never prompt.
+A compound command (several lines, a heredoc) is not covered by that rule and does prompt.
+Claude itself lets read-only commands (`git log`, `whoami`, ...) through without a prompt.
 
 Sandboxed Claude settings: `autoAllowBashIfSandboxed: true` (sandboxed commands never prompt).
 With ask: `allowUnsandboxedCommands: true` (a blocked command may ask to run outside the

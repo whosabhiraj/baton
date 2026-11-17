@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/whosabhiraj/baton/internal/config"
@@ -17,9 +18,18 @@ func (claude) Argv(acct config.Account, model, effort string) ([]string, error) 
 	}
 	argv := claudeBase(model, effort)
 	argv = append(argv, permissionFlags(acct.Permissions)...)
-	argv = append(argv, claudeToolFlags(acct.Permissions)...)
+	p := acct.Permissions
+	if p.Mode == "acceptEdits" || p.Mode == "default" {
+		// the agent reports through `baton`: without this every report would wait for the
+		// user's OK (or be refused when nobody is asked)
+		p.AllowedTools = append(slices.Clone(p.AllowedTools), BatonBashRule)
+	}
+	argv = append(argv, claudeToolFlags(p)...)
 	return append(argv, acct.Permissions.ExtraArgs...), nil
 }
+
+// BatonBashRule allows the agent's own `baton` reports in modes where Bash would prompt.
+const BatonBashRule = "Bash(baton:*)"
 
 func claudeBase(model, effort string) []string {
 	// partial messages stream thinking and text as it is written: a sign of life during long

@@ -38,11 +38,14 @@ func TestClaudeArgv(t *testing.T) {
 		{"permissive+model+effort", config.Account{Permissions: config.Permissions{Mode: "permissive"}}, "opus", "high",
 			cat(base, []string{"--model", "opus", "--effort", "high", "--permission-mode", "bypassPermissions"})},
 		{"acceptEdits", config.Account{Permissions: config.Permissions{Mode: "acceptEdits"}}, "default", "",
-			cat(base, []string{"--permission-mode", "acceptEdits"})},
-		{"default mode no flag", config.Account{Permissions: config.Permissions{Mode: "default"}}, "", "", base},
+			cat(base, []string{"--permission-mode", "acceptEdits", "--allowedTools", "Bash(baton:*)"})},
+		{"default mode no flag", config.Account{Permissions: config.Permissions{Mode: "default"}}, "", "",
+			cat(base, []string{"--allowedTools", "Bash(baton:*)"})},
 		{"tools and extra", config.Account{Permissions: config.Permissions{Mode: "default", AllowedTools: []string{"Bash", "Edit"},
 			DeniedTools: []string{"WebFetch"}, ExtraArgs: []string{"--max-turns", "9"}}}, "", "",
-			cat(base, []string{"--allowedTools", "Bash,Edit", "--disallowedTools", "WebFetch", "--max-turns", "9"})},
+			cat(base, []string{"--allowedTools", "Bash,Edit,Bash(baton:*)", "--disallowedTools", "WebFetch", "--max-turns", "9"})},
+		{"permissive needs no rule", config.Account{Permissions: config.Permissions{Mode: "permissive", AllowedTools: []string{"Edit"}}}, "", "",
+			cat(base, []string{"--permission-mode", "bypassPermissions", "--allowedTools", "Edit"})},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
