@@ -86,6 +86,17 @@ func fakeAppServer() {
 	time.Sleep(time.Minute) // hang like the real one may: the driver must not wait for us
 }
 
+// syncBuf is a Writer safe for the driver and exec's stderr copier writing at once. A bare
+// bytes.Buffer there loses lines: exec copies with ReadFrom, which reslices the buffer after
+// its read and drops what the driver wrote meanwhile.
+type syncBuf struct {
+	mu sync.Mutex
+	b  bytes.Buffer
+}
+
+func (s *syncBuf) Write(p []byte) (int, error) { s.mu.Lock(); defer s.mu.Unlock(); return s.b.Write(p) }
+func (s *syncBuf) String() string              { s.mu.Lock(); defer s.mu.Unlock(); return s.b.String() }
+
 type fakeHub struct {
 	mu        sync.Mutex
 	decision  string // what GET returns after the first poll
@@ -123,7 +134,8 @@ func runDriver(t *testing.T, hub *fakeHub, timeout time.Duration) (int, string, 
 	t.Setenv(EnvToken, "bt_run_secret") // in our env too: childEnv must strip it for codex
 	t.Setenv("BATON_TOKEN", "bt_run_secret2")
 	env := map[string]string{EnvURL: srv.URL, EnvToken: "bt_run_secret", "BATON_RUN_ID": "r1", EnvCLI: exe}
-	var out, errb bytes.Buffer
+	var out bytes.Buffer
+	var errb syncBuf
 	done := make(chan int, 1)
 	go func() {
 		done <- Run(Options{Args: []string{"-c", "x=1"}, Stdin: strings.NewReader("THE BRIEF"), Stdout: &out, Stderr: &errb,
@@ -202,7 +214,8 @@ func TestDriverNoHub(t *testing.T) {
 	exe, _ := os.Executable()
 	t.Setenv("FAKE_APP_SERVER", "1")
 	env := map[string]string{"BATON_RUN_ID": "r1", EnvCLI: exe} // no URL/token: every request is a no
-	var out, errb bytes.Buffer
+	var out bytes.Buffer
+	var errb syncBuf
 	code := Run(Options{Stdin: strings.NewReader("b"), Stdout: &out, Stderr: &errb, Getenv: func(k string) string { return env[k] }, AskTimeout: time.Second})
 	if code != 0 || !strings.Contains(out.String(), `"decision":"decline"`) || !strings.Contains(errb.String(), "no hub URL") {
 		t.Fatalf("code %d\n%s\n%s", code, out.String(), errb.String())
